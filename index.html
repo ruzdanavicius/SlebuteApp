@@ -2577,6 +2577,7 @@
     // the app stays open.
     const VILNIUS_LAT = 54.6872, VILNIUS_LON = 25.2797;
     let weatherRefreshTimer = null;
+    let weatherEverLoaded = false;
 
     function weatherIconForCode(code) {
         if (code === 0) return 'fa-sun';
@@ -2590,22 +2591,37 @@
     }
 
     async function loadVilniusWeather() {
+        const pillEl = document.getElementById('weatherPill');
         const iconEl = document.getElementById('weatherIcon');
         const tempEl = document.getElementById('weatherTemp');
         if (!iconEl || !tempEl) return;
+        // Time-box the fetch so a stalled connection (captive portal, dead
+        // Wi-Fi) can't leave the request hanging forever.
+        const ctrl = new AbortController();
+        const timeout = setTimeout(() => ctrl.abort(), 6000);
+        let ok = false;
         try {
             const url = `https://api.open-meteo.com/v1/forecast?latitude=${VILNIUS_LAT}&longitude=${VILNIUS_LON}&current_weather=true`;
-            const res = await fetch(url);
-            if (!res.ok) return;
-            const data = await res.json();
-            const cw = data.current_weather;
-            if (!cw) return;
-            iconEl.className = 'fas ' + weatherIconForCode(cw.weathercode);
-            tempEl.innerText = Math.round(cw.temperature) + '°';
+            const res = await fetch(url, { signal: ctrl.signal });
+            if (res.ok) {
+                const data = await res.json();
+                const cw = data && data.current_weather;
+                // Strict: reject null/string/missing, not just NaN (Number(null) === 0).
+                if (cw && typeof cw.temperature === 'number' && Number.isFinite(cw.temperature)) {
+                    iconEl.className = 'fas ' + weatherIconForCode(cw.weathercode);
+                    tempEl.innerText = Math.round(cw.temperature) + '°';
+                    weatherEverLoaded = ok = true;
+                }
+            }
         } catch (e) {
-            // Offline or blocked — leave the last-known value (or the
-            // placeholder) showing rather than surfacing an error.
+            // Offline, blocked, timed out, or bad JSON — never toast, never throw.
+        } finally {
+            clearTimeout(timeout);
         }
+        // Once we've shown a real reading, keep the last-known value on a later
+        // failure. Until then, a failed/garbage response hides the pill entirely
+        // so the cashier isn't left staring at a dangling "—°".
+        if (pillEl) pillEl.classList.toggle('hidden', !ok && !weatherEverLoaded);
     }
 
     function initWeatherWidget() {
