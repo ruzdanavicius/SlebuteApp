@@ -816,7 +816,7 @@
                 <i class="fas fa-cloud" id="weatherIcon"></i>
                 <span id="weatherTemp">—°</span>
             </div>
-            <div class="nav-btn" id="navOverridePin" style="display:none;" onclick="openSetOverridePinModal()" data-i18n-title="setpin.title" title="Discount-override PIN"><i class="fas fa-key"></i></div>
+            <div class="nav-btn" id="navOverridePin" onclick="openSetOverridePinModal()" data-i18n-title="setpin.title" title="My PIN"><i class="fas fa-key"></i></div>
             <div class="nav-btn" onclick="logout()" data-i18n-title="nav.logout" title="Log out"><i class="fas fa-sign-out-alt"></i></div>
         </nav>
 
@@ -1583,13 +1583,14 @@
         </div>
     </div>
 
-    <!-- SET OVERRIDE PIN MODAL — admin/manager sets their own discount-override PIN -->
+    <!-- SET MY PIN MODAL — any employee sets their own personal PIN -->
     <div class="modal-overlay" id="setOverridePinModal">
         <div class="modal-box narrow">
             <div class="close-modal" onclick="closeModal('setOverridePinModal')"><i class="fas fa-times"></i></div>
             <div class="vm-content">
-                <h2><i class="fas fa-key"></i> <span data-i18n="setpin.title">Discount-override PIN</span></h2>
-                <p class="muted" style="font-size:0.85rem; margin: 8px 0 4px;" data-i18n="setpin.hint">This PIN lets you approve a cashier's discount over 25% at the till without logging in.</p>
+                <h2><i class="fas fa-key"></i> <span data-i18n="setpin.title">My PIN</span></h2>
+                <p class="muted" style="font-size:0.85rem; margin: 8px 0 4px;" data-i18n="setpin.hint">Your personal 4–6 digit PIN. Managers and admins use it to approve a cashier's discount over 25% at the till. Staff PIN quick-login will use the same PIN later.</p>
+                <p class="muted" id="setOverridePinStatus" style="font-size:0.8rem; margin: 0 0 4px;"></p>
                 <div class="form-group mt-14">
                     <label data-i18n="setpin.new_label">New PIN (4–6 digits)</label>
                     <input type="password" inputmode="numeric" autocomplete="off" maxlength="6" class="form-input" id="setOverridePinInput" placeholder="••••">
@@ -1743,8 +1744,9 @@
             'discount.override_bad_pin': "That PIN wasn't accepted.", 'discount.override_pin_bad_format': 'Enter the 4–6 digit PIN.',
             'discount.override_approved': 'Discount approved.', 'discount.override_needed': 'This discount needs admin/manager approval.',
             'discount.override_offline': 'Discounts over 25% need a connection so a manager can approve.',
-            'setpin.title': 'Discount-override PIN', 'setpin.hint': "This PIN lets you approve a cashier's discount over 25% at the till without logging in.",
+            'setpin.title': 'My PIN', 'setpin.hint': "Your personal 4–6 digit PIN. Managers and admins use it to approve a cashier's discount over 25% at the till. Staff PIN quick-login will use the same PIN later.",
             'setpin.new_label': 'New PIN (4–6 digits)', 'setpin.save': 'Save PIN', 'setpin.saved': 'PIN saved.', 'setpin.bad_format': 'PIN must be 4–6 digits.',
+            'setpin.already_set': 'You already have a PIN — enter a new one to change it.', 'setpin.not_set': "You don't have a PIN set yet.",
             'cart.split_cash_label': 'Cash (€)', 'cart.split_card_label': 'Card (€)',
             'cart.total': 'Total', 'cart.change_due': 'Change due', 'cart.checkout': 'Checkout',
             'vm.stock_note': 'Stock shown is for the location you are viewing.',
@@ -2017,8 +2019,9 @@
             'discount.override_bad_pin': 'PIN nepriimtas.', 'discount.override_pin_bad_format': 'Įveskite 4–6 skaitmenų PIN.',
             'discount.override_approved': 'Nuolaida patvirtinta.', 'discount.override_needed': 'Šiai nuolaidai reikia administratoriaus/vadovo patvirtinimo.',
             'discount.override_offline': 'Nuolaidoms virš 25% reikia ryšio, kad vadovas galėtų patvirtinti.',
-            'setpin.title': 'Nuolaidų patvirtinimo PIN', 'setpin.hint': 'Šis PIN leidžia kasoje patvirtinti kasininko nuolaidą virš 25% neprisijungiant.',
+            'setpin.title': 'Mano PIN', 'setpin.hint': 'Jūsų asmeninis 4–6 skaitmenų PIN. Vadovai ir administratoriai juo kasoje patvirtina kasininko nuolaidą virš 25%. Vėliau tuo pačiu PIN bus galima greitai prisijungti.',
             'setpin.new_label': 'Naujas PIN (4–6 skaitmenys)', 'setpin.save': 'Išsaugoti PIN', 'setpin.saved': 'PIN išsaugotas.', 'setpin.bad_format': 'PIN turi būti 4–6 skaitmenys.',
+            'setpin.already_set': 'PIN jau nustatytas — įveskite naują, jei norite pakeisti.', 'setpin.not_set': 'PIN dar nenustatytas.',
             'cart.split_cash_label': 'Grynieji (€)', 'cart.split_card_label': 'Kortelė (€)',
             'cart.total': 'Viso', 'cart.change_due': 'Grąža', 'cart.checkout': 'Apmokėti',
             'vm.stock_note': 'Rodomas kiekis yra peržiūrimoje parduotuvėje.',
@@ -2589,7 +2592,6 @@
         document.getElementById('navInventory').style.display = (PROFILE.role === 'admin' || PROFILE.role === 'manager') ? 'flex' : 'none';
         document.getElementById('navDashboard').style.display = (PROFILE.role === 'admin' || PROFILE.role === 'manager') ? 'flex' : 'none';
         document.getElementById('navSuppliers').style.display = (PROFILE.role === 'admin' || PROFILE.role === 'manager') ? 'flex' : 'none';
-        document.getElementById('navOverridePin').style.display = (PROFILE.role === 'admin' || PROFILE.role === 'manager') ? 'flex' : 'none';
         updateCachedLoginBanner();
         toast(t('offline.profile_reverified_toast'), 'success');
     }
@@ -2695,7 +2697,6 @@
         document.getElementById('navInventory').style.display = (PROFILE.role === 'admin' || PROFILE.role === 'manager') ? 'flex' : 'none';
         document.getElementById('navDashboard').style.display = (PROFILE.role === 'admin' || PROFILE.role === 'manager') ? 'flex' : 'none';
         document.getElementById('navSuppliers').style.display = (PROFILE.role === 'admin' || PROFILE.role === 'manager') ? 'flex' : 'none';
-        document.getElementById('navOverridePin').style.display = (PROFILE.role === 'admin' || PROFILE.role === 'manager') ? 'flex' : 'none';
         document.getElementById('escposBtn').classList.toggle('hidden', !('serial' in navigator));
         updateCachedLoginBanner();
         initWeatherWidget(); // fire-and-forget, never blocks app boot
@@ -3606,17 +3607,23 @@
         if (_discountOverrideResolver) { _discountOverrideResolver(false); _discountOverrideResolver = null; }
     }
 
-    function openSetOverridePinModal() {
+    async function openSetOverridePinModal() {
         document.getElementById('setOverridePinInput').value = '';
         document.getElementById('setOverridePinMsg').textContent = '';
+        const statusEl = document.getElementById('setOverridePinStatus');
+        statusEl.textContent = '';
         document.getElementById('setOverridePinModal').classList.add('active');
         setTimeout(() => document.getElementById('setOverridePinInput').focus(), 50);
+        try {
+            const { data } = await sb.rpc('rpc_has_pin');
+            statusEl.textContent = data ? t('setpin.already_set') : t('setpin.not_set');
+        } catch (e) { /* non-critical */ }
     }
     async function saveOverridePin() {
         const pin = document.getElementById('setOverridePinInput').value.trim();
         const msg = document.getElementById('setOverridePinMsg');
         if (!/^[0-9]{4,6}$/.test(pin)) { msg.style.color = 'var(--danger-color)'; msg.textContent = t('setpin.bad_format'); return; }
-        const { error } = await sb.rpc('rpc_set_override_pin', { p_pin: pin });
+        const { error } = await sb.rpc('rpc_set_my_pin', { p_pin: pin });
         if (error) { msg.style.color = 'var(--danger-color)'; msg.textContent = error.message; return; }
         msg.style.color = 'var(--success-color)'; msg.textContent = t('setpin.saved');
         toast(t('setpin.saved'), 'success');
