@@ -568,11 +568,7 @@
         .note-type-chips { display:flex; gap: 8px; margin-bottom: 12px; flex-wrap:wrap; }
         .note-chip { font-size: 0.78rem; font-weight:600; padding: 6px 14px; border-radius: 20px; border: 1px solid rgba(36,22,30,0.16); background: var(--card-bg); color: var(--text-secondary); cursor:pointer; }
         .note-chip.active { background: var(--accent-tint); color: var(--accent-color); border-color: var(--accent-color); }
-        .note-textarea-wrap { position:relative; }
-        .note-textarea-wrap textarea { width:100%; resize:vertical; padding-right: 40px; }
-        .note-mic-btn { position:absolute; right: 8px; bottom: 8px; }
-        .note-mic-btn.recording { background: var(--danger-color); color: white; animation: note-mic-pulse 1.4s ease-in-out infinite; }
-        @keyframes note-mic-pulse { 0%,100% { opacity:1; } 50% { opacity:0.55; } }
+        .note-textarea-wrap textarea { width:100%; resize:vertical; }
         .note-review-list { display:flex; flex-direction:column; }
         .note-review-row { display:flex; align-items:flex-start; gap: 12px; padding: 12px 0; border-bottom: 1px solid rgba(36,22,30,0.06); }
         .note-review-row:last-child { border-bottom: none; }
@@ -1434,8 +1430,7 @@
                     <button type="button" class="note-chip" data-type="OTHER" onclick="selectNoteType('OTHER')" data-i18n="note.type_other">Other</button>
                 </div>
                 <div class="note-textarea-wrap">
-                    <textarea id="noteBody" class="form-input" rows="4" data-i18n-placeholder="note.placeholder" placeholder="Type your note here, or tap the microphone icon to dictate"></textarea>
-                    <button type="button" class="icon-btn-sm note-mic-btn" id="noteMicBtn" onclick="toggleNoteDictation()" title="Dictate" style="display:none;"><i class="fas fa-microphone"></i></button>
+                    <textarea id="noteBody" class="form-input" rows="4" data-i18n-placeholder="note.placeholder" placeholder="Type your note here"></textarea>
                 </div>
                 <p class="muted" id="noteError" style="font-size:0.8rem; color:var(--danger-color); min-height:1.1em;"></p>
                 <button class="btn btn-primary btn-block mt-14" onclick="submitCustomerNote()"><i class="fas fa-check"></i> <span data-i18n="note.submit">Save note</span></button>
@@ -1847,8 +1842,8 @@
             'reorder.total_items': 'Line items', 'reorder.total_units': 'Total units', 'reorder.qty_update_error': 'Could not update quantity:',
             'nav.customer_note': 'Customer note', 'note.title': 'Quick note', 'note.subtitle': "Product ideas, comments, notes, or customer feedback.",
             'note.type_product': 'Product idea', 'note.type_feedback': 'Feedback', 'note.type_other': 'Other',
-            'note.placeholder': 'Type your note here, or tap the microphone icon to dictate', 'note.submit': 'Save note', 'note.empty_error': 'Write something first.',
-            'note.save_error': 'Could not save that:', 'note.saved_toast': 'Note saved.', 'note.mic_error': 'Voice input had a problem',
+            'note.placeholder': 'Type your note here', 'note.submit': 'Save note', 'note.empty_error': 'Write something first.',
+            'note.save_error': 'Could not save that:', 'note.saved_toast': 'Note saved.',
             'note.review_title': 'What customers are asking for', 'note.review_empty': "No new notes since you last checked.",
             'note.review_more_suffix': 'more to review', 'note.mark_reviewed': 'Mark reviewed',
             'note.type_badge_product_idea': 'Product idea', 'note.type_badge_feedback': 'Feedback', 'note.type_badge_other': 'Other',
@@ -2110,8 +2105,8 @@
             'reorder.total_items': 'Prekių eilutės', 'reorder.total_units': 'Viso vienetų', 'reorder.qty_update_error': 'Nepavyko atnaujinti kiekio:',
             'nav.customer_note': 'Pastaba', 'note.title': 'Greita pastaba', 'note.subtitle': 'Prekių idėjos, komentarai, pastabos arba klientų atsiliepimai.',
             'note.type_product': 'Prekės idėja', 'note.type_feedback': 'Atsiliepimas', 'note.type_other': 'Kita',
-            'note.placeholder': 'Komentarą rašykite čia, arba spauskite mikrofono simbolį ir padiktuokite balsu', 'note.submit': 'Išsaugoti', 'note.empty_error': 'Pirmiausia parašykite tekstą.',
-            'note.save_error': 'Nepavyko išsaugoti:', 'note.saved_toast': 'Pastaba išsaugota.', 'note.mic_error': 'Balso įvestis su triktimi',
+            'note.placeholder': 'Komentarą rašykite čia', 'note.submit': 'Išsaugoti', 'note.empty_error': 'Pirmiausia parašykite tekstą.',
+            'note.save_error': 'Nepavyko išsaugoti:', 'note.saved_toast': 'Pastaba išsaugota.',
             'note.review_title': 'Ko klientai klausia', 'note.review_empty': 'Naujų pastabų nėra.',
             'note.review_more_suffix': 'dar reikia peržiūrėti', 'note.mark_reviewed': 'Pažymėti kaip peržiūrėtą',
             'note.type_badge_product_idea': 'Prekės idėja', 'note.type_badge_feedback': 'Atsiliepimas', 'note.type_badge_other': 'Kita',
@@ -2344,8 +2339,6 @@
     // Customer note capture — no localStorage needed, this is a single
     // short-lived modal interaction, not something that survives a refresh.
     let selectedNoteType = null;
-    let noteDictationActive = false;
-    let noteSpeechRecognition = null;
 
     let cart = [];
     let paymentMethod = 'CASH';
@@ -7386,12 +7379,10 @@
         document.getElementById('noteError').textContent = '';
         selectedNoteType = null;
         document.querySelectorAll('#noteTypeChips .note-chip').forEach(b => b.classList.remove('active'));
-        setupNoteMicButton();
         document.getElementById('noteCaptureModal').classList.add('active');
     }
 
     function closeNoteCaptureModal() {
-        stopNoteDictation();
         closeModal('noteCaptureModal');
     }
 
@@ -7402,78 +7393,11 @@
         });
     }
 
-    // Voice dictation — the browser's own Web Speech API, no new backend, no
-    // API cost. Firefox doesn't implement this (it's behind a disabled-by-
-    // default flag), so the feature-detect below is what keeps this a bonus
-    // input method rather than a broken button: browsers without it simply
-    // never show the mic icon, and typing always works regardless.
-    function setupNoteMicButton() {
-        const btn = document.getElementById('noteMicBtn');
-        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-        btn.style.display = SR ? 'flex' : 'none';
-        noteDictationActive = false;
-        btn.classList.remove('recording');
-    }
-
-    // Speech is appended at the point dictation started, never overwrites
-    // anything already typed, and never auto-submits — the textarea stays
-    // the single thing the person reviews before saving, dictated or not.
-    // Language follows the app's own EN/LT toggle (currentLang), same as
-    // date formatting elsewhere in this file.
-    function toggleNoteDictation() {
-        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SR) return;
-        if (noteDictationActive) { stopNoteDictation(); return; }
-
-        noteSpeechRecognition = new SR();
-        noteSpeechRecognition.lang = currentLang === 'lt' ? 'lt-LT' : 'en-US';
-        noteSpeechRecognition.continuous = true;
-        noteSpeechRecognition.interimResults = false;
-
-        const textarea = document.getElementById('noteBody');
-        const prefix = textarea.value;
-        let finalTranscript = '';
-
-        noteSpeechRecognition.onresult = (event) => {
-            let chunk = '';
-            for (let i = event.resultIndex; i < event.results.length; i++) {
-                if (event.results[i].isFinal) chunk += event.results[i][0].transcript;
-            }
-            if (!chunk) return;
-            finalTranscript += chunk;
-            const sep = prefix && !/[\s\n]$/.test(prefix) ? ' ' : '';
-            textarea.value = prefix + sep + finalTranscript.trim();
-        };
-        noteSpeechRecognition.onerror = (event) => {
-            toast(t('note.mic_error') + ' (' + event.error + ')', 'warn');
-            stopNoteDictation();
-        };
-        noteSpeechRecognition.onend = () => {
-            noteDictationActive = false;
-            document.getElementById('noteMicBtn')?.classList.remove('recording');
-        };
-
-        try {
-            noteSpeechRecognition.start();
-            noteDictationActive = true;
-            document.getElementById('noteMicBtn').classList.add('recording');
-        } catch (e) {
-            toast(t('note.mic_error') + ' (' + e.message + ')', 'warn');
-        }
-    }
-
-    function stopNoteDictation() {
-        if (noteSpeechRecognition) { try { noteSpeechRecognition.stop(); } catch (e) { /* already stopped */ } }
-        noteDictationActive = false;
-        document.getElementById('noteMicBtn')?.classList.remove('recording');
-    }
-
     async function submitCustomerNote() {
         const body = document.getElementById('noteBody').value.trim();
         const errEl = document.getElementById('noteError');
         if (!body) { errEl.textContent = t('note.empty_error'); return; }
         errEl.textContent = '';
-        stopNoteDictation();
 
         try {
             const { error } = await sb.from('customer_notes').insert({
