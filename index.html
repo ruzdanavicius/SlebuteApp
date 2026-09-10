@@ -234,6 +234,8 @@
         .storage-badge { display:inline-block; font-size:0.6rem; font-weight:700; letter-spacing:0.03em; background: #b5760f; color:#fff; border-radius:4px; padding:1px 5px; margin-bottom:3px; }
         .storage-hint-icon { color: #b5760f; font-size: 0.72rem; cursor: pointer; margin-left: 4px; vertical-align: middle; }
         .storage-hint-icon:hover { opacity: 0.7; }
+        .otherloc-hint-icon { color: var(--accent-color); font-size: 0.72rem; cursor: pointer; margin-left: 4px; vertical-align: middle; }
+        .otherloc-hint-icon:hover { opacity: 0.7; }
         .storage-sibling-popup { position: fixed; z-index: 200; background: var(--sidebar-color); border: var(--glass-border); border-radius: 10px; box-shadow: 0 12px 30px rgba(36,22,30,0.25); padding: 10px 12px; font-size: 0.78rem; min-width: 180px; max-width: 260px; }
         .storage-sibling-popup-title { font-weight: 700; margin-bottom: 6px; color: #b5760f; }
         .storage-sibling-popup-row { display:flex; justify-content:space-between; gap:10px; padding: 3px 0; }
@@ -1750,6 +1752,7 @@
             'cart.split_cash_label': 'Cash (€)', 'cart.split_card_label': 'Card (€)',
             'cart.total': 'Total', 'cart.change_due': 'Change due', 'cart.checkout': 'Checkout',
             'vm.stock_note': 'Stock shown is for the location you are viewing.',
+            'vm.stock_at_prefix': 'Stock at', 'vm.tap_to_request': 'tap a size to add it as a transfer request',
             'reqmodal.title': 'Remote Stock Action', 'reqmodal.requesting_from': 'You are requesting items from',
             'reqmodal.reserve_title': 'Reserve for Client', 'reqmodal.reserve_desc': 'Client collects it at that store (48h hold).',
             'reqmodal.client_name': 'Client name', 'reqmodal.client_phone': 'Client phone (optional)',
@@ -1805,6 +1808,7 @@
             'storage.empty': 'No SKUs currently in storage match these filters.',
             'storage.printed_toast': 'Storage list printed.',
             'storage.sibling_hint_title': 'Also in storage (this store):',
+            'otherloc.hint_title': 'Available at the other store:',
             'storage.confirm_move_prefix': 'shows 0 on display, but shows', 'storage.confirm_move_middle': 'in storage —',
             'storage.confirm_move_suffix': 'sell it now? (moves 1 unit to display to match.)',
             'storage.move_failed_prefix': "Couldn't move stock:",
@@ -2030,6 +2034,7 @@
             'cart.split_cash_label': 'Grynieji (€)', 'cart.split_card_label': 'Kortelė (€)',
             'cart.total': 'Viso', 'cart.change_due': 'Grąža', 'cart.checkout': 'Apmokėti',
             'vm.stock_note': 'Rodomas kiekis yra peržiūrimoje parduotuvėje.',
+            'vm.stock_at_prefix': 'Atsargos —', 'vm.tap_to_request': 'palieskite dydį, kad pridėtumėte kaip perkėlimo užklausą',
             'reqmodal.title': 'Nuotolinis prekių veiksmas', 'reqmodal.requesting_from': 'Užsakote prekes iš',
             'reqmodal.reserve_title': 'Rezervuoti klientui', 'reqmodal.reserve_desc': 'Klientas atsiima toje parduotuvėje (laikoma 48 val.).',
             'reqmodal.client_name': 'Kliento vardas', 'reqmodal.client_phone': 'Kliento telefonas (neprivaloma)',
@@ -2085,6 +2090,7 @@
             'storage.empty': 'Pagal pasirinktus filtrus sandėlyje šiuo metu nieko nėra.',
             'storage.printed_toast': 'Sandėlio sąrašas atspausdintas.',
             'storage.sibling_hint_title': 'Taip pat sandėlyje (šioje parduotuvėje):',
+            'otherloc.hint_title': 'Yra kitoje parduotuvėje:',
             'storage.confirm_move_prefix': 'prekyboje rodo 0, bet sandėlyje rodo', 'storage.confirm_move_middle': 'vnt. —',
             'storage.confirm_move_suffix': 'ar vis tiek parduoti? (1 vnt. bus perkeltas į prekybą.)',
             'storage.move_failed_prefix': 'Nepavyko perkelti prekės:',
@@ -2855,6 +2861,20 @@
     // effect until the next real catalog reload. This is what used to leave
     // the grid stuck showing just the one scanned item, with no way to clear
     // it short of navigating away and back.
+    // After an own-store scan-to-cart: keep the grid on just that style so the
+    // cashier can check its sizes/colours/stock (and the other-location hint)
+    // without it fighting the sale. The style's own barcode sits in the search
+    // box — visible, and cleared by hand or by the next scan to go back to
+    // browsing. (This is the deliberate counterpart to clearBarcodeSearch()'s
+    // "a scan must not leave the grid stuck on one item" rule, which still
+    // applies to the remote-view and master-barcode paths.)
+    function focusGridOnProduct(product) {
+        if (!product) return;
+        lastSearchResults = [product];
+        renderProducts(applyPosFilters([product]));
+        barcodeInput.value = product.base_barcode || '';
+    }
+
     function clearBarcodeSearch() {
         barcodeInput.value = '';
         // Only the "grid was narrowed by a manual/partial search" case
@@ -2902,7 +2922,21 @@
         // steps. This is the one deliberate exception to "storage moves
         // only happen in the Storage tab" — everywhere else (search,
         // grid browsing, Manage Catalog) storage stays managed there.
-        if (hit) { posScanOrSelectVariant(hit.product, hit.variant); clearBarcodeSearch(); return; }
+        if (hit) {
+            // Browsing another store's stock: a scan is a "what else is
+            // available here?" question, not a sale action. Show the variant
+            // picker for that other store and let the cashier tap the size/
+            // colour the customer actually wants — only THAT tap adds a line
+            // (which, in a remote view, becomes a transfer request).
+            if (isRemoteView()) { openProduct(hit.product.id); clearBarcodeSearch(); return; }
+            // Own store: add straight to the cart (never interrupt a sale with
+            // a popup), then narrow the grid to this style so its card — with
+            // its stock pill and the other-location / storage hints — is right
+            // there to glance at or tap for the full picker.
+            posScanOrSelectVariant(hit.product, hit.variant);
+            focusGridOnProduct(hit.product);
+            return;
+        }
         const productMatch = products.find(p => p.base_barcode && p.base_barcode.toLowerCase() === code.toLowerCase());
         if (productMatch) { openProduct(productMatch.id); clearBarcodeSearch(); return; }
 
@@ -3212,7 +3246,11 @@
         if (total <= 0) { pillClass = 'out'; pillText = t('pos.out_of_stock'); }
         else if (p.variants.some(v => availableStock(v) > 0 && availableStock(v) <= v.safetyThreshold)) { pillClass = 'low'; pillText = `${total} — ${t('pos.low_suffix')}`; }
         const siblings = productStorageSiblings(p.id);
-        return { pillClass, pillText, hasStorageSiblings: siblings.length > 0 };
+        return {
+            pillClass, pillText,
+            hasStorageSiblings: siblings.length > 0,
+            hasOtherLocationStock: productOtherLocationSiblings(p.id).length > 0
+        };
     }
 
     function renderProducts(items) {
@@ -3231,10 +3269,13 @@
             const storageHint = meta.hasStorageSiblings
                 ? `<i class="fas fa-box-archive storage-hint-icon" onclick="toggleStorageSiblingHint(event, ${p.id})"></i>`
                 : '';
+            const otherLocHint = meta.hasOtherLocationStock
+                ? `<i class="fas fa-store otherloc-hint-icon" title="${t('otherloc.hint_title')}" onclick="toggleOtherLocationHint(event, ${p.id})"></i>`
+                : '';
             return `<div class="product-card" data-product-id="${p.id}" onclick="openProduct(${p.id})">
                 <img src="${p.image_url || ''}" class="product-img" loading="lazy" decoding="async" onerror="this.style.opacity=0.2">
                 <div class="product-info">
-                    <h3>${escapeHtml(p.name)} ${storageHint}</h3>
+                    <h3>${escapeHtml(p.name)} ${storageHint}${otherLocHint}</h3>
                     <p><span>${p.base_barcode || t('pos.no_barcode')}</span><span class="stock-pill ${meta.pillClass}">${meta.pillText}</span></p>
                 </div>
             </div>`;
@@ -3270,6 +3311,16 @@
         } else if (!meta.hasStorageSiblings && existingHint) {
             existingHint.remove();
         }
+        const existingOther = card.querySelector('.otherloc-hint-icon');
+        if (meta.hasOtherLocationStock && !existingOther) {
+            const icon = document.createElement('i');
+            icon.className = 'fas fa-store otherloc-hint-icon';
+            icon.title = t('otherloc.hint_title');
+            icon.onclick = (e) => toggleOtherLocationHint(e, productId);
+            card.querySelector('.product-info h3')?.appendChild(icon);
+        } else if (!meta.hasOtherLocationStock && existingOther) {
+            existingOther.remove();
+        }
         return true;
     }
 
@@ -3284,6 +3335,13 @@
         document.getElementById('vmImage').src = p.image_url || '';
         document.getElementById('vmTitle').innerText = p.name;
         document.getElementById('vmSku').innerText = t('vm.ref') + ' ' + (p.base_barcode || '---');
+        // Make it unmistakable which store's numbers these are — the picker is
+        // used both to sell from this store and to browse the other store's
+        // stock for a transfer.
+        const vmNote = document.querySelector('#variantModal [data-i18n="vm.stock_note"]');
+        if (vmNote) vmNote.innerText = isRemoteView()
+            ? `${t('vm.stock_at_prefix')} ${STORES.find(s => s.id === VIEW_LOCATION_ID)?.name || ''} — ${t('vm.tap_to_request')}`
+            : t('vm.stock_note');
         // Stock adjustment RPC is available to any authenticated staff member
         // (this shop runs one person per shift, so restricting it to
         // manager/admin would block routine receiving/correction work) — the
@@ -3420,8 +3478,11 @@
 
         if (availableStock(v) > 0) { addToCart(p, v); return; }
 
+        // "Sell it anyway" (storage → display in one tap) is an own-store
+        // exception only — in a remote view there's no local sale to rescue,
+        // and moving another store's storage stock from here would be wrong.
         const storageQty = v.storageStock || 0;
-        if (storageQty > 0) { confirmMoveFromStorage(p.id, v.id); return; }
+        if (storageQty > 0 && !isRemoteView()) { confirmMoveFromStorage(p.id, v.id); return; }
 
         toast(t('toast.no_stock_item'), 'warn');
     }
@@ -3515,6 +3576,58 @@
     function closeStorageSiblingHintOnOutsideClick() {
         document.getElementById('storageSiblingPopup')?.remove();
         document.removeEventListener('click', closeStorageSiblingHintOnOutsideClick);
+    }
+
+    /* ============================================================
+       OTHER-LOCATION HINT — same idea as the storage hint above, but
+       for stock sitting at a DIFFERENT store. A small icon on the
+       product card; a glance-only anchored popup on tap. Never fires
+       on its own, never blocks a sale. To actually pull one of those
+       units the cashier switches to that store's grid (location
+       selector) and taps the size/colour there → transfer request.
+       Reads v.stockByLocation, which rpc_get_pos_catalog() already
+       returns for every store (not just the one being viewed).
+       ============================================================ */
+    function productOtherLocationSiblings(productId) {
+        const p = products.find(x => x.id === productId);
+        if (!p) return [];
+        const rows = [];
+        for (const v of p.variants) {
+            for (const [locId, s] of Object.entries(v.stockByLocation || {})) {
+                if (Number(locId) === VIEW_LOCATION_ID) continue;
+                const qty = (s.quantity || 0), storage = (s.storage || 0);
+                if (qty + storage <= 0) continue;
+                const store = STORES.find(x => x.id === Number(locId));
+                rows.push({ colorName: v.colorName, size: v.size, storeName: store ? store.name : '—', qty, storage });
+            }
+        }
+        return rows;
+    }
+
+    function toggleOtherLocationHint(event, productId) {
+        event.stopPropagation();
+        const existing = document.getElementById('otherLocPopup');
+        if (existing) { existing.remove(); document.removeEventListener('click', closeOtherLocationHintOnOutsideClick); if (existing.dataset.productId == productId) return; }
+
+        const rows = productOtherLocationSiblings(productId);
+        if (!rows.length) return;
+
+        const icon = event.currentTarget;
+        const rect = icon.getBoundingClientRect();
+        const popup = document.createElement('div');
+        popup.id = 'otherLocPopup';
+        popup.className = 'storage-sibling-popup';
+        popup.dataset.productId = productId;
+        popup.style.top = `${rect.bottom + window.scrollY + 6}px`;
+        popup.style.left = `${Math.max(8, rect.left + window.scrollX - 120)}px`;
+        popup.innerHTML = `<div class="storage-sibling-popup-title">${t('otherloc.hint_title')}</div>` +
+            rows.map(s => `<div class="storage-sibling-popup-row"><span>${escapeHtml(s.colorName)} / ${escapeHtml(s.size)} · ${escapeHtml(s.storeName)}</span><span>${s.qty}${s.storage > 0 ? ` (+${s.storage} ${t('storage.in_storage_suffix')})` : ''}</span></div>`).join('');
+        document.body.appendChild(popup);
+        setTimeout(() => document.addEventListener('click', closeOtherLocationHintOnOutsideClick), 0);
+    }
+    function closeOtherLocationHintOnOutsideClick() {
+        document.getElementById('otherLocPopup')?.remove();
+        document.removeEventListener('click', closeOtherLocationHintOnOutsideClick);
     }
 
     function removeFromCart(vid) { const productId = cart.find(c => c.variantId === vid)?.productId; cart = cart.filter(c => c.variantId !== vid); updateCartUI(); refreshPosStockDisplay(productId); }
