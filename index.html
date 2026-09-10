@@ -1920,7 +1920,7 @@
             'register.open_shift': 'Open Shift', 'register.open_shift_btn': 'Open Shift',
             'register.no_shift_open': 'No shift is open yet. Enter the starting cash float to open one.',
             'register.opened': 'Opened', 'register.opening_float': 'Opening float', 'register.orders_today': 'Orders today',
-            'register.cash_sales': 'Cash sales', 'register.card_sales': 'Card sales', 'register.split_sales': 'Split sales', 'register.gift_card_sales': 'Gift card sales',
+            'register.cash_sales': 'Cash sales', 'register.card_sales': 'Card sales', 'register.split_sales': 'Split sales',
             'register.cash_in': 'Cash In', 'register.cash_out': 'Cash Out', 'register.close_shift': 'Close Shift',
             'register.stale_shift_title': 'This shift is still open from a previous day',
             'register.stale_shift_body': "Sales are still reported correctly by their own date, but for clean cash-up, close this till and open a fresh one for today.",
@@ -2183,7 +2183,7 @@
             'register.open_shift': 'Pamainos atidarymas', 'register.open_shift_btn': 'Atidaryti pamainą',
             'register.no_shift_open': 'Pamaina dar neatidaryta. Įveskite pradinę kasos sumą, kad ją atidarytumėte.',
             'register.opened': 'Atidaryta', 'register.opening_float': 'Pradinė suma', 'register.orders_today': 'Šiandienos užsakymai',
-            'register.cash_sales': 'Grynųjų pardavimai', 'register.card_sales': 'Kortelės pardavimai', 'register.split_sales': 'Mišrūs pardavimai', 'register.gift_card_sales': 'Dovanų kortelių pardavimai',
+            'register.cash_sales': 'Grynųjų pardavimai', 'register.card_sales': 'Kortelės pardavimai', 'register.split_sales': 'Mišrūs pardavimai',
             'register.cash_in': 'Grynųjų įnešimas', 'register.cash_out': 'Grynųjų išėmimas', 'register.close_shift': 'Uždaryti pamainą',
             'register.stale_shift_title': 'Ši pamaina vis dar atidaryta nuo ankstesnės dienos',
             'register.stale_shift_body': 'Pardavimai vis tiek teisingai priskiriami savo dienai, bet dėl tvarkingo kasos uždarymo uždarykite šią kasą ir atidarykite naują šiandienai.',
@@ -6374,17 +6374,11 @@
         // any store. It's now wrapped in rpc_get_register_summary(), which
         // enforces "admin sees any register, everyone else only their own
         // store's" server-side. See migration: security_lockdown_anon_access.
-        // QA-AUDIT FIX (gift cards): register_summary only breaks totals out
-        // by cash/card/split, so gift-card sales are queried directly here
-        // instead — orders_select RLS already scopes this to admin-or-own-
-        // store, same as everything else on this screen.
-        const [{ data: summaryRows }, { data: movements }, { data: giftCardOrders }] = await Promise.all([
+        const [{ data: summaryRows }, { data: movements }] = await Promise.all([
             sb.rpc('rpc_get_register_summary', { p_register_id: currentRegister.id }),
-            sb.from('cash_movements').select('*').eq('register_id', currentRegister.id).order('created_at', { ascending: false }),
-            sb.from('orders').select('grand_total').eq('register_id', currentRegister.id).eq('payment_method', 'GIFT_CARD').eq('status', 'COMPLETED')
+            sb.from('cash_movements').select('*').eq('register_id', currentRegister.id).order('created_at', { ascending: false })
         ]);
         const summary = (summaryRows && summaryRows[0]) || null;
-        const giftCardTotal = (giftCardOrders || []).reduce((s, o) => s + Number(o.grand_total || 0), 0);
 
         // Daily Sales is now correctly bucketed by each ORDER's own local
         // calendar date (migration_27), regardless of which register/shift
@@ -6415,7 +6409,6 @@
                 <div class="stat-box"><div class="label">${t('register.cash_sales')}</div><div class="value">${money(summary?.cash_total)}</div></div>
                 <div class="stat-box"><div class="label">${t('register.card_sales')}</div><div class="value">${money(summary?.card_total)}</div></div>
                 <div class="stat-box"><div class="label">${t('register.split_sales')}</div><div class="value">${money(summary?.split_total)}</div></div>
-                <div class="stat-box"><div class="label">${t('register.gift_card_sales')}</div><div class="value">${money(giftCardTotal)}</div></div>
             </div>
             <div style="display:flex; gap:10px; margin-bottom:20px;">
                 <button class="btn btn-success" style="flex:1;" onclick="openMovementModal('CASH_IN')"><i class="fas fa-arrow-down"></i> ${t('register.cash_in')}</button>
