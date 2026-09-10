@@ -1879,6 +1879,11 @@
             'dash.restock_row_stale': 'This item changed — refreshing the list.',
             'dash.restock_transfer_badge': 'Transfer available', 'dash.restock_transfer_title': 'Another store already has enough spare stock of this exact item — move it instead of buying more.',
             'dash.restock_transfer_cta': 'Transfer stock', 'dash.restock_transfer_meta_suffix': 'available at other stores',
+            'dash.restock_rate_wk': 'wk', 'dash.restock_sellthrough': 'sold-through', 'dash.restock_on_order': 'on order', 'dash.restock_keep_prefix': 'keep',
+            'dash.restock_markdown_badge': 'Slow seller', 'dash.restock_markdown_hint': 'Aged stock, low sell-through — consider a markdown rather than reordering.', 'dash.restock_markdown_cta': 'Review for markdown',
+            'rebal.title': 'Move stock between stores', 'rebal.badge_shortfall': 'Short here', 'rebal.badge_consolidate': 'Consolidate',
+            'rebal.move': 'Move', 'rebal.cta': 'Move stock', 'rebal.dismiss': 'Not moving this', 'rebal.more': 'more',
+            'rebal.on_hand': 'on hand', 'rebal.sold_30d': 'sold/30d', 'rebal.has_spare': 'has spare', 'rebal.not_selling': 'not selling here', 'rebal.sells_it': 'sells it',
             'reorder.title': 'Reorder list', 'reorder.empty': "You haven't added anything yet — use the cart icon next to a restock suggestion.",
             'reorder.remove': 'Remove', 'reorder.qty_label': 'Qty', 'reorder.print': 'Print list',
             'reorder.print_confirm_title': 'Print this reorder list?', 'reorder.print_confirm_body': "This finalizes the list — items already printed can't be edited afterward. You can still start a new list for anything added later.",
@@ -2154,6 +2159,11 @@
             'dash.restock_row_stale': 'Ši prekė pasikeitė — atnaujinama.',
             'dash.restock_transfer_badge': 'Galima perkelti', 'dash.restock_transfer_title': 'Kitoje parduotuvėje šios prekės yra pakankamai atsargų — perkelkite ją, o ne užsakykite naujos.',
             'dash.restock_transfer_cta': 'Perkelti atsargas', 'dash.restock_transfer_meta_suffix': 'yra kitose parduotuvėse',
+            'dash.restock_rate_wk': 'sav.', 'dash.restock_sellthrough': 'parduota', 'dash.restock_on_order': 'užsakyta', 'dash.restock_keep_prefix': 'laikyti',
+            'dash.restock_markdown_badge': 'Blogai parduodama', 'dash.restock_markdown_hint': 'Sena prekė, prastas pardavimas – verčiau nukainoti, o ne užsakyti.', 'dash.restock_markdown_cta': 'Peržiūrėti nukainojimą',
+            'rebal.title': 'Perkelti prekes tarp parduotuvių', 'rebal.badge_shortfall': 'Čia trūksta', 'rebal.badge_consolidate': 'Sutelkti',
+            'rebal.move': 'Perkelti', 'rebal.cta': 'Perkelti', 'rebal.dismiss': 'Neperkelsiu', 'rebal.more': 'daugiau',
+            'rebal.on_hand': 'turi', 'rebal.sold_30d': 'parduota/30d', 'rebal.has_spare': 'turi atsargų', 'rebal.not_selling': 'čia neparduodama', 'rebal.sells_it': 'ją parduoda',
             'reorder.title': 'Užsakymo sąrašas', 'reorder.empty': 'Dar nieko nepridėjote — naudokite krepšelio ikoną šalia siūlymo papildyti atsargas.',
             'reorder.remove': 'Pašalinti', 'reorder.qty_label': 'Kiekis', 'reorder.print': 'Spausdinti sąrašą',
             'reorder.print_confirm_title': 'Spausdinti šį užsakymo sąrašą?', 'reorder.print_confirm_body': 'Tai užbaigia sąrašą — jau atspausdintų prekių vėliau redaguoti nebegalėsite. Vėliau pridėtoms prekėms galėsite pradėti naują sąrašą.',
@@ -6149,7 +6159,7 @@
        ============================================================ */
     let rebalanceContext = null;
 
-    function openStockRebalanceModal(variantId) {
+    function openStockRebalanceModal(variantId, prefillFromLocationId = null, prefillQty = 0) {
         let variant = null, product = null;
         for (const p of products) {
             const v = (p.variants || []).find(x => x.id === variantId);
@@ -6169,6 +6179,17 @@
                 { id: storeB.id, name: storeB.name, original: qtyB, qty: qtyB }
             ]
         };
+        // Pre-set the see-saw when opened from a rebalance suggestion: take
+        // prefillQty off the donor, hand it to the other store.
+        if (prefillFromLocationId && prefillQty > 0) {
+            const fromIdx = rebalanceContext.stores.findIndex(s => s.id === prefillFromLocationId);
+            if (fromIdx !== -1) {
+                const total = qtyA + qtyB;
+                const move = Math.min(prefillQty, rebalanceContext.stores[fromIdx].original);
+                rebalanceContext.stores[fromIdx].qty = rebalanceContext.stores[fromIdx].original - move;
+                rebalanceContext.stores[fromIdx === 0 ? 1 : 0].qty = total - rebalanceContext.stores[fromIdx].qty;
+            }
+        }
         document.getElementById('rebalanceItemLabel').innerText =
             `${product.name} — ${variant.colorName} / ${variant.size} · ${variant.sku}`;
         document.getElementById('rebalanceError').innerText = '';
@@ -7077,7 +7098,7 @@
         // store" server-side; p_location_id is left null so the RPC applies
         // that rule itself rather than trusting a client-supplied value.
         // See migration: security_lockdown_anon_access.
-        const [{ data: periodDailyRows }, { data: periodLines }, { data: voided }, { data: restockRows }, { data: notesRows }] = await Promise.all([
+        const [{ data: periodDailyRows }, { data: periodLines }, { data: voided }, { data: restockRows }, { data: notesRows }, { data: rebalanceRows }] = await Promise.all([
             sb.from('v_daily_sales').select('*').gte('sale_date', dashboardPeriod.from).lte('sale_date', dashboardPeriod.to),
             sb.rpc('rpc_get_sales_by_variant', { p_location_id: null, p_date_from: periodStart, p_date_to: periodEnd }),
             sb.from('orders').select('id').in('status', ['VOIDED','REFUNDED']).gte('created_at', periodStart).lte('created_at', periodEnd),
@@ -7088,13 +7109,15 @@
             sb.rpc('rpc_get_replenishment_candidates', { p_location_id: null }),
             // Also not period-scoped, same reasoning: unreviewed notes are a
             // queue to clear, not a metric that resets with the date filter.
-            sb.from('customer_notes').select('*').eq('status', 'OPEN').order('created_at', { ascending: false }).limit(50)
+            sb.from('customer_notes').select('*').eq('status', 'OPEN').order('created_at', { ascending: false }).limit(50),
+            // Suggested inter-store moves — live snapshot, same reasoning as restock.
+            sb.rpc('rpc_get_stock_rebalance', { p_location_id: null })
         ]);
 
-        renderDashboardContent(periodDailyRows || [], periodLines || [], (voided || []).length, restockRows || [], notesRows || []);
+        renderDashboardContent(periodDailyRows || [], periodLines || [], (voided || []).length, restockRows || [], notesRows || [], rebalanceRows || []);
     }
 
-    function renderDashboardContent(periodRows, periodLines, voidedCount, restockRows, notesRows) {
+    function renderDashboardContent(periodRows, periodLines, voidedCount, restockRows, notesRows, rebalanceRows = []) {
         const wrap = document.getElementById('dashboardWrap');
         // Managers are store-scoped by RLS (same as everywhere else in the
         // app) — periodRows/periodLines will only ever contain their own
@@ -7157,6 +7180,8 @@
                 <div id="trendChartHolder"></div>
             </div>
 
+            ${renderRebalanceCard(rebalanceRows, visibleStores, isAdmin)}
+
             ${renderRestockCard(restockRows, visibleStores, isAdmin)}
 
             ${renderCustomerNotesCard(notesRows, visibleStores, isAdmin)}
@@ -7185,16 +7210,24 @@
         const visibleIds = new Set(visibleStores.map(s => s.id));
         const rows = (rawRows || [])
             .filter(r => visibleIds.has(r.location_id))
-            .filter(r => !restockDeclinedThisSession.has(`${r.variant_id}:${r.location_id}`));
+            .filter(r => !restockDeclinedThisSession.has(`${r.variant_id}:${r.location_id}`))
+            // A shortfall the network can fully cover by a transfer belongs in
+            // "Move stock between stores", not "buy more". Markdown candidates
+            // stay here — they're a decision, not a purchase.
+            .filter(r => !r.fulfillable_by_transfer || r.markdown_candidate);
         lastRestockRows = rows;
         const sorted = rows.slice().sort((a, b) => {
+            // markdown candidates sink to the bottom — they're not urgent buys
+            const aMd = a.markdown_candidate ? 1 : 0;
+            const bMd = b.markdown_candidate ? 1 : 0;
+            if (aMd !== bMd) return aMd - bMd;
             const aCrit = a.at_or_below_threshold ? 0 : 1;
             const bCrit = b.at_or_below_threshold ? 0 : 1;
             if (aCrit !== bCrit) return aCrit - bCrit;
             const aDays = a.days_of_cover ?? Infinity;
             const bDays = b.days_of_cover ?? Infinity;
             if (aDays !== bDays) return aDays - bDays;
-            return Number(b.revenue_30d) - Number(a.revenue_30d);
+            return Number(b.revenue_at_risk ?? b.revenue_30d) - Number(a.revenue_at_risk ?? a.revenue_30d);  // [G9]
         });
         return { total: sorted.length, sorted, top: sorted.slice(0, 8) };
     }
@@ -7224,6 +7257,19 @@
         return '';
     }
 
+    // One-line, plain-language "why this number" — managers correct a
+    // suggestion they understand and ignore a black box. [F1]
+    function restockRationale(r) {
+        const parts = [];
+        const wk = Number(r.weekly_rate) || 0;
+        if (wk > 0) parts.push(`~${wk % 1 === 0 ? wk : wk.toFixed(1)}/${t('dash.restock_rate_wk')}`);
+        else parts.push(t('dash.restock_no_recent_sales'));
+        if (r.days_of_cover != null) parts.push(`~${Math.round(r.days_of_cover)} ${t('dash.restock_days_left_suffix')}`);
+        if (r.sell_through_pct != null) parts.push(`${r.sell_through_pct}% ${t('dash.restock_sellthrough')}`);
+        if (Number(r.on_order_qty) > 0) parts.push(`${r.on_order_qty} ${t('dash.restock_on_order')}`);
+        return parts.join(' · ');
+    }
+
     function renderRestockRow(r, showStore) {
         const rawLabel = `${r.product_name} — ${r.color_name} / ${r.size}`;
         const label = escapeHtml(rawLabel);
@@ -7232,12 +7278,32 @@
             ? `onmouseenter="showImgPreview(event, '${escapeHtml(imgUrl)}')" onmousemove="positionImgPreview(event)" onmouseleave="hideImgPreview()"`
             : '';
         const hoverCls = imgUrl ? ' ds-hoverable' : '';
+        const storeSuffix = showStore ? ` · ${escapeHtml(r.location_name)}` : '';
+
+        // Markdown candidate: aged, poor sell-through, still holding stock above
+        // its reserve. This is a "decide" row, not a "buy" row — swap the reorder
+        // controls for a link into the markdown flow. [D2]
+        if (r.markdown_candidate) {
+            return `
+            <div class="restock-row">
+                <div class="restock-info">
+                    <div class="restock-name${hoverCls}" ${hoverAttr}>${label}<span class="ts-sub"> · ${escapeHtml(r.sku)}${storeSuffix}</span></div>
+                    <div class="restock-meta">
+                        <span class="restock-badge watch" title="${t('dash.restock_markdown_hint')}"><i class="fas fa-tag"></i> ${t('dash.restock_markdown_badge')}</span>
+                        <span>${t('dash.restock_in_stock_prefix')} ${r.on_hand_total}</span>
+                        <span class="muted">${restockRationale(r)}</span>
+                    </div>
+                </div>
+                <div class="restock-actions">
+                    <button class="btn btn-ghost" onclick="openMarkdownModal(${r.variant_id}, '${escapeHtml(rawLabel)}', ${Number(r.price) || 0}, ${r.location_id})"><i class="fas fa-tag"></i> ${t('dash.restock_markdown_cta')}</button>
+                    <button class="icon-btn-sm restock-decline-btn" onclick="declineRestockSuggestion(${r.variant_id}, ${r.location_id})" title="${t('dash.restock_decline')}"><i class="fas fa-xmark"></i></button>
+                </div>
+            </div>`;
+        }
+
         const urgencyClass = r.at_or_below_threshold ? 'restock-badge critical' : 'restock-badge watch';
         const urgencyText = r.at_or_below_threshold ? t('dash.restock_critical') : t('dash.restock_watch');
-        const paceText = r.days_of_cover != null
-            ? `${r.days_of_cover} ${t('dash.restock_days_left_suffix')}`
-            : t('dash.restock_no_recent_sales');
-        const storeSuffix = showStore ? ` · ${escapeHtml(r.location_name)}` : '';
+        const paceText = restockRationale(r);
 
         // fulfillable_by_transfer / transferable_qty_available come from
         // v_replenishment_candidates (migration_15, velocity-aware since
@@ -7290,8 +7356,8 @@
                     <div class="restock-meta">
                         <span class="${urgencyClass}">${urgencyText}</span>
                         ${transferBadge}
-                        <span>${t('dash.restock_in_stock_prefix')} ${r.current_quantity} (${t('dash.restock_threshold_prefix')} ${r.safety_stock_threshold})</span>
-                        <span>${paceText}</span>
+                        <span>${t('dash.restock_in_stock_prefix')} ${r.current_quantity}${Number(r.storage_quantity) > 0 ? ` (+${r.storage_quantity} ${t('storage.in_storage_suffix')})` : ''} · ${t('dash.restock_keep_prefix')} ~${r.reserve_qty}</span>
+                        <span class="muted">${paceText}</span>
                         ${transferMeta}
                     </div>
                 </div>
@@ -7301,6 +7367,64 @@
                     ${extraIconsHtml}
                 </div>
             </div>`;
+    }
+
+    // "Move stock between stores" — reads v_stock_rebalance (rpc_get_stock_rebalance).
+    // SHORTFALL rows first (a store is below its own pace-based reserve and another
+    // store has spare), then CONSOLIDATE (a store sells it, another is sitting on
+    // dead stock of it). Suggest-only: the button opens the existing rebalance modal
+    // pre-set to the suggested move, the manager confirms.
+    let rebalanceDismissedThisSession = new Set();
+    function renderRebalanceCard(rebalanceRows, visibleStores, isAdmin) {
+        const visibleIds = new Set(visibleStores.map(s => s.id));
+        const rows = (rebalanceRows || [])
+            .filter(r => visibleIds.has(r.donor_location_id) && visibleIds.has(r.receiver_location_id))
+            .filter(r => Number(r.move_qty) > 0)
+            .filter(r => !rebalanceDismissedThisSession.has(`${r.variant_id}:${r.donor_location_id}:${r.receiver_location_id}`))
+            .sort((a, b) => {
+                const aS = a.reason === 'SHORTFALL' ? 0 : 1;
+                const bS = b.reason === 'SHORTFALL' ? 0 : 1;
+                if (aS !== bS) return aS - bS;
+                return Number(b.move_value) - Number(a.move_value);
+            });
+        if (rows.length === 0) return '';  // nothing to move — don't show an empty card
+        const top = rows.slice(0, 6);
+        const rowHtml = top.map(r => {
+            const label = escapeHtml(`${r.product_name} — ${r.color_name} / ${r.size}`);
+            const shortfall = r.reason === 'SHORTFALL';
+            const badge = shortfall
+                ? `<span class="restock-badge critical">${t('rebal.badge_shortfall')}</span>`
+                : `<span class="restock-badge watch">${t('rebal.badge_consolidate')}</span>`;
+            const why = shortfall
+                ? `${escapeHtml(r.receiver_name)}: ${r.receiver_on_hand} ${t('rebal.on_hand')}, ${r.receiver_units_30d} ${t('rebal.sold_30d')} · ${escapeHtml(r.donor_name)} ${t('rebal.has_spare')} ${r.donor_surplus}`
+                : `${escapeHtml(r.donor_name)}: ${r.donor_on_hand} ${t('rebal.on_hand')}, ${t('rebal.not_selling')} · ${escapeHtml(r.receiver_name)} ${t('rebal.sells_it')} (${r.receiver_units_30d}/30d)`;
+            return `<div class="restock-row is-transferable">
+                <div class="restock-info">
+                    <div class="restock-name">${label}<span class="ts-sub"> · ${escapeHtml(r.sku)}</span></div>
+                    <div class="restock-meta">
+                        ${badge}
+                        <span><i class="fas fa-right-left"></i> ${t('rebal.move')} <b>${r.move_qty}</b> · ${escapeHtml(r.donor_name)} → ${escapeHtml(r.receiver_name)}</span>
+                        <span class="muted">${why}</span>
+                    </div>
+                </div>
+                <div class="restock-actions">
+                    <button class="btn btn-ghost restock-transfer-btn" onclick="openStockRebalanceModal(${r.variant_id}, ${r.donor_location_id}, ${r.move_qty})"><i class="fas fa-truck"></i> ${t('rebal.cta')}</button>
+                    <button class="icon-btn-sm restock-decline-btn" onclick="dismissRebalanceSuggestion(${r.variant_id}, ${r.donor_location_id}, ${r.receiver_location_id})" title="${t('rebal.dismiss')}"><i class="fas fa-xmark"></i></button>
+                </div>
+            </div>`;
+        }).join('');
+        const more = rows.length - top.length;
+        return `<div class="section-card" id="rebalanceCard">
+            <div class="restock-card-head">
+                <h3>${t('rebal.title')} <span class="muted" style="font-weight:400; font-size:0.8rem;">(${rows.length})</span></h3>
+            </div>
+            <div class="restock-list">${rowHtml}</div>
+            ${more > 0 ? `<p class="muted" style="font-size:0.8rem; margin-top:8px;">+${more} ${t('rebal.more')}</p>` : ''}
+        </div>`;
+    }
+    function dismissRebalanceSuggestion(variantId, donorId, receiverId) {
+        rebalanceDismissedThisSession.add(`${variantId}:${donorId}:${receiverId}`);
+        renderDashboardView(true);
     }
 
     function renderRestockCard(restockRows, visibleStores, isAdmin) {
