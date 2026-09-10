@@ -816,6 +816,7 @@
                 <i class="fas fa-cloud" id="weatherIcon"></i>
                 <span id="weatherTemp">—°</span>
             </div>
+            <div class="nav-btn" id="navOverridePin" style="display:none;" onclick="openSetOverridePinModal()" data-i18n-title="setpin.title" title="Discount-override PIN"><i class="fas fa-key"></i></div>
             <div class="nav-btn" onclick="logout()" data-i18n-title="nav.logout" title="Log out"><i class="fas fa-sign-out-alt"></i></div>
         </nav>
 
@@ -1196,12 +1197,12 @@
 
             <div id="cartControls">
                 <div class="discount-row">
-                    <select id="basketDiscType" onchange="updateCartUI()">
+                    <select id="basketDiscType" onchange="onBasketDiscountChange()">
                         <option value="NONE" data-i18n="cart.no_basket_disc">No basket disc.</option>
                         <option value="PERCENT" data-i18n="cart.percent_off">% off</option>
                         <option value="FIXED" data-i18n="cart.euro_off">€ off</option>
                     </select>
-                    <input type="number" id="basketDiscValue" placeholder="0" min="0" oninput="updateCartUI()">
+                    <input type="number" id="basketDiscValue" placeholder="0" min="0" oninput="updateCartUI()" onchange="onBasketDiscountChange()">
                 </div>
 
                 <div class="payment-tabs" id="paymentTabs">
@@ -1565,6 +1566,40 @@
         </div>
     </div>
 
+    <!-- DISCOUNT OVERRIDE MODAL — admin/manager PIN to allow a >25% discount -->
+    <div class="modal-overlay" id="discountOverrideModal">
+        <div class="modal-box narrow">
+            <div class="close-modal" onclick="cancelDiscountOverride()"><i class="fas fa-times"></i></div>
+            <div class="vm-content">
+                <h2><i class="fas fa-user-shield"></i> <span data-i18n="discount.override_title">Manager approval needed</span></h2>
+                <p class="muted" style="font-size:0.85rem; margin: 8px 0 4px;" data-i18n="discount.override_hint">A discount over 25% needs an admin or manager PIN.</p>
+                <div class="form-group mt-14">
+                    <label data-i18n="discount.override_pin_label">Admin / manager PIN</label>
+                    <input type="password" inputmode="numeric" autocomplete="off" maxlength="6" class="form-input" id="discountOverridePinInput" placeholder="••••" onkeydown="if(event.key==='Enter')submitDiscountOverride()">
+                </div>
+                <p class="muted" id="discountOverrideError" style="font-size:0.8rem; color:var(--danger-color); min-height:1.1em;"></p>
+                <button class="btn btn-primary btn-block mt-14" onclick="submitDiscountOverride()"><i class="fas fa-check"></i> <span data-i18n="discount.override_ok">Approve</span></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SET OVERRIDE PIN MODAL — admin/manager sets their own discount-override PIN -->
+    <div class="modal-overlay" id="setOverridePinModal">
+        <div class="modal-box narrow">
+            <div class="close-modal" onclick="closeModal('setOverridePinModal')"><i class="fas fa-times"></i></div>
+            <div class="vm-content">
+                <h2><i class="fas fa-key"></i> <span data-i18n="setpin.title">Discount-override PIN</span></h2>
+                <p class="muted" style="font-size:0.85rem; margin: 8px 0 4px;" data-i18n="setpin.hint">This PIN lets you approve a cashier's discount over 25% at the till without logging in.</p>
+                <div class="form-group mt-14">
+                    <label data-i18n="setpin.new_label">New PIN (4–6 digits)</label>
+                    <input type="password" inputmode="numeric" autocomplete="off" maxlength="6" class="form-input" id="setOverridePinInput" placeholder="••••">
+                </div>
+                <p class="muted" id="setOverridePinMsg" style="font-size:0.8rem; min-height:1.1em;"></p>
+                <button class="btn btn-primary btn-block mt-14" onclick="saveOverridePin()"><i class="fas fa-check"></i> <span data-i18n="setpin.save">Save PIN</span></button>
+            </div>
+        </div>
+    </div>
+
     <!-- OFFLINE SALE QUEUE MODAL -->
     <div class="modal-overlay" id="pendingSalesModal">
         <div class="modal-box wide">
@@ -1702,6 +1737,14 @@
             'cart.no_basket_disc': 'No basket disc.', 'cart.percent_off': '% off', 'cart.euro_off': '€ off',
             'cart.cash': 'Cash', 'cart.card': 'Card', 'cart.split': 'Split', 'cart.gift_card': 'Gift Card',
             'cart.cash_tendered': 'Cash tendered (€)', 'cart.subtotal': 'Subtotal', 'cart.discount': 'Discount',
+            'discount.cap_toast': 'Discounts over 25% need manager approval — reverted to 25%.',
+            'discount.override_title': 'Manager approval needed', 'discount.override_hint': 'A discount over 25% needs an admin or manager PIN.',
+            'discount.override_pin_label': 'Admin / manager PIN', 'discount.override_ok': 'Approve',
+            'discount.override_bad_pin': "That PIN wasn't accepted.", 'discount.override_pin_bad_format': 'Enter the 4–6 digit PIN.',
+            'discount.override_approved': 'Discount approved.', 'discount.override_needed': 'This discount needs admin/manager approval.',
+            'discount.override_offline': 'Discounts over 25% need a connection so a manager can approve.',
+            'setpin.title': 'Discount-override PIN', 'setpin.hint': "This PIN lets you approve a cashier's discount over 25% at the till without logging in.",
+            'setpin.new_label': 'New PIN (4–6 digits)', 'setpin.save': 'Save PIN', 'setpin.saved': 'PIN saved.', 'setpin.bad_format': 'PIN must be 4–6 digits.',
             'cart.split_cash_label': 'Cash (€)', 'cart.split_card_label': 'Card (€)',
             'cart.total': 'Total', 'cart.change_due': 'Change due', 'cart.checkout': 'Checkout',
             'vm.stock_note': 'Stock shown is for the location you are viewing.',
@@ -1968,6 +2011,14 @@
             'cart.no_basket_disc': 'Be nuolaidos', 'cart.percent_off': '% nuolaida', 'cart.euro_off': '€ nuolaida',
             'cart.cash': 'Grynieji', 'cart.card': 'Kortelė', 'cart.split': 'Mišrus', 'cart.gift_card': 'Dovanų kortelė',
             'cart.cash_tendered': 'Gauta grynaisiais (€)', 'cart.subtotal': 'Tarpinė suma', 'cart.discount': 'Nuolaida',
+            'discount.cap_toast': 'Nuolaidoms virš 25% reikia vadovo patvirtinimo — grąžinta iki 25%.',
+            'discount.override_title': 'Reikia vadovo patvirtinimo', 'discount.override_hint': 'Nuolaidai virš 25% reikia administratoriaus ar vadovo PIN.',
+            'discount.override_pin_label': 'Administratoriaus / vadovo PIN', 'discount.override_ok': 'Patvirtinti',
+            'discount.override_bad_pin': 'PIN nepriimtas.', 'discount.override_pin_bad_format': 'Įveskite 4–6 skaitmenų PIN.',
+            'discount.override_approved': 'Nuolaida patvirtinta.', 'discount.override_needed': 'Šiai nuolaidai reikia administratoriaus/vadovo patvirtinimo.',
+            'discount.override_offline': 'Nuolaidoms virš 25% reikia ryšio, kad vadovas galėtų patvirtinti.',
+            'setpin.title': 'Nuolaidų patvirtinimo PIN', 'setpin.hint': 'Šis PIN leidžia kasoje patvirtinti kasininko nuolaidą virš 25% neprisijungiant.',
+            'setpin.new_label': 'Naujas PIN (4–6 skaitmenys)', 'setpin.save': 'Išsaugoti PIN', 'setpin.saved': 'PIN išsaugotas.', 'setpin.bad_format': 'PIN turi būti 4–6 skaitmenys.',
             'cart.split_cash_label': 'Grynieji (€)', 'cart.split_card_label': 'Kortelė (€)',
             'cart.total': 'Viso', 'cart.change_due': 'Grąža', 'cart.checkout': 'Apmokėti',
             'vm.stock_note': 'Rodomas kiekis yra peržiūrimoje parduotuvėje.',
@@ -2347,6 +2398,12 @@
     let selectedNoteType = null;
 
     let cart = [];
+    // Discount cap (CLAUDE.md §11): a cashier can't apply an effective discount
+    // over CASHIER_DISCOUNT_CAP % without an admin/manager PIN. discountOverridePin
+    // holds an accepted PIN for the CURRENT sale only — cleared on startNewSale().
+    // The server (rpc_process_pos_sale) re-verifies; this is the till-side gate.
+    const CASHIER_DISCOUNT_CAP = 25;
+    let discountOverridePin = null;
     let paymentMethod = 'CASH';
     let pickupMethod = 'CARD';
     let currentAdjustTarget = null;  // {variantId, locationId, label}
@@ -2532,6 +2589,7 @@
         document.getElementById('navInventory').style.display = (PROFILE.role === 'admin' || PROFILE.role === 'manager') ? 'flex' : 'none';
         document.getElementById('navDashboard').style.display = (PROFILE.role === 'admin' || PROFILE.role === 'manager') ? 'flex' : 'none';
         document.getElementById('navSuppliers').style.display = (PROFILE.role === 'admin' || PROFILE.role === 'manager') ? 'flex' : 'none';
+        document.getElementById('navOverridePin').style.display = (PROFILE.role === 'admin' || PROFILE.role === 'manager') ? 'flex' : 'none';
         updateCachedLoginBanner();
         toast(t('offline.profile_reverified_toast'), 'success');
     }
@@ -2637,6 +2695,7 @@
         document.getElementById('navInventory').style.display = (PROFILE.role === 'admin' || PROFILE.role === 'manager') ? 'flex' : 'none';
         document.getElementById('navDashboard').style.display = (PROFILE.role === 'admin' || PROFILE.role === 'manager') ? 'flex' : 'none';
         document.getElementById('navSuppliers').style.display = (PROFILE.role === 'admin' || PROFILE.role === 'manager') ? 'flex' : 'none';
+        document.getElementById('navOverridePin').style.display = (PROFILE.role === 'admin' || PROFILE.role === 'manager') ? 'flex' : 'none';
         document.getElementById('escposBtn').classList.toggle('hidden', !('serial' in navigator));
         updateCachedLoginBanner();
         initWeatherWidget(); // fire-and-forget, never blocks app boot
@@ -3466,6 +3525,7 @@
         let pct = parseFloat(val); if (isNaN(pct) || pct < 0) pct = 0; if (pct > 100) pct = 100;
         item.linePct = pct;
         updateCartUI();
+        enforceDiscountCap();
     }
 
     function cartLineTotal(item) { return round2(item.price * item.qty * (1 - item.linePct/100)); }
@@ -3479,6 +3539,88 @@
         if (type === 'PERCENT') return round2(subtotal * val / 100);
         if (type === 'FIXED') return round2(Math.min(val, subtotal));
         return 0;
+    }
+
+    /* ---- Discount cap (CLAUDE.md §11) -------------------------------------
+       A cashier can't take an effective discount over CASHIER_DISCOUNT_CAP %
+       (the bigger of the basket % and any single line's %) without an admin/
+       manager PIN, which unlocks it for the rest of this sale only. The
+       server (rpc_process_pos_sale) re-checks and records the approver. */
+    function effectiveBasketDiscPct() {
+        const type = document.getElementById('basketDiscType').value;
+        const val = parseFloat(document.getElementById('basketDiscValue').value) || 0;
+        if (type === 'PERCENT') return Math.max(0, val);
+        if (type === 'FIXED') { const sub = cartSubtotal(); return sub > 0 ? Math.min(val, sub) / sub * 100 : 0; }
+        return 0;
+    }
+    function effectiveDiscountPct() {
+        return Math.max(effectiveBasketDiscPct(), cart.reduce((m, i) => Math.max(m, i.linePct || 0), 0));
+    }
+    function discountNeedsApproval() {
+        return effectiveDiscountPct() > CASHIER_DISCOUNT_CAP + 0.001 && !isManagerOrAdmin() && !discountOverridePin;
+    }
+    function clampDiscountsToCap() {
+        cart.forEach(i => { if ((i.linePct || 0) > CASHIER_DISCOUNT_CAP) i.linePct = CASHIER_DISCOUNT_CAP; });
+        const type = document.getElementById('basketDiscType').value;
+        const el = document.getElementById('basketDiscValue');
+        const cur = parseFloat(el.value) || 0;
+        if (type === 'PERCENT' && cur > CASHIER_DISCOUNT_CAP) el.value = CASHIER_DISCOUNT_CAP;
+        if (type === 'FIXED') { const capEur = round2(cartSubtotal() * CASHIER_DISCOUNT_CAP / 100); if (cur > capEur) el.value = capEur; }
+        updateCartUI();
+    }
+    // After a discount change: if it now needs approval, prompt. On cancel,
+    // snap every discount back to the cap.
+    async function enforceDiscountCap() {
+        if (!discountNeedsApproval()) return true;
+        const ok = await requestDiscountOverride();
+        if (!ok) { clampDiscountsToCap(); toast(t('discount.cap_toast'), 'warn'); return false; }
+        updateCartUI();
+        return true;
+    }
+    function onBasketDiscountChange() { updateCartUI(); enforceDiscountCap(); }
+
+    let _discountOverrideResolver = null;
+    function requestDiscountOverride() {
+        if (discountOverridePin || isManagerOrAdmin()) return Promise.resolve(true);
+        if (!isOnline) { toast(t('discount.override_offline'), 'warn'); return Promise.resolve(false); }
+        document.getElementById('discountOverridePinInput').value = '';
+        document.getElementById('discountOverrideError').textContent = '';
+        document.getElementById('discountOverrideModal').classList.add('active');
+        setTimeout(() => document.getElementById('discountOverridePinInput').focus(), 50);
+        return new Promise(res => { _discountOverrideResolver = res; });
+    }
+    async function submitDiscountOverride() {
+        const pin = document.getElementById('discountOverridePinInput').value.trim();
+        const errEl = document.getElementById('discountOverrideError');
+        if (!/^[0-9]{4,6}$/.test(pin)) { errEl.textContent = t('discount.override_pin_bad_format'); return; }
+        const { data, error } = await sb.rpc('rpc_verify_discount_override', { p_location_id: DEVICE_LOCATION_ID, p_pin: pin });
+        if (error) { errEl.textContent = error.message; return; }
+        if (!data) { errEl.textContent = t('discount.override_bad_pin'); return; }
+        discountOverridePin = pin;
+        document.getElementById('discountOverrideModal').classList.remove('active');
+        if (_discountOverrideResolver) { _discountOverrideResolver(true); _discountOverrideResolver = null; }
+        toast(t('discount.override_approved'), 'success');
+    }
+    function cancelDiscountOverride() {
+        document.getElementById('discountOverrideModal').classList.remove('active');
+        if (_discountOverrideResolver) { _discountOverrideResolver(false); _discountOverrideResolver = null; }
+    }
+
+    function openSetOverridePinModal() {
+        document.getElementById('setOverridePinInput').value = '';
+        document.getElementById('setOverridePinMsg').textContent = '';
+        document.getElementById('setOverridePinModal').classList.add('active');
+        setTimeout(() => document.getElementById('setOverridePinInput').focus(), 50);
+    }
+    async function saveOverridePin() {
+        const pin = document.getElementById('setOverridePinInput').value.trim();
+        const msg = document.getElementById('setOverridePinMsg');
+        if (!/^[0-9]{4,6}$/.test(pin)) { msg.style.color = 'var(--danger-color)'; msg.textContent = t('setpin.bad_format'); return; }
+        const { error } = await sb.rpc('rpc_set_override_pin', { p_pin: pin });
+        if (error) { msg.style.color = 'var(--danger-color)'; msg.textContent = error.message; return; }
+        msg.style.color = 'var(--success-color)'; msg.textContent = t('setpin.saved');
+        toast(t('setpin.saved'), 'success');
+        setTimeout(() => closeModal('setOverridePinModal'), 900);
     }
 
     function cartGrandTotal() {
@@ -3628,6 +3770,14 @@
         if (checkoutInFlight) return;
         if (isRemoteView() || cart.length === 0) return;
 
+        // Discount cap (CLAUDE.md §11): over 25% needs an admin/manager PIN.
+        // Prompt for it before doing anything else; abort the sale if declined
+        // (the server rejects it too, but this keeps the flow clean).
+        if (discountNeedsApproval()) {
+            const ok = await requestDiscountOverride();
+            if (!ok) { toast(t('discount.override_needed'), 'warn'); return; }
+        }
+
         // Check fresh (not relying on possibly-stale cached state) so a
         // forgotten shift-open doesn't surface as a raw error mid-sale —
         // pop the quick-open modal instead and resume automatically once
@@ -3670,7 +3820,8 @@
             p_card_amount: cardAmount,
             p_discount_total: discType === 'NONE' ? 0 : discVal,
             p_discount_type: discType === 'NONE' ? null : discType,
-            p_customer: null
+            p_customer: null,
+            p_override_pin: discountOverridePin || null
         };
 
         try {
@@ -3684,12 +3835,16 @@
 
             if (error) {
                 if (isNetworkError(error)) { queueSaleLocally(payload, cart.slice()); return; }
-                toast(error.message, 'error');
+                const m = error.message || '';
+                if (m.includes('DISCOUNT_OVERRIDE_REQUIRED')) { discountOverridePin = null; toast(t('discount.override_needed'), 'error'); return; }
+                if (m.includes('DISCOUNT_OVERRIDE_BAD_PIN')) { discountOverridePin = null; toast(t('discount.override_bad_pin'), 'error'); return; }
+                toast(m, 'error');
                 return;
             }
 
             showReceipt(data, cart.slice());
             cart = [];
+            discountOverridePin = null;
             await loadInventory();
             updateCartUI();
         } catch (err) {
@@ -3703,6 +3858,7 @@
 
     function startNewSale() {
         cart = [];
+        discountOverridePin = null; // approval doesn't carry to the next sale
         document.getElementById('basketDiscType').value = 'NONE';
         document.getElementById('basketDiscValue').value = '';
         document.getElementById('cashTenderedInput').value = '';
