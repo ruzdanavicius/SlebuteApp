@@ -232,9 +232,9 @@
         .btn-ghost.active { background: var(--accent-color); border-color: var(--accent-color); color: white; }
         .sale-badge { display:inline-block; font-size:0.6rem; font-weight:700; letter-spacing:0.03em; background: var(--danger-color); color:#fff; border-radius:4px; padding:1px 5px; margin-bottom:3px; }
         .storage-badge { display:inline-block; font-size:0.6rem; font-weight:700; letter-spacing:0.03em; background: #b5760f; color:#fff; border-radius:4px; padding:1px 5px; margin-bottom:3px; }
-        .storage-hint-icon { color: #b5760f; font-size: 0.72rem; cursor: pointer; margin-left: 4px; vertical-align: middle; }
+        .storage-hint-icon { color: #b5760f; font-size: 0.86rem; cursor: pointer; flex-shrink: 0; vertical-align: middle; }
         .storage-hint-icon:hover { opacity: 0.7; }
-        .otherloc-hint-icon { color: var(--accent-color); font-size: 0.72rem; cursor: pointer; margin-left: 4px; vertical-align: middle; }
+        .otherloc-hint-icon { color: var(--accent-color); font-size: 0.86rem; cursor: pointer; flex-shrink: 0; vertical-align: middle; margin-left: auto; padding-left: 8px; }
         .otherloc-hint-icon:hover { opacity: 0.7; }
         .storage-sibling-popup { position: fixed; z-index: 200; background: var(--sidebar-color); border: var(--glass-border); border-radius: 10px; box-shadow: 0 12px 30px rgba(36,22,30,0.25); padding: 10px 12px; font-size: 0.78rem; min-width: 180px; max-width: 260px; }
         .storage-sibling-popup-title { font-weight: 700; margin-bottom: 6px; color: #b5760f; }
@@ -282,7 +282,8 @@
         .product-card { background: var(--card-bg); border: var(--glass-border); border-radius: 16px; padding: 10px; cursor: pointer; transition: 0.15s; position: relative; overflow: hidden; contain: content; }
         .product-card:hover { transform: translateY(-4px); box-shadow: 0 10px 30px var(--shadow-color); border-color: rgba(107,37,69,0.3); }
         .product-img { width: 100%; height: 170px; object-fit: cover; border-radius: 12px; margin-bottom: 10px; background: var(--card-bg-raised); }
-        .product-info h3 { font-size: 0.92rem; font-weight: 600; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .product-info h3 { font-size: 0.92rem; font-weight: 600; margin-bottom: 3px; display: flex; align-items: center; gap: 5px; }
+        .product-info h3 .p-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .product-info p { color: var(--text-secondary); font-size: 0.78rem; display:flex; justify-content:space-between; align-items:center; gap: 6px; }
         .product-info p span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .stock-pill { font-size: 0.68rem; font-weight: 700; padding: 2px 7px; border-radius: 20px; flex-shrink: 0; white-space: nowrap; }
@@ -3275,7 +3276,7 @@
             return `<div class="product-card" data-product-id="${p.id}" onclick="openProduct(${p.id})">
                 <img src="${p.image_url || ''}" class="product-img" loading="lazy" decoding="async" onerror="this.style.opacity=0.2">
                 <div class="product-info">
-                    <h3>${escapeHtml(p.name)} ${storageHint}${otherLocHint}</h3>
+                    <h3><span class="p-name">${escapeHtml(p.name)}</span>${storageHint}${otherLocHint}</h3>
                     <p><span>${p.base_barcode || t('pos.no_barcode')}</span><span class="stock-pill ${meta.pillClass}">${meta.pillText}</span></p>
                 </div>
             </div>`;
@@ -3302,12 +3303,13 @@
         const meta = computeProductCardMeta(p);
         const pill = card.querySelector('.stock-pill');
         if (pill) { pill.className = `stock-pill ${meta.pillClass}`; pill.textContent = meta.pillText; }
+        const nameEl = card.querySelector('.product-info h3 .p-name');
         const existingHint = card.querySelector('.storage-hint-icon');
         if (meta.hasStorageSiblings && !existingHint) {
             const icon = document.createElement('i');
             icon.className = 'fas fa-box-archive storage-hint-icon';
             icon.onclick = (e) => toggleStorageSiblingHint(e, productId);
-            card.querySelector('.product-info h3')?.appendChild(icon);
+            nameEl?.after(icon);   // stays right next to the name
         } else if (!meta.hasStorageSiblings && existingHint) {
             existingHint.remove();
         }
@@ -3317,7 +3319,7 @@
             icon.className = 'fas fa-store otherloc-hint-icon';
             icon.title = t('otherloc.hint_title');
             icon.onclick = (e) => toggleOtherLocationHint(e, productId);
-            card.querySelector('.product-info h3')?.appendChild(icon);
+            card.querySelector('.product-info h3')?.appendChild(icon);   // margin-left:auto pushes it to the right edge
         } else if (!meta.hasOtherLocationStock && existingOther) {
             existingOther.remove();
         }
