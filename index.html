@@ -3543,9 +3543,12 @@
     function productStorageSiblings(productId) {
         const p = products.find(x => x.id === productId);
         if (!p) return [];
+        // Size first (small→large), then colour — a customer will usually take a
+        // different colour in the right size, rarely the reverse.
         return p.variants
             .filter(v => (v.storageStock || 0) > 0)
-            .map(v => ({ colorName: v.colorName, size: v.size, qty: v.storageStock }));
+            .map(v => ({ colorName: v.colorName, size: v.size, qty: v.storageStock }))
+            .sort((a, b) => compareSizes(a.size, b.size) || (a.colorName || '').localeCompare(b.colorName || ''));
     }
 
     // Toggles a small anchored popup near the clicked icon. Deliberately
@@ -3601,6 +3604,10 @@
                 rows.push({ colorName: v.colorName, size: v.size, storeName: store ? store.name : '—', qty, storage });
             }
         }
+        // Size first (small→large), then colour, then store.
+        rows.sort((a, b) => compareSizes(a.size, b.size)
+            || (a.colorName || '').localeCompare(b.colorName || '')
+            || (a.storeName || '').localeCompare(b.storeName || ''));
         return rows;
     }
 
