@@ -1744,6 +1744,8 @@
             'adjust.reason_damaged': 'Damaged', 'adjust.reason_transfer': 'Transfer',
             'adjust.notes_label': 'Notes (optional)', 'adjust.apply': 'Apply Adjustment',
             'pos.sale_toggle': 'Sale', 'pos.sale_toggle_title': 'Show only marked-down items', 'pos.sale_badge': 'SALE',
+            'clearance.final_sale_tag': 'FINAL SALE', 'clearance.final_sale_title': 'Clearance item — final sale, no returns or exchanges',
+            'returns.final_sale_blocked': 'Clearance items are final sale and cannot be returned or exchanged.',
             'storage.badge': 'IN STORAGE', 'storage.in_storage_title': 'In storage at this store',
             'storage.in_storage_suffix': 'in storage', 'storage.on_display_suffix': 'on display',
             'storage.moved_to_storage_prefix': 'Moved to storage:', 'storage.moved_to_display_prefix': 'Moved to display:',
@@ -1853,6 +1855,7 @@
             'sup.load_failed': 'Failed to load suppliers:', 'sup.name_required': 'Supplier name is required.', 'sup.saved': 'Supplier saved.',
             'receipt.cashier': 'Cashier:', 'receipt.vat_incl': 'VAT (incl.)', 'receipt.total_label': 'TOTAL', 'receipt.change': 'Change',
             'receipt.receipt_label': 'Receipt:', 'receipt.thank_you': 'Thank you for shopping with us!',
+            'receipt.final_sale_note': 'Final sale — no returns or exchanges',
             'toast.load_catalog_failed': 'Failed to load catalog:', 'toast.no_stock_item': 'No more stock available for this item.',
             'toast.added_item_prefix': 'Added', 'toast.no_stock': 'No more stock available.', 'toast.unexpected_error': 'Unexpected error:',
             'toast.client_name_required': 'Client name is required for a reservation.', 'toast.request_sent_prefix': 'Request',
@@ -2007,6 +2010,8 @@
             'adjust.reason_damaged': 'Sugadinta', 'adjust.reason_transfer': 'Perkėlimas',
             'adjust.notes_label': 'Pastabos (neprivaloma)', 'adjust.apply': 'Pritaikyti pakeitimą',
             'pos.sale_toggle': 'Išpardavimas', 'pos.sale_toggle_title': 'Rodyti tik nukainotas prekes', 'pos.sale_badge': 'NUOLAIDA',
+            'clearance.final_sale_tag': 'GALUTINIS PARDAVIMAS', 'clearance.final_sale_title': 'Nukainota prekė — galutinis pardavimas, negrąžinama ir nekeičiama',
+            'returns.final_sale_blocked': 'Nukainotos prekės yra galutinis pardavimas – jų grąžinti ar keisti negalima.',
             'storage.badge': 'SANDĖLYJE', 'storage.in_storage_title': 'Sandėlyje šioje parduotuvėje',
             'storage.in_storage_suffix': 'sandėlyje', 'storage.on_display_suffix': 'prekyboje',
             'storage.moved_to_storage_prefix': 'Perkelta į sandėlį:', 'storage.moved_to_display_prefix': 'Perkelta į prekybą:',
@@ -2116,6 +2121,7 @@
             'sup.load_failed': 'Nepavyko įkelti tiekėjų:', 'sup.name_required': 'Būtina įvesti tiekėjo pavadinimą.', 'sup.saved': 'Tiekėjas išsaugotas.',
             'receipt.cashier': 'Kasininkas:', 'receipt.vat_incl': 'PVM (įskaič.)', 'receipt.total_label': 'VISO', 'receipt.change': 'Grąža',
             'receipt.receipt_label': 'Kvitas:', 'receipt.thank_you': 'Ačiū, kad apsipirkote pas mus!',
+            'receipt.final_sale_note': 'Galutinis pardavimas — negrąžinama ir nekeičiama',
             'toast.load_catalog_failed': 'Nepavyko įkelti katalogo:', 'toast.no_stock_item': 'Šios prekės daugiau nėra sandėlyje.',
             'toast.added_item_prefix': 'Pridėta', 'toast.no_stock': 'Daugiau nėra sandėlyje.', 'toast.unexpected_error': 'Netikėta klaida:',
             'toast.client_name_required': 'Rezervacijai būtinas kliento vardas.', 'toast.request_sent_prefix': 'Užsakymas',
@@ -3241,7 +3247,7 @@
             <div class="variant-chip ${trulyUnavailable ? 'disabled' : ''}" onclick="posScanOrSelectVariant(${p.id}, ${v.id})">
                 <div class="adj-icon" onclick="event.stopPropagation(); openAdjustModal(${v.id}, '${escapeHtml(p.name)} — ${v.colorName} / ${v.size}')"><i class="fas fa-sliders"></i></div>
                 <div style="width:14px; height:14px; border-radius:50%; background:${v.colorHex}; margin:0 auto 6px auto; border:1px solid #fff;"></div>
-                ${v.isClearance ? `<div class="sale-badge">${t('pos.sale_badge')}</div>` : ''}
+                ${v.isClearance ? `<div class="sale-badge" title="${t('clearance.final_sale_title')}">${t('pos.sale_badge')}</div>` : ''}
                 ${avail <= 0 && storageQty > 0 ? `<div class="storage-badge" title="${t('storage.in_storage_title')}">${t('storage.badge')}</div>` : ''}
                 <div style="font-weight:700; font-size:0.85rem;">${v.size}</div>
                 <div style="font-size:0.68rem; opacity:0.7;">€${Number(v.price).toFixed(2)}</div>
@@ -3312,6 +3318,7 @@
                 variantId: v.id, productId: p.id, name: p.name, img: p.image_url,
                 size: v.size, colorName: v.colorName, colorHex: v.colorHex,
                 price: Number(v.price), qty: 1, maxStock: v.stock, linePct: 0,
+                isClearance: !!v.isClearance, // final-sale marker — shown on the cart line + receipt, non-refundable
                 vatRate: Number(v.vatRate) || 0 // kept only for the offline-receipt VAT estimate, see queueSaleLocally()
             });
         }
@@ -3507,6 +3514,7 @@
                             <div class="cart-variant-row">
                                 <span class="variant-tag">${i.size}</span>
                                 <div class="cart-color-dot" style="background-color:${i.colorHex}"></div>
+                                ${i.isClearance ? `<span class="sale-badge" style="margin:0;" title="${t('clearance.final_sale_title')}">${t('clearance.final_sale_tag')}</span>` : ''}
                             </div>
                         </div>
                         <div class="cart-item-price">
@@ -4071,7 +4079,7 @@
         panel.innerHTML = list.map(p => `
             <div class="products-list-item ${editingProductId === p.id ? 'active' : ''}" onclick="loadProductForEdit(${p.id})">
                 <img src="${p.image_url||''}" loading="lazy" decoding="async" onerror="this.style.opacity=0.2">
-                <span>${escapeHtml(p.name)}${productHasClearanceVariant(p) ? ` <span class="sale-badge">${t('pos.sale_badge')}</span>` : ''}</span>
+                <span>${escapeHtml(p.name)}${productHasClearanceVariant(p) ? ` <span class="sale-badge" title="${t('clearance.final_sale_title')}">${t('pos.sale_badge')}</span>` : ''}</span>
             </div>`).join('') || `<p class="muted" style="font-size:0.8rem; padding:8px;">${t('inv.no_styles')}</p>`;
     }
 
@@ -5716,14 +5724,17 @@
         `;
         document.getElementById('refundLines').innerHTML = refundOrder.items.map(it => {
             const remaining = refundLineRemaining(it);
-            const disabled = notCompleted || remaining <= 0;
+            // Clearance items are final sale — non-selectable, no matter the role
+            // (server enforces this too; this just makes the reason visible up front).
+            const finalSale = !!it.is_clearance;
+            const disabled = notCompleted || remaining <= 0 || finalSale;
             return `
             <div style="display:flex; align-items:center; gap:10px; padding:8px; background:var(--input-bg); border-radius:8px; border:2px solid ${it.selectedQty > 0 ? 'var(--accent-color)' : 'transparent'}; opacity:${disabled ? 0.5 : 1}; cursor:${disabled ? 'default' : 'pointer'};"
                  ${disabled ? '' : `onclick="toggleRefundLine(${it.order_item_id})"`}>
                 <div style="flex:1; font-size:0.85rem;">
                     <div style="font-weight:600;">${escapeHtml(it.product_name)} — ${escapeHtml(it.color_name)} / ${escapeHtml(it.size)}</div>
                     <div class="muted" style="font-size:0.75rem;">${escapeHtml(it.sku)} · ${money(it.unit_price)} · ${remaining} ${t('returns.remaining_of')} ${it.quantity}
-                        ${remaining <= 0 ? ` — <span style="color:var(--danger-color);">${t('returns.fully_refunded_tag')}</span>` : ''}</div>
+                        ${finalSale ? ` — <span style="color:var(--danger-color); font-weight:700;">${t('clearance.final_sale_tag')}</span>` : (remaining <= 0 ? ` — <span style="color:var(--danger-color);">${t('returns.fully_refunded_tag')}</span>` : '')}</div>
                 </div>
                 <input type="number" min="0" max="${remaining}" value="${it.selectedQty}" style="width:56px;" class="form-input"
                     ${disabled ? 'disabled' : ''} onclick="event.stopPropagation()"
@@ -5738,7 +5749,7 @@
 
     function toggleRefundLine(orderItemId) {
         const it = refundOrder.items.find(x => x.order_item_id === orderItemId);
-        if (!it) return;
+        if (!it || it.is_clearance) return; // clearance = final sale, not returnable
         const remaining = refundLineRemaining(it);
         it.selectedQty = it.selectedQty > 0 ? 0 : remaining;
         renderRefundOrderView();
@@ -5746,7 +5757,7 @@
 
     function setRefundLineQty(orderItemId, val) {
         const it = refundOrder.items.find(x => x.order_item_id === orderItemId);
-        if (!it) return;
+        if (!it || it.is_clearance) return;
         const remaining = refundLineRemaining(it);
         it.selectedQty = Math.min(Math.max(parseInt(val) || 0, 0), remaining);
         renderRefundOrderView();
@@ -5754,7 +5765,7 @@
 
     function selectAllRemainingRefundLines() {
         if (!refundOrder) return;
-        refundOrder.items.forEach(it => { it.selectedQty = refundLineRemaining(it); });
+        refundOrder.items.forEach(it => { it.selectedQty = it.is_clearance ? 0 : refundLineRemaining(it); });
         renderRefundOrderView();
     }
 
@@ -5768,6 +5779,11 @@
             const it = refundOrder.items.find(x => x.sku && x.sku.toLowerCase() === (code || '').toLowerCase());
             if (!it) {
                 status.innerText = `"${escapeHtml(code)}" ${t('returns.doesnt_belong_suffix')}`;
+                status.style.color = 'var(--danger-color)';
+                return;
+            }
+            if (it.is_clearance) {
+                status.innerText = t('returns.final_sale_blocked');
                 status.style.color = 'var(--danger-color)';
                 return;
             }
@@ -5915,8 +5931,12 @@
     }
 
     async function confirmOrderRefund() {
-        const items = refundOrder.items.filter(it => it.selectedQty > 0)
-            .map(it => ({ order_item_id: it.order_item_id, quantity: it.selectedQty }));
+        const selected = refundOrder.items.filter(it => it.selectedQty > 0);
+        // Belt-and-braces: clearance lines are already non-selectable, and the
+        // server rejects them too — this just gives a clean message if one
+        // ever slips through.
+        if (selected.some(it => it.is_clearance)) { toast(t('returns.final_sale_blocked'), 'warn'); return; }
+        const items = selected.map(it => ({ order_item_id: it.order_item_id, quantity: it.selectedQty }));
         if (items.length === 0) { toast(t('returns.select_at_least_one'), 'warn'); return; }
 
         const btn = document.getElementById('returnsConfirmBtn');
@@ -5930,7 +5950,13 @@
         });
 
         btn.disabled = false; btn.innerHTML = `<i class="fas fa-check"></i> <span id="returnsConfirmLabel">${t('returns.confirm_refund')}</span>`;
-        if (error) { toast(error.message, 'error'); return; }
+        if (error) {
+            // Server guards clearance items (FINAL_SALE_NO_RETURN now, and the
+            // older FINAL_SALE_OVERRIDE_REQUIRED before this migration lands).
+            const m = error.message || '';
+            if (m.includes('FINAL_SALE') || m.includes('final-sale clearance')) { toast(t('returns.final_sale_blocked'), 'error'); return; }
+            toast(m, 'error'); return;
+        }
 
         toast(`${t('returns.refund_success_prefix')} ${money(data.refunded_amount)} — ${refundOrder.order_number} (${t('returns.status_' + data.new_status.toLowerCase())})`, 'success');
         closeReturnsModal();
@@ -8395,8 +8421,9 @@ ${qrBlock}${field(skuG, qrColX, skuY)}${field(priceG, blockX, mm(1.5))}${compBlo
         line('-'.repeat(paperChars));
         for (const i of soldItems) {
             const lineTotal = cartLineTotal(i);
-            padRow(`${i.qty}x ${i.name} (${i.size})`.slice(0, paperChars - 8), money(lineTotal));
+            padRow(`${i.qty}x ${i.name} (${i.size})${i.isClearance ? ' *' : ''}`.slice(0, paperChars - 8), money(lineTotal));
         }
+        if (soldItems.some(i => i.isClearance)) { center(true); bold(true); line('* ' + t('receipt.final_sale_note')); bold(false); center(false); }
         line('-'.repeat(paperChars));
         padRow(t('cart.subtotal'), money(saleResult.subtotal));
         padRow(t('receipt.vat_incl'), money(saleResult.tax_total));
@@ -8445,8 +8472,9 @@ ${qrBlock}${field(skuG, qrColX, skuY)}${field(priceG, blockX, mm(1.5))}${compBlo
         const now = new Date();
         const lines = soldItems.map(i => {
             const lineTotal = cartLineTotal(i);
-            return `<div class="receipt-line"><span>${i.qty}x ${escapeHtml(i.name)} (${i.size})</span><span>${money(lineTotal)}</span></div>`;
+            return `<div class="receipt-line"><span>${i.qty}x ${escapeHtml(i.name)} (${i.size})${i.isClearance ? ' *' : ''}</span><span>${money(lineTotal)}</span></div>`;
         }).join('');
+        const hasClearance = soldItems.some(i => i.isClearance);
         const paper = document.getElementById('receiptPaper');
         paper.innerHTML = `
             <h3>${escapeHtml(store?.name || '')}</h3>
@@ -8454,6 +8482,7 @@ ${qrBlock}${field(skuG, qrColX, skuY)}${field(priceG, blockX, mm(1.5))}${compBlo
             <p class="center">${t('receipt.cashier')} ${escapeHtml(PROFILE.full_name)}</p>
             <hr>
             ${lines}
+            ${hasClearance ? `<p class="center" style="font-weight:700;">* ${t('receipt.final_sale_note')}</p>` : ''}
             <hr>
             <div class="receipt-line"><span>${t('cart.subtotal')}</span><span>${money(saleResult.subtotal)}</span></div>
             <div class="receipt-line"><span>${t('receipt.vat_incl')}</span><span>${money(saleResult.tax_total)}</span></div>
