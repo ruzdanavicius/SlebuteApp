@@ -192,11 +192,16 @@
         .pending-sale-actions { display:flex; gap:8px; }
         .pending-sale-actions .btn { padding:6px 12px; font-size:0.76rem; }
         .store-pill { font-size: 0.6rem; color: var(--text-secondary); text-align:center; margin-bottom: 10px; line-height: 1.3; white-space: pre-line; }
-        /* Vilnius weather indicator — sits where .store-pill used to, above
-           the sidebar logout button. Small icon + temperature only, no
-           text label needed. Fails silently (see loadVilniusWeather()). */
-        .weather-pill { display:flex; flex-direction:column; align-items:center; gap:3px; font-size: 0.62rem; color: var(--text-secondary); margin-bottom: 10px; line-height: 1; }
-        .weather-pill i { font-size: 0.95rem; color: var(--accent-color); }
+        /* Vilnius weather — a quiet second line under the store-pill in the
+           cart header (top-right corner), not a sidebar/nav-rail element.
+           Deliberately styled to read as ambient/glanceable only: same
+           font and muted color as store-pill above it, at reduced opacity
+           and with no accent color on the icon, so it's visible without
+           competing with the store-pill or the nav rail for attention.
+           Fails silently (see loadVilniusWeather()) — never blocks login
+           or checkout. */
+        .weather-pill { display:flex; align-items:center; justify-content:center; gap:4px; font-size: 0.6rem; color: var(--text-secondary); opacity: 0.55; line-height: 1.3; }
+        .weather-pill i { font-size: 0.68rem; color: inherit; }
 
         /* MAIN CONTENT */
         /* translate3d(0,0,0) + will-change: transform forces Chrome to
@@ -415,6 +420,12 @@
         .storage-browse-panel { flex: 1; min-width: 0; }
         .storage-filter-row { display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; }
         .storage-filter-row input, .storage-filter-row select { flex: 1; min-width: 150px; }
+        /* The free-text search carries a much longer placeholder than the
+           short dropdown filters next to it — giving it the same flex-basis
+           let it get squeezed down to dropdown width in the wrapped row,
+           clipping the placeholder. Always give it the full row instead;
+           the dropdowns wrap onto their own row below exactly as before. */
+        .storage-filter-row input[type="text"] { flex: 1 1 100%; min-width: 220px; }
         .storage-table th, .storage-table td { white-space: nowrap; }
         .storage-table .storage-table-qty-line { display:flex; align-items:center; gap:6px; margin-bottom:5px; }
         .storage-tab-qty-sep { color: var(--text-secondary); font-size: 0.8rem; }
@@ -811,14 +822,6 @@
                 <span class="conn-dot" id="connDot"></span>
                 <span class="nav-badge hidden" id="offlineBadge">0</span>
             </div>
-            <!-- Vilnius weather — decorative/glanceable only, never blocks
-                 login or checkout if the fetch fails (see loadVilniusWeather()).
-                 Username/store (formerly here) moved to the cart-header, see
-                 #storePill there. -->
-            <div class="weather-pill" id="weatherPill" title="Vilnius">
-                <i class="fas fa-cloud" id="weatherIcon"></i>
-                <span id="weatherTemp">—°</span>
-            </div>
             <div class="nav-btn" id="navOverridePin" onclick="openSetOverridePinModal()" data-i18n-title="setpin.title" title="My PIN"><i class="fas fa-key"></i></div>
             <div class="nav-btn" onclick="logout()" data-i18n-title="nav.logout" title="Log out"><i class="fas fa-sign-out-alt"></i></div>
         </nav>
@@ -950,6 +953,14 @@
                         <div class="products-list" id="productsListPanel"></div>
                     </div>
                     <div class="form-scroll">
+                        <div id="invFormEmpty" class="empty-state">
+                            <i class="fas fa-shirt"></i>
+                            <span data-i18n="inv.select_or_new">Select a style from the list, or start a new one.</span>
+                            <div style="margin-top:16px;">
+                                <button class="btn btn-primary" onclick="startNewProduct()"><i class="fas fa-plus"></i> <span data-i18n="inv.new_style">New Style</span></button>
+                            </div>
+                        </div>
+                        <div id="invFormFields" class="hidden">
                         <div class="form-card">
                             <div class="section-title" data-i18n="inv.style_reference">Style Reference</div>
                             <div class="form-group">
@@ -1017,6 +1028,7 @@
                         <div style="display:flex; gap:12px;">
                             <button class="btn btn-ghost" onclick="startNewProduct()" data-i18n="common.clear">Clear</button>
                             <button class="btn btn-primary" id="saveBtn" style="flex:1;" onclick="saveMatrixProduct()"><i class="fas fa-save"></i> <span data-i18n="inv.save_style">Save Style</span></button>
+                        </div>
                         </div>
                     </div>
                 </div>
@@ -1193,8 +1205,20 @@
                      .role-badge { display:none }. store-pill (name/store,
                      formerly in the sidebar above logout) now lives here
                      in its place. -->
-                <span class="role-badge" id="roleBadge">—</span>
-                <div class="store-pill" id="storePill">—</div>
+                <div style="display:flex; flex-direction:column; align-items:flex-end;">
+                    <span class="role-badge" id="roleBadge">—</span>
+                    <div class="store-pill" id="storePill">—</div>
+                    <!-- Vilnius weather — decorative/glanceable only, never
+                         blocks login or checkout if the fetch fails (see
+                         loadVilniusWeather()). Sits right under the
+                         logged-in user's name/store, styled to match it
+                         rather than draw its own attention — see
+                         .weather-pill. -->
+                    <div class="weather-pill" id="weatherPill" title="Vilnius">
+                        <i class="fas fa-cloud" id="weatherIcon"></i>
+                        <span id="weatherTemp">—°</span>
+                    </div>
+                </div>
             </div>
             <div class="cart-items" id="cartItems"></div>
 
@@ -1839,6 +1863,7 @@
             'quickopen.float_label': 'Opening cash float (€)', 'quickopen.open_continue': 'Open & Continue Sale',
             'receipt.print': 'Print', 'receipt.print_usb': 'Print via USB', 'receipt.new_sale': 'New Sale',
             'inv.title': 'Manage Catalog', 'inv.print_labels': 'Print Labels', 'inv.new_style': 'New Style',
+            'inv.select_or_new': 'Select a style from the list, or start a new one.',
             'inv.search_styles': 'Search styles...', 'inv.style_reference': 'Style Reference',
             'inv.base_barcode': 'Base Barcode (scan tag)', 'inv.base_barcode_hint': 'No barcode on the garment? Leave this blank — a reference like "keln-001" (from the category) is assigned automatically. It won\u2019t match future scans the way a real tag barcode would.', 'inv.loaded_existing': 'Loaded existing style — editing.',
             'inv.product_name': 'Product Name', 'inv.category': 'Category',
@@ -1981,6 +2006,7 @@
             'register.cash_movements': 'Cash Movements', 'register.no_movements': 'No movements yet.',
             'toast.shift_opened': 'Shift opened!',
             'pos.no_products': 'No products found.', 'pos.in_stock_suffix': 'in stock', 'pos.out_of_stock': 'Out of stock',
+            'pos.load_failed': "Couldn't load products.", 'pos.retry': 'Try again',
             'pos.all_categories': 'All', 'pos.uncategorized': 'Uncategorized',
             'pos.low_suffix': 'low', 'pos.no_barcode': 'No barcode', 'vm.ref': 'Ref:',
             'cart.bag_empty': 'Bag is empty', 'cart.disc_label': 'disc', 'cart.request_options': 'Request Options',
@@ -2121,6 +2147,7 @@
             'quickopen.float_label': 'Pradinė kasos suma (€)', 'quickopen.open_continue': 'Atidaryti ir tęsti pardavimą',
             'receipt.print': 'Spausdinti', 'receipt.print_usb': 'Spausdinti per USB', 'receipt.new_sale': 'Naujas pardavimas',
             'inv.title': 'Prekių valdymas', 'inv.print_labels': 'Spausdinti etiketes', 'inv.new_style': 'Naujas modelis',
+            'inv.select_or_new': 'Pasirinkite modelį iš sąrašo arba pradėkite naują.',
             'inv.search_styles': 'Ieškoti modelių...', 'inv.style_reference': 'Modelio informacija',
             'inv.base_barcode': 'Pagrindinis brūkšninis kodas', 'inv.base_barcode_hint': 'Ant drabužio nėra brūkšninio kodo? Palikite tuščią — nuoroda, pvz. „keln-001“ (iš kategorijos), bus priskirta automatiškai. Ji neatpažins būsimų skenavimų taip, kaip tikras kodas ant etiketės.', 'inv.loaded_existing': 'Įkeltas esamas modelis — redaguojama.',
             'inv.product_name': 'Prekės pavadinimas', 'inv.category': 'Kategorija',
@@ -2263,6 +2290,7 @@
             'register.cash_movements': 'Grynųjų judėjimas', 'register.no_movements': 'Judėjimų dar nėra.',
             'toast.shift_opened': 'Pamaina atidaryta!',
             'pos.no_products': 'Prekių nerasta.', 'pos.in_stock_suffix': 'sandėlyje', 'pos.out_of_stock': 'Nėra sandėlyje',
+            'pos.load_failed': 'Nepavyko įkelti prekių.', 'pos.retry': 'Bandykite dar kartą',
             'pos.all_categories': 'Visos', 'pos.uncategorized': 'Be kategorijos',
             'pos.low_suffix': 'mažai', 'pos.no_barcode': 'Nėra kodo', 'vm.ref': 'Kodas:',
             'cart.bag_empty': 'Krepšelis tuščias', 'cart.disc_label': 'nuolaida', 'cart.request_options': 'Užsakymo parinktys',
@@ -2645,7 +2673,7 @@
         window.location.reload();
     }
 
-    // VILNIUS WEATHER — sidebar icon + temperature, purely decorative.
+    // VILNIUS WEATHER — cart-header icon + temperature, purely decorative.
     // Open-Meteo has no API key/auth, so this is a plain fetch. Any
     // failure (offline, blocked, API hiccup) is swallowed silently —
     // this must never toast an error or block login/checkout, it's a
@@ -3105,7 +3133,16 @@
         } else {
             ({ data, error } = await sb.rpc('rpc_get_pos_catalog'));
         }
-        if (error) { console.error(error); toast(t('toast.load_catalog_failed') + ' ' + error.message, 'error'); return; }
+        if (error) {
+            console.error(error);
+            toast(t('toast.load_catalog_failed') + ' ' + error.message, 'error');
+            // Toasts auto-dismiss in a few seconds — a cashier who looks away
+            // mid-failure must not come back to a silently blank grid with no
+            // way to tell what happened or what to do. This persists until a
+            // retry succeeds (loadInventory() overwrites it via renderProducts()).
+            grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1;"><i class="fas fa-triangle-exclamation"></i>${t('pos.load_failed')}<div style="margin-top:16px;"><button class="btn btn-primary" onclick="loadInventory()"><i class="fas fa-rotate"></i> ${t('pos.retry')}</button></div></div>`;
+            return;
+        }
 
         products = (data || []).map(prod => {
             const variants = [];
@@ -5046,7 +5083,16 @@
         document.getElementById('categorySuggestBox').classList.remove('open');
     }
 
+    // Reveals the (blank-until-now) style form and hides the "pick something"
+    // placeholder — called only once the manager actually asks for a form,
+    // either via New Style or by picking an existing style from the list.
+    function showInventoryForm() {
+        document.getElementById('invFormEmpty').classList.add('hidden');
+        document.getElementById('invFormFields').classList.remove('hidden');
+    }
+
     function startNewProduct() {
+        showInventoryForm();
         editingProductId = null;
         ['new_base_barcode','new_name','new_category','new_size_range','new_composition','new_description','new_image'].forEach(id => document.getElementById(id).value = '');
         document.getElementById('new_supplier').value = '';
@@ -5063,6 +5109,7 @@
     function loadProductForEdit(id) {
         const p = products.find(x => x.id === id);
         if (!p) return;
+        showInventoryForm();
         editingProductId = id;
         document.getElementById('printAllStyleBtn').classList.remove('hidden');
         document.getElementById('new_base_barcode').value = p.base_barcode || '';
@@ -8937,7 +8984,16 @@ ${qrBlock}${field(skuG, qrColX, skuY)}${field(priceG, blockX, mm(1.5))}${compBlo
         // blocked there, so focus regardless of local/remote.
         if (view === 'pos') { barcodeInput.focus(); loadInventory(); }
         else if (view === 'storage') { openStorageTab(); }
-        else if (view === 'inventory') { renderProductsList(); if (!document.getElementById('colorBlocksContainer').children.length) startNewProduct(); }
+        else if (view === 'inventory') {
+            renderProductsList();
+            // Only jump straight into a blank "New Style" form if one was
+            // already in progress (colorBlocksContainer non-empty — a draft
+            // new style or an open edit) — a genuinely fresh visit to this
+            // tab should offer the pick-one-or-start-new placeholder instead
+            // of dropping a manager who just wants to browse into a form.
+            if (document.getElementById('colorBlocksContainer').children.length) showInventoryForm();
+            else { document.getElementById('invFormFields').classList.add('hidden'); document.getElementById('invFormEmpty').classList.remove('hidden'); }
+        }
         else if (view === 'requests') { enterRequestsView(); }
         else if (view === 'register') { renderRegisterView(); }
         else if (view === 'dailysales') { renderDailySalesView(); }
