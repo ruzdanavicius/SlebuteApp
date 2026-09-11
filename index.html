@@ -624,6 +624,11 @@
         .variant-chip:hover { border-color: var(--accent-color); background: var(--accent-tint); }
         .variant-chip.disabled { opacity: 0.35; cursor: not-allowed; pointer-events: none; }
         .variant-chip .adj-icon { position:absolute; top:3px; right:3px; width:18px; height:18px; border-radius:5px; background:rgba(0,0,0,0.4); display:flex; align-items:center; justify-content:center; font-size:0.6rem; pointer-events:all; cursor:pointer; }
+        /* Only ever shown on a chip that's also .disabled (0 stock everywhere)
+           — pointer-events:all overrides the chip's own pointer-events:none,
+           same trick .adj-icon above already relies on. */
+        .variant-chip .reorder-request-icon { position:absolute; top:3px; left:3px; width:18px; height:18px; border-radius:5px; background:rgba(0,0,0,0.4); display:flex; align-items:center; justify-content:center; font-size:0.6rem; pointer-events:all; cursor:pointer; }
+        .variant-chip .reorder-request-icon.sent { background: var(--success-color); cursor:default; }
 
         .scan-item-row { display:flex; align-items:center; gap:12px; padding:10px; border-radius:10px; background: var(--card-bg-raised); border: 1px solid rgba(36,22,30,0.08); transition:0.15s; }
         .scan-item-row.done { background: var(--success-tint); border-color: rgba(71,116,89,0.3); }
@@ -1288,6 +1293,28 @@
         </div>
     </div>
 
+    <!-- REQUEST REORDER MODAL — a cashier flagging a size that's at zero
+         stock everywhere (see the "request-reorder" icon in variantGrid,
+         openProduct()) as worth restocking, with an optional comment. This
+         does NOT set a quantity or commit to an order — it only lands as a
+         REQUESTED row a manager reviews on the Dashboard Restock card
+         (rpc_request_reorder / rpc_get_reorder_requests / migration
+         reorder_requests_cashier_flag in slebute-ops). -->
+    <div class="modal-overlay" id="requestReorderModal">
+        <div class="modal-box narrow">
+            <div class="close-modal" onclick="closeModal('requestReorderModal')"><i class="fas fa-times"></i></div>
+            <div class="vm-content">
+                <h2><i class="fas fa-bell-concierge"></i> <span data-i18n="reorderreq.title">Request Reorder</span></h2>
+                <p class="muted" style="font-size:0.85rem; margin-bottom:8px;" id="requestReorderContext"></p>
+                <div class="form-group">
+                    <label data-i18n="reorderreq.comment_label">Why (optional)</label>
+                    <textarea class="form-input" id="requestReorderComment" rows="3" placeholder="e.g. a customer asked for it this week" data-i18n-placeholder="reorderreq.comment_placeholder"></textarea>
+                </div>
+                <button class="btn btn-primary btn-block mt-14" onclick="submitRequestReorder()"><i class="fas fa-paper-plane"></i> <span data-i18n="reorderreq.submit">Send to Manager</span></button>
+            </div>
+        </div>
+    </div>
+
     <!-- REMOTE REQUEST MODAL -->
     <div class="modal-overlay" id="requestModal">
         <div class="modal-box narrow">
@@ -1922,6 +1949,11 @@
             'reorder.col_size': 'Size', 'reorder.col_store': 'Store', 'reorder.col_supplier': 'Supplier', 'reorder.col_qty': 'Qty to order',
             'reorder.no_supplier': 'No supplier set', 'reorder.prepared_by': 'Prepared by', 'reorder.date': 'Date',
             'reorder.total_items': 'Line items', 'reorder.total_units': 'Total units', 'reorder.qty_update_error': 'Could not update quantity:',
+            'reorderreq.title': 'Request Reorder', 'reorderreq.comment_label': 'Why (optional)',
+            'reorderreq.comment_placeholder': 'e.g. a customer asked for it this week', 'reorderreq.submit': 'Send to Manager',
+            'reorderreq.icon_title': 'Request this be reordered', 'reorderreq.sent_title': 'Reorder requested',
+            'reorderreq.sent_toast': 'Sent to your manager.', 'reorderreq.error_prefix': "Couldn't send the request:",
+            'reorderreq.badge': 'Requested by staff',
             'nav.customer_note': 'Customer note', 'note.title': 'Quick note', 'note.subtitle': "Product ideas, comments, notes, or customer feedback.",
             'note.type_product': 'Product idea', 'note.type_feedback': 'Feedback', 'note.type_other': 'Other',
             'note.placeholder': 'Type your note here', 'note.submit': 'Save note', 'note.empty_error': 'Write something first.',
@@ -2206,6 +2238,11 @@
             'reorder.col_size': 'Dydis', 'reorder.col_store': 'Parduotuvė', 'reorder.col_supplier': 'Tiekėjas', 'reorder.col_qty': 'Kiekis užsakyti',
             'reorder.no_supplier': 'Tiekėjas nenurodytas', 'reorder.prepared_by': 'Parengė', 'reorder.date': 'Data',
             'reorder.total_items': 'Prekių eilutės', 'reorder.total_units': 'Viso vienetų', 'reorder.qty_update_error': 'Nepavyko atnaujinti kiekio:',
+            'reorderreq.title': 'Prašyti papildyti', 'reorderreq.comment_label': 'Kodėl (neprivaloma)',
+            'reorderreq.comment_placeholder': 'pvz. klientas šią savaitę klausė šios prekės', 'reorderreq.submit': 'Siųsti vadovui',
+            'reorderreq.icon_title': 'Prašyti papildyti šią prekę', 'reorderreq.sent_title': 'Papildymo prašymas išsiųstas',
+            'reorderreq.sent_toast': 'Išsiųsta jūsų vadovui.', 'reorderreq.error_prefix': 'Nepavyko išsiųsti prašymo:',
+            'reorderreq.badge': 'Darbuotojo prašymas',
             'nav.customer_note': 'Pastaba', 'note.title': 'Greita pastaba', 'note.subtitle': 'Prekių idėjos, komentarai, pastabos arba klientų atsiliepimai.',
             'note.type_product': 'Prekės idėja', 'note.type_feedback': 'Atsiliepimas', 'note.type_other': 'Kita',
             'note.placeholder': 'Komentarą rašykite čia', 'note.submit': 'Išsaugoti', 'note.empty_error': 'Pirmiausia parašykite tekstą.',
@@ -3450,6 +3487,8 @@
     function escapeHtml(s) { const d = document.createElement('div'); d.innerText = s || ''; return d.innerHTML; }
 
     let currentOpenProductId = null; // lets refreshPosStockDisplay() live-update the open variant modal after a cart change
+    let requestedReorderThisSession = new Set(); // variantId — hides the request-reorder icon (shows a sent checkmark instead) after use, so an accidental double-tap can't queue duplicate requests. Cleared on page reload, same lightweight scope as restockDeclinedThisSession on the Dashboard.
+    let requestReorderVariantId = null; // which chip's icon opened requestReorderModal
 
     function openProduct(id) {
         const p = products.find(x => x.id === id);
@@ -3501,14 +3540,31 @@
             // anywhere (0 display AND 0 storage) is disabled.
             const storageQty = v.storageStock || 0;
             const trulyUnavailable = avail <= 0 && storageQty <= 0;
+            // Cross-location check for the reorder-request icon below — a
+            // size can be truly unavailable AT THIS STORE (trulyUnavailable
+            // above) while another store still has it, which isn't worth
+            // reordering yet. stockByLocation carries every store's raw
+            // quantity+storage (see loadInventory()), so this is the same
+            // "not available in either location" condition a cashier would
+            // actually mean by "we're out of this."
+            const totalEverywhere = Object.values(v.stockByLocation || {}).reduce((s, loc) => s + (loc.quantity || 0) + (loc.storage || 0), 0);
+            const unavailableEverywhere = trulyUnavailable && totalEverywhere <= 0;
+            const alreadyRequested = requestedReorderThisSession.has(v.id);
             const stockLine = avail > 0
                 ? `<div style="font-size:0.68rem; color:var(--success-color)">${avail} ${t('vm.stock_left_suffix')}</div>`
                 : (storageQty > 0
                     ? `<div style="font-size:0.68rem; color:var(--warning-text, #9a6b0a)">${storageQty} ${t('storage.in_storage_suffix')}</div>`
                     : `<div style="font-size:0.68rem; color:var(--danger-color)">0 ${t('vm.stock_left_suffix')}</div>`);
+            const reorderIconHtml = unavailableEverywhere
+                ? `<div class="reorder-request-icon ${alreadyRequested ? 'sent' : ''}" title="${alreadyRequested ? t('reorderreq.sent_title') : t('reorderreq.icon_title')}"
+                       onclick="event.stopPropagation(); ${alreadyRequested ? '' : `openRequestReorderModal(${v.id}, '${escapeHtml(p.name)} — ${v.colorName} / ${v.size}')`}">
+                       <i class="fas ${alreadyRequested ? 'fa-check' : 'fa-bell-concierge'}"></i>
+                   </div>`
+                : '';
             return `
             <div class="variant-chip ${trulyUnavailable ? 'disabled' : ''}" onclick="posScanOrSelectVariant(${p.id}, ${v.id})">
                 <div class="adj-icon" onclick="event.stopPropagation(); openAdjustModal(${v.id}, '${escapeHtml(p.name)} — ${v.colorName} / ${v.size}')"><i class="fas fa-sliders"></i></div>
+                ${reorderIconHtml}
                 <div style="width:14px; height:14px; border-radius:50%; background:${v.colorHex}; margin:0 auto 6px auto; border:1px solid #fff;"></div>
                 ${v.isClearance ? `<div class="sale-badge" title="${t('clearance.final_sale_title')}">${t('pos.sale_badge')}</div>` : ''}
                 ${avail <= 0 && storageQty > 0 ? `<div class="storage-badge" title="${t('storage.in_storage_title')}">${t('storage.badge')}</div>` : ''}
@@ -3518,6 +3574,38 @@
             </div>`;
         }).join('');
         document.getElementById('variantModal').classList.add('active');
+    }
+
+    // Cashier side of the reorder-request flow (rpc_request_reorder — any
+    // authenticated staff member, no manager gate; the audit trail is the
+    // accountability, same reasoning as rpc_record_stock_adjustment). Flags
+    // this store (DEVICE_LOCATION_ID, not whatever store is being browsed
+    // remotely) as needing restock on this SKU; a manager reviews it on the
+    // Dashboard Restock card via rpc_get_reorder_requests.
+    function openRequestReorderModal(variantId, contextLabel) {
+        requestReorderVariantId = variantId;
+        document.getElementById('requestReorderContext').innerText = contextLabel;
+        document.getElementById('requestReorderComment').value = '';
+        document.getElementById('requestReorderModal').classList.add('active');
+    }
+
+    async function submitRequestReorder() {
+        if (requestReorderVariantId == null) return;
+        const comment = document.getElementById('requestReorderComment').value.trim();
+        try {
+            const { error } = await sb.rpc('rpc_request_reorder', {
+                p_variant_id: requestReorderVariantId, p_location_id: DEVICE_LOCATION_ID,
+                p_comment: comment || null
+            });
+            if (error) throw error;
+            requestedReorderThisSession.add(requestReorderVariantId);
+            toast(t('reorderreq.sent_toast'), 'success');
+            closeModal('requestReorderModal');
+            // Re-render so the icon flips to the "sent" checkmark immediately.
+            if (currentOpenProductId != null) openProduct(currentOpenProductId);
+        } catch (e) {
+            toast(t('reorderreq.error_prefix') + ' ' + e.message, 'error');
+        }
     }
 
     function closeModal(id) {
@@ -7363,7 +7451,7 @@
         // store" server-side; p_location_id is left null so the RPC applies
         // that rule itself rather than trusting a client-supplied value.
         // See migration: security_lockdown_anon_access.
-        const [{ data: periodDailyRows }, { data: periodLines }, { data: voided }, { data: restockRows }, { data: notesRows }, { data: rebalanceRows }] = await Promise.all([
+        const [{ data: periodDailyRows }, { data: periodLines }, { data: voided }, { data: restockRows }, { data: notesRows }, { data: rebalanceRows }, { data: requestRows }] = await Promise.all([
             sb.from('v_daily_sales').select('*').gte('sale_date', dashboardPeriod.from).lte('sale_date', dashboardPeriod.to),
             sb.rpc('rpc_get_sales_by_variant', { p_location_id: null, p_date_from: periodStart, p_date_to: periodEnd }),
             sb.from('orders').select('id').in('status', ['VOIDED','REFUNDED']).gte('created_at', periodStart).lte('created_at', periodEnd),
@@ -7376,13 +7464,16 @@
             // queue to clear, not a metric that resets with the date filter.
             sb.from('customer_notes').select('*').eq('status', 'OPEN').order('created_at', { ascending: false }).limit(50),
             // Suggested inter-store moves — live snapshot, same reasoning as restock.
-            sb.rpc('rpc_get_stock_rebalance', { p_location_id: null })
+            sb.rpc('rpc_get_stock_rebalance', { p_location_id: null }),
+            // Cashier-flagged reorder requests — live snapshot too, merged
+            // into the Restock card (see renderRestockCard).
+            sb.rpc('rpc_get_reorder_requests', { p_location_id: null })
         ]);
 
-        renderDashboardContent(periodDailyRows || [], periodLines || [], (voided || []).length, restockRows || [], notesRows || [], rebalanceRows || []);
+        renderDashboardContent(periodDailyRows || [], periodLines || [], (voided || []).length, restockRows || [], notesRows || [], rebalanceRows || [], requestRows || []);
     }
 
-    function renderDashboardContent(periodRows, periodLines, voidedCount, restockRows, notesRows, rebalanceRows = []) {
+    function renderDashboardContent(periodRows, periodLines, voidedCount, restockRows, notesRows, rebalanceRows = [], requestRows = []) {
         const wrap = document.getElementById('dashboardWrap');
         // Managers are store-scoped by RLS (same as everywhere else in the
         // app) — periodRows/periodLines will only ever contain their own
@@ -7447,7 +7538,7 @@
 
             ${renderRebalanceCard(rebalanceRows, visibleStores, isAdmin)}
 
-            ${renderRestockCard(restockRows, visibleStores, isAdmin)}
+            ${renderRestockCard(restockRows, visibleStores, isAdmin, requestRows)}
 
             ${renderCustomerNotesCard(notesRows, visibleStores, isAdmin)}
         `;
@@ -7692,10 +7783,43 @@
         renderDashboardView(true);
     }
 
-    function renderRestockCard(restockRows, visibleStores, isAdmin) {
+    // Cashier-flagged "out of stock everywhere, please reorder" requests
+    // (rpc_request_reorder / rpc_get_reorder_requests) merge into this same
+    // card per the reviewed plan, rendered as their own small list above the
+    // velocity-based suggestions — a direct human signal is worth seeing
+    // before the algorithmic ones. requester name + comment show as a hover
+    // tooltip on the badge icon, same pattern every other hint icon in this
+    // app already uses (title attribute, no custom tooltip system).
+    let lastReorderRequestRows = [];
+    function renderReorderRequestRow(r) {
+        const label = escapeHtml(`${r.product_name} — ${r.color_name} / ${r.size}`);
+        const who = escapeHtml(r.requester_name || '');
+        const why = r.comment ? `: ${escapeHtml(r.comment)}` : '';
+        return `<div class="restock-row">
+            <div class="restock-info">
+                <div class="restock-name">${label}<span class="ts-sub"> · ${escapeHtml(r.sku)} · ${escapeHtml(r.location_name)}</span></div>
+                <div class="restock-meta">
+                    <span class="restock-badge critical" title="${who}${why}"><i class="fas fa-user"></i> ${t('reorderreq.badge')}</span>
+                </div>
+            </div>
+            <div class="restock-actions">
+                <div class="restock-qty-group">
+                    <input type="number" min="1" class="restock-qty-input" value="1"
+                        onkeydown="if(event.key==='Enter'){event.preventDefault(); this.parentElement.nextElementSibling.click();}">
+                </div>
+                <button class="icon-btn-sm restock-add-btn" onclick="addReorderRequestToCart(${r.decision_id}, this)" title="${t('dash.restock_add_to_list')}"><i class="fas fa-cart-plus"></i></button>
+                <button class="icon-btn-sm restock-decline-btn" onclick="declineReorderRequest(${r.decision_id})" title="${t('dash.restock_decline')}"><i class="fas fa-xmark"></i></button>
+            </div>
+        </div>`;
+    }
+
+    function renderRestockCard(restockRows, visibleStores, isAdmin, requestRows) {
         lastRestockVisibleStores = visibleStores;
         lastRestockIsAdmin = isAdmin;
-        const { total, sorted, top } = computeRestockCandidates(restockRows, visibleStores);
+        const visibleIds = new Set(visibleStores.map(s => s.id));
+        lastReorderRequestRows = (requestRows || []).filter(r => visibleIds.has(r.location_id));
+        const { total: velocityTotal, sorted, top } = computeRestockCandidates(restockRows, visibleStores);
+        const total = velocityTotal + lastReorderRequestRows.length;
         const showStore = isAdmin && visibleStores.length > 1;
         const listBtn = `<button class="btn btn-ghost reorder-list-btn" onclick="openReorderListModal()"><i class="fas fa-clipboard-list"></i> ${t('dash.restock_view_list')}${reorderCart.length ? ` (${reorderCart.length})` : ''}</button>`;
         if (total === 0) {
@@ -7705,19 +7829,60 @@
                 <p class="muted" style="font-size:0.85rem;">${t('dash.restock_empty')}</p>
             </div>`;
         }
+        const requestsHtml = lastReorderRequestRows.map(renderReorderRequestRow).join('');
         const visibleRows = restockExpanded ? sorted : top;
-        const moreCount = total - visibleRows.length;
+        const moreCount = velocityTotal - visibleRows.length;
         const toggleHtml = restockExpanded
-            ? (total > 8 ? `<button class="btn-link restock-more" onclick="toggleRestockExpanded()">${t('dash.restock_show_less')}</button>` : '')
+            ? (velocityTotal > 8 ? `<button class="btn-link restock-more" onclick="toggleRestockExpanded()">${t('dash.restock_show_less')}</button>` : '')
             : (moreCount > 0 ? `<button class="btn-link restock-more" onclick="toggleRestockExpanded()">+${moreCount} ${t('dash.restock_more_suffix')}</button>` : '');
         return `<div class="section-card" id="restockCard">
             <div class="restock-card-head">
                 <h3>${t('dash.restock_title')} <span class="muted" style="font-weight:400; font-size:0.8rem;">(${total})</span></h3>
                 ${listBtn}
             </div>
-            <div class="restock-list">${visibleRows.map(r => renderRestockRow(r, showStore)).join('')}</div>
+            <div class="restock-list">${requestsHtml}${visibleRows.map(r => renderRestockRow(r, showStore)).join('')}</div>
             ${toggleHtml}
         </div>`;
+    }
+
+    async function addReorderRequestToCart(decisionId, btn) {
+        const input = btn.parentElement.querySelector('.restock-qty-input');
+        const qty = parseInt(input.value);
+        if (!qty || qty <= 0) { toast(t('toast.enter_qty_add'), 'warn'); return; }
+        const r = lastReorderRequestRows.find(x => x.decision_id === decisionId);
+        if (!r) { toast(t('dash.restock_row_stale'), 'warn'); renderDashboardView(true); return; }
+        try {
+            const { data: batchId, error } = await sb.rpc('rpc_action_reorder_request', { p_decision_id: decisionId, p_action: 'ADD', p_qty: qty });
+            if (error) throw error;
+            // Same batch a plain addToReorderCart() would use/open — keeping
+            // reorderBatchId in sync here matters, otherwise the next normal
+            // "add" from a velocity suggestion would lazily open a SECOND
+            // open batch instead of joining this one.
+            reorderBatchId = batchId;
+            reorderCart.push({
+                decisionId, variantId: r.variant_id, locationId: r.location_id, qty,
+                productName: r.product_name, colorName: r.color_name, size: r.size,
+                sku: r.sku, baseBarcode: r.base_barcode,
+                supplierName: null, supplierPhone: null, supplierEmail: null,
+                locationName: r.location_name
+            });
+            persistReorderCart();
+            toast(t('dash.restock_added_toast'), 'success');
+            renderDashboardView(true);
+        } catch (e) {
+            toast(t('dash.restock_batch_error') + ' ' + e.message, 'error');
+        }
+    }
+
+    async function declineReorderRequest(decisionId) {
+        try {
+            const { error } = await sb.rpc('rpc_action_reorder_request', { p_decision_id: decisionId, p_action: 'DECLINE' });
+            if (error) throw error;
+            toast(t('dash.restock_declined_toast'), 'success');
+            renderDashboardView(true);
+        } catch (e) {
+            toast(t('dash.restock_decision_error') + ' ' + e.message, 'error');
+        }
     }
 
     /* ============================================================
