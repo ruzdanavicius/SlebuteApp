@@ -1764,8 +1764,33 @@
     // original stale token forever. This was previously fixed in the
     // mobile app but had gone missing here too (confirmed absent as of
     // SlebuteApp_43 — same latent bug, same fix).
+    //
+    // Dead-session recovery (2026-09-11): the counterpart problem — the
+    // session going to null *after* the app already booted (e.g. tab
+    // backgrounded past the refresh window, or a refresh token rotated/
+    // invalidated by the same login being open on another device — mobile
+    // hit this exact class, see its isAuthError()/showSessionExpiredScreen()
+    // comment). Without this, the UI kept rendering as "logged in" while
+    // every write silently ran as anon and failed with a raw Postgres
+    // "permission denied for function" instead of any indication the
+    // session had died. Try one silent refreshSession() first (usually
+    // invisible); only reload to the login screen if that also fails, so a
+    // merely-stale-but-still-valid session doesn't interrupt anyone.
+    let sessionRecoveryInProgress = false;
     sb.auth.onAuthStateChange((_event, session) => {
-        if (session) sb.realtime.setAuth(session.access_token);
+        if (session) { sb.realtime.setAuth(session.access_token); return; }
+        if (!PROFILE || sessionRecoveryInProgress) return; // not logged in yet, or already handling
+        sessionRecoveryInProgress = true;
+        sb.auth.refreshSession()
+            .then(({ data }) => {
+                if (data && data.session) { sessionRecoveryInProgress = false; return; }
+                toast(t('toast.session_expired'), 'warn');
+                setTimeout(() => window.location.reload(), 1500);
+            })
+            .catch(() => {
+                toast(t('toast.session_expired'), 'warn');
+                setTimeout(() => window.location.reload(), 1500);
+            });
     });
 
     /* ============================================================
@@ -1988,6 +2013,7 @@
             'toast.client_name_required': 'Client name is required for a reservation.', 'toast.request_sent_prefix': 'Request',
             'toast.request_sent_suffix': 'sent!', 'toast.product_name_required': 'Product name is required.',
             'toast.add_size_required': 'Add at least one size with a price.', 'toast.style_saved': 'Style saved!',
+            'toast.session_expired': 'Session expired — signing you in again.',
             'toast.image_process_failed': 'Could not process that image:', 'toast.enter_qty_add': 'Enter a quantity to add.',
             'toast.added_qty_suffix': 'added.', 'toast.enter_valid_price': 'Enter a valid price.', 'toast.price_updated': 'Price updated.',
             'toast.supplier_updated': 'Supplier updated.', 'toast.no_existing_sizes': 'No existing sizes in this color to update.',
@@ -2289,6 +2315,7 @@
             'toast.client_name_required': 'Rezervacijai būtinas kliento vardas.', 'toast.request_sent_prefix': 'Užsakymas',
             'toast.request_sent_suffix': 'išsiųstas!', 'toast.product_name_required': 'Būtina įvesti prekės pavadinimą.',
             'toast.add_size_required': 'Pridėkite bent vieną dydį su kaina.', 'toast.style_saved': 'Modelis išsaugotas!',
+            'toast.session_expired': 'Sesija baigėsi — prisijungiama iš naujo.',
             'toast.image_process_failed': 'Nepavyko apdoroti nuotraukos:', 'toast.enter_qty_add': 'Įveskite pridedamą kiekį.',
             'toast.added_qty_suffix': 'pridėta.', 'toast.enter_valid_price': 'Įveskite galiojančią kainą.', 'toast.price_updated': 'Kaina atnaujinta.',
             'toast.supplier_updated': 'Tiekėjas atnaujintas.', 'toast.no_existing_sizes': 'Šioje spalvoje nėra esamų dydžių atnaujinimui.',
