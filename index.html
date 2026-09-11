@@ -1884,6 +1884,7 @@
             'markdown.undo_title': 'Undo markdown', 'markdown.undo_title_full': 'Return to Full Price',
             'markdown.undo_apply': 'Return to Full Price', 'markdown.undo_success': 'Returned to full price.',
             'labelmodal.title': 'Print Labels', 'labelmodal.print_all': 'Print All',
+            'labelmodal.just_saved_subtitle': 'Just added/updated — set copies, then print.',
             'quickopen.title': 'Open Register First',
             'quickopen.hint': 'No shift is open at this store yet — enter the starting cash float to open one, then this sale will go straight through.',
             'quickopen.hint_register': 'Enter the starting cash float to open your shift.',
@@ -2173,6 +2174,7 @@
             'markdown.undo_title': 'Atšaukti nukainojimą', 'markdown.undo_title_full': 'Grąžinti į pilną kainą',
             'markdown.undo_apply': 'Grąžinti į pilną kainą', 'markdown.undo_success': 'Grąžinta į pilną kainą.',
             'labelmodal.title': 'Spausdinti etiketes', 'labelmodal.print_all': 'Spausdinti visas',
+            'labelmodal.just_saved_subtitle': 'Ką tik pridėta/atnaujinta — nustatykite kiekius ir spausdinkite.',
             'quickopen.title': 'Pirmiausia atidarykite kasą',
             'quickopen.hint': 'Šioje parduotuvėje dar neatidaryta pamaina — įveskite pradinę grynųjų sumą, ir šis pardavimas bus iš karto užbaigtas.',
             'quickopen.hint_register': 'Įveskite pradinę kasos sumą, kad atidarytumėte pamainą.',
@@ -5513,13 +5515,26 @@
 
         if (error) { toast(error.message, 'error'); return; }
         toast(t('toast.style_saved'), 'success');
-        addToPendingLabels((data.variants || []).map(v => ({
+        // v_variants_out on the RPC side is built only from what THIS call
+        // submitted (p_variants) — never the style's pre-existing untouched
+        // sizes — so this is already correctly scoped to "just what was
+        // added/changed in this save," copies = the stock just typed per
+        // size (summed across both stores). Opened directly as its own
+        // print modal (not routed through addToPendingLabels/the header
+        // queue) — routing through both would let the two share the same
+        // item objects, so adjusting a quantity here would silently mutate
+        // whatever's sitting in the header queue too, and printing from
+        // here would leave duplicates behind to accidentally reprint later.
+        const newLabelItems = (data.variants || []).map(v => ({
             productName: data.product_name, sizeRange: data.size_range, composition: data.composition,
             colorName: v.color_name, size: v.size, price: v.price, sku: v.sku,
             copies: Math.max(1, Object.values(v.stock || {}).reduce((a,b) => a + (parseInt(b)||0), 0))
-        })));
+        }));
         await loadInventory();
         startNewProduct();
+        if (newLabelItems.length) {
+            openLabelPrintModal(t('labelmodal.title'), t('labelmodal.just_saved_subtitle'), newLabelItems);
+        }
     }
 
     /* Client-side compression: downscale to a max edge and re-encode as JPEG
@@ -9040,9 +9055,19 @@ ${qrBlock}${field(skuG, qrColX, skuY)}${field(priceG, blockX, mm(1.5))}${compBlo
     function printLabelsForProduct(productId) {
         const p = products.find(x => x.id === productId);
         if (!p) return;
+        // Copies default to the SKU's real total unit count — every store,
+        // display + storage combined (stockByLocation already carries every
+        // location, see loadInventory()) — not a flat 1 each. This is what
+        // makes this button useful for a whole-style reprint (e.g. after a
+        // price change): it's a ready-to-go "one label per physical unit"
+        // list. A variant genuinely out of stock defaults to 0 copies, which
+        // printSingleLabel already treats as "skip" — the same adjust-qty
+        // inputs in the modal cover both raising a 0 and zeroing out a line
+        // you don't want, no separate remove control needed.
         const items = p.variants.map(v => ({
             productName: p.name, sizeRange: p.size_range || null, composition: p.composition || null,
-            colorName: v.colorName, size: v.size, price: v.price, sku: v.sku, copies: 1
+            colorName: v.colorName, size: v.size, price: v.price, sku: v.sku,
+            copies: Object.values(v.stockByLocation || {}).reduce((s, loc) => s + (loc.quantity || 0) + (loc.storage || 0), 0)
         }));
         openLabelPrintModal(`${t('labelmodal.print_labels_prefix')} ${p.name}`, p.size_range ? `${t('labelmodal.collection_sizes')} ${p.size_range}` : t('labelmodal.set_copies_hint'), items);
     }
