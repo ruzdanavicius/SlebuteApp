@@ -672,6 +672,9 @@
         .toast.success { border-left-color: var(--success-color); }
         .toast.error { border-left-color: var(--danger-color); }
         .toast.warn { border-left-color: var(--warning-text); }
+        .toast { display:flex; flex-direction:column; gap:8px; align-items:flex-start; }
+        .toast-action-btn { background:none; border:1px solid var(--accent-color); color:var(--accent-color); border-radius:6px; padding:5px 10px; font-size:0.78rem; font-weight:600; cursor:pointer; }
+        .toast-action-btn:hover { background:var(--accent-tint); }
         @keyframes toastIn { from { opacity:0; transform: translateX(20px); } to { opacity:1; transform: translateX(0); } }
 
         .role-badge { font-size: 0.65rem; text-transform:uppercase; font-weight:700; padding: 2px 8px; border-radius: 20px; background: var(--accent-tint); color: var(--accent-color); letter-spacing: 0.04em; display: none; /* hidden by request — kept in DOM/still populated, just not shown; store-pill takes its visual slot */ }
@@ -1954,6 +1957,17 @@
             'reorderreq.icon_title': 'Request this be reordered', 'reorderreq.sent_title': 'Reorder requested',
             'reorderreq.sent_toast': 'Sent to your manager.', 'reorderreq.error_prefix': "Couldn't send the request:",
             'reorderreq.badge': 'Requested by staff',
+            'reordertrack.title': 'Awaiting order', 'reordertrack.empty': 'Nothing printed yet.',
+            'reordertrack.none_pending': 'Everything printed has been ordered.', 'reordertrack.ordered_history': 'Already ordered',
+            'reordertrack.ordered_by_prefix': 'Ordered by', 'reordertrack.mark_ordered_title': 'Mark as ordered',
+            'reordertrack.undo_title': 'Undo — not actually ordered yet', 'reordertrack.marked_toast': 'Marked as ordered.',
+            'reordertrack.unmarked_toast': 'Moved back to awaiting order.', 'reordertrack.load_error': "Couldn't load:",
+            'reordertrack.error_prefix': "Couldn't update:",
+            'reorderconflict.requested_msg': 'This item is flagged for reorder.',
+            'reorderconflict.added_msg_suffix': 'queued to reorder for this item.',
+            'reorderconflict.cancel_request_action': 'Cancel request', 'reorderconflict.reduce_by_prefix': 'Reduce by ',
+            'reorderconflict.declined_toast': 'Reorder request cancelled.', 'reorderconflict.removed_toast': 'Removed from the reorder list — fully restocked.',
+            'reorderconflict.reduced_toast_prefix': 'Reorder qty reduced to', 'reorderconflict.error_prefix': "Couldn't update the reorder list:",
             'nav.customer_note': 'Customer note', 'note.title': 'Quick note', 'note.subtitle': "Product ideas, comments, notes, or customer feedback.",
             'note.type_product': 'Product idea', 'note.type_feedback': 'Feedback', 'note.type_other': 'Other',
             'note.placeholder': 'Type your note here', 'note.submit': 'Save note', 'note.empty_error': 'Write something first.',
@@ -2243,6 +2257,17 @@
             'reorderreq.icon_title': 'Prašyti papildyti šią prekę', 'reorderreq.sent_title': 'Prašymas išsiųstas',
             'reorderreq.sent_toast': 'Išsiųsta', 'reorderreq.error_prefix': 'Nepavyko išsiųsti prašymo:',
             'reorderreq.badge': 'Darbuotojo prašymas',
+            'reordertrack.title': 'Laukiama užsakymo', 'reordertrack.empty': 'Kol kas nieko neatspausdinta.',
+            'reordertrack.none_pending': 'Visos atspausdintos prekės jau užsakytos.', 'reordertrack.ordered_history': 'Jau užsakyta',
+            'reordertrack.ordered_by_prefix': 'Užsakė', 'reordertrack.mark_ordered_title': 'Pažymėti kaip užsakyta',
+            'reordertrack.undo_title': 'Atšaukti — dar neužsakyta', 'reordertrack.marked_toast': 'Pažymėta kaip užsakyta.',
+            'reordertrack.unmarked_toast': 'Grąžinta į laukiančių sąrašą.', 'reordertrack.load_error': 'Nepavyko įkelti:',
+            'reordertrack.error_prefix': 'Nepavyko atnaujinti:',
+            'reorderconflict.requested_msg': 'Ši prekė pažymėta papildymui.',
+            'reorderconflict.added_msg_suffix': 'vnt. laukia papildymo šiai prekei.',
+            'reorderconflict.cancel_request_action': 'Atšaukti prašymą', 'reorderconflict.reduce_by_prefix': 'Sumažinti ',
+            'reorderconflict.declined_toast': 'Papildymo prašymas atšauktas.', 'reorderconflict.removed_toast': 'Pašalinta iš papildymo sąrašo — jau pilnai papildyta.',
+            'reorderconflict.reduced_toast_prefix': 'Papildymo kiekis sumažintas iki', 'reorderconflict.error_prefix': 'Nepavyko atnaujinti papildymo sąrašo:',
             'nav.customer_note': 'Pastaba', 'note.title': 'Greita pastaba', 'note.subtitle': 'Prekių idėjos, komentarai, pastabos arba klientų atsiliepimai.',
             'note.type_product': 'Prekės idėja', 'note.type_feedback': 'Atsiliepimas', 'note.type_other': 'Kita',
             'note.placeholder': 'Komentarą rašykite čia', 'note.submit': 'Išsaugoti', 'note.empty_error': 'Pirmiausia parašykite tekstą.',
@@ -2519,12 +2544,31 @@
     /* ============================================================
        TOASTS
        ============================================================ */
-    function toast(msg, type='info') {
+    // action (optional): { label, onClick } — renders an inline button inside
+    // the toast and holds it on screen longer (8s vs 3.5s) so there's time to
+    // read and decide. Still auto-dismisses on its own either way — this is
+    // the "inform without stopping" pattern (CLAUDE.md §6), never a blocking
+    // confirm(). Built via DOM methods rather than innerHTML so msg/label
+    // (always plain text here, no HTML) never need escaping.
+    function toast(msg, type='info', action=null) {
         const el = document.createElement('div');
         el.className = `toast ${type}`;
-        el.textContent = msg;
+        const msgEl = document.createElement('span');
+        msgEl.textContent = msg;
+        el.appendChild(msgEl);
+        const dismiss = () => { el.style.opacity = '0'; el.style.transition='0.3s'; setTimeout(()=>el.remove(), 300); };
+        let timeoutMs = 3500;
+        if (action) {
+            timeoutMs = 8000;
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'toast-action-btn';
+            btn.textContent = action.label;
+            btn.onclick = () => { action.onClick(); dismiss(); };
+            el.appendChild(btn);
+        }
         document.getElementById('toastContainer').appendChild(el);
-        setTimeout(() => { el.style.opacity = '0'; el.style.transition='0.3s'; setTimeout(()=>el.remove(), 300); }, 3500);
+        setTimeout(dismiss, timeoutMs);
     }
 
     function playPing() {
@@ -5576,6 +5620,50 @@
     }
 
     /* ============================================================
+       REORDER RESTOCK CONFLICT — slice 4 of the reorder review. Called
+       AFTER a stock increase already succeeded (return, quick-add, adjust,
+       transfer-receive — see each call site), never to gate the increase
+       itself. Purely a non-blocking follow-up: "this SKU is on the reorder
+       list, want to adjust it?" via a toast action button, not a confirm()
+       — a cashier mid-return/mid-rush should never be stopped by this.
+       rpc_get_open_reorder_for_variant / rpc_reduce_reorder_for_restock,
+       both open to any authenticated staff member (not manager-gated) —
+       the person who just scanned the stock in is best placed to resolve
+       it in the moment; the audit trail is the accountability.
+       ============================================================ */
+    let reorderConflictShownThisSession = new Set(); // decision_id — avoids re-showing the same toast on every tap of a multi-tap stepper before the first one is resolved
+
+    async function checkReorderConflict(variantId, locationId, restockedQty) {
+        if (!variantId || !locationId || !restockedQty || restockedQty <= 0) return;
+        try {
+            const { data, error } = await sb.rpc('rpc_get_open_reorder_for_variant', { p_variant_id: variantId, p_location_id: locationId });
+            if (error || !data || !data.length) return;
+            const r = data[0];
+            if (reorderConflictShownThisSession.has(r.decision_id)) return;
+            reorderConflictShownThisSession.add(r.decision_id);
+            const msg = r.decision === 'REQUESTED'
+                ? t('reorderconflict.requested_msg')
+                : `${r.decided_qty} ${t('reorderconflict.added_msg_suffix')}`;
+            const actionLabel = r.decision === 'REQUESTED'
+                ? t('reorderconflict.cancel_request_action')
+                : `${t('reorderconflict.reduce_by_prefix')}${restockedQty}`;
+            toast(msg, 'warn', { label: actionLabel, onClick: () => resolveReorderConflict(r.decision_id, restockedQty) });
+        } catch (e) { /* best-effort — never let this block or error out the stock change it followed */ }
+    }
+
+    async function resolveReorderConflict(decisionId, restockedQty) {
+        try {
+            const { data, error } = await sb.rpc('rpc_reduce_reorder_for_restock', { p_decision_id: decisionId, p_restocked_qty: restockedQty });
+            if (error) throw error;
+            if (data.action === 'declined') toast(t('reorderconflict.declined_toast'), 'success');
+            else if (data.action === 'removed') toast(t('reorderconflict.removed_toast'), 'success');
+            else toast(`${t('reorderconflict.reduced_toast_prefix')} ${data.new_qty}`, 'success');
+        } catch (e) {
+            toast(t('reorderconflict.error_prefix') + ' ' + e.message, 'error');
+        }
+    }
+
+    /* ============================================================
        QUICK STOCK ADJUSTMENT
        ============================================================ */
     function openAdjustModal(variantId, label, locationId = null) {
@@ -5616,6 +5704,7 @@
         toast(`+${qty} ${t('toast.added_qty_suffix')}`, 'success');
         const ctx = findVariantContext(variantId);
         if (ctx) addToPendingLabels([{ ...ctx, copies: qty }]);
+        checkReorderConflict(variantId, locationId, qty);
         await loadInventory();
         if (editingProductId) loadProductForEdit(editingProductId);
     }
@@ -5709,6 +5798,7 @@
         if (qty > 0) {
             const ctx = findVariantContext(currentAdjustTarget.variantId);
             if (ctx) addToPendingLabels([{ ...ctx, copies: qty }]);
+            checkReorderConflict(currentAdjustTarget.variantId, currentAdjustTarget.locationId, qty);
         }
 
         closeModal('adjustModal');
@@ -5940,10 +6030,11 @@
 
     async function manageRequest(id, newStatus, payment = null) {
         const { error } = await sb.rpc('rpc_update_stock_request_status', { p_request_id: id, p_new_status: newStatus, p_payment: payment });
-        if (error) { toast(error.message, 'error'); return; }
+        if (error) { toast(error.message, 'error'); return false; }
         toast(`${t('toast.request_updated_prefix')} ${t('req.status_' + newStatus.toLowerCase())}`, 'success');
         await loadRequests();
         await loadInventory();
+        return true;
     }
 
     /* ============================================================
@@ -5973,7 +6064,7 @@
         scanTransferContext = {
             requestId, direction,
             targetStatus: direction === 'ship' ? 'IN_TRANSIT' : 'COMPLETED',
-            fromLabel: r.source.name, toLabel: r.target.name, requestNumber: r.request_number,
+            fromLabel: r.source.name, toLabel: r.target.name, targetLocationId: r.target.id, requestNumber: r.request_number,
             items
         };
         document.getElementById('scanTransferStatus').style.color = '';
@@ -6050,7 +6141,14 @@
     async function confirmScanTransfer() {
         const ctx = scanTransferContext;
         if (!ctx) return;
-        await manageRequest(ctx.requestId, ctx.targetStatus);
+        const ok = await manageRequest(ctx.requestId, ctx.targetStatus);
+        // Receiving a transfer (targetStatus COMPLETED) increases stock at
+        // the target store — same reorder-conflict check as any other
+        // restock path. Shipping (IN_TRANSIT) doesn't change stock anywhere
+        // yet, so no check there.
+        if (ok && ctx.targetStatus === 'COMPLETED') {
+            for (const it of ctx.items) checkReorderConflict(it.variantId, ctx.targetLocationId, it.scannedQty || it.requiredQty);
+        }
         scanTransferContext = null;
         closeModal('scanTransferModal');
     }
@@ -6445,6 +6543,7 @@
                 p_return_reason: selectedReturnReason
             });
             if (error) { failed++; toast(`${r.sku}: ${error.message}`, 'error'); }
+            else checkReorderConflict(r.variantId, DEVICE_LOCATION_ID, r.qty);
         }
         btn.disabled = false; btn.innerHTML = `<i class="fas fa-check"></i> <span id="returnsConfirmLabel">${t('returns.confirm')}</span>`;
         if (failed === 0) {
@@ -6485,6 +6584,7 @@
         }
 
         toast(`${t('returns.refund_success_prefix')} ${money(data.refunded_amount)} — ${refundOrder.order_number} (${t('returns.status_' + data.new_status.toLowerCase())})`, 'success');
+        for (const it of selected) checkReorderConflict(it.variant_id, DEVICE_LOCATION_ID, it.selectedQty);
         closeReturnsModal();
         await loadInventory();
         if (document.getElementById('view-dailysales').classList.contains('active')) loadDailySalesDay(dailySalesCurrentDate, true);
