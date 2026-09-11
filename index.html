@@ -620,6 +620,10 @@
         .vm-content { padding: 26px; }
         .vm-content h2 { margin-bottom: 4px; }
         .variant-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 10px; margin: 18px 0; }
+        .variant-level-back { display:flex; align-items:center; gap:6px; font-size:0.82rem; font-weight:600; color:var(--accent-color); cursor:pointer; margin-top:10px; }
+        .color-bubble-row { display:flex; justify-content:center; gap:4px; margin-top:6px; flex-wrap:wrap; }
+        .color-bubble { width:14px; height:14px; border-radius:50%; border:1px solid rgba(0,0,0,0.15); cursor:pointer; }
+        .color-bubble-tooltip { position:fixed; z-index:200; background:var(--sidebar-color); border:var(--glass-border); border-radius:8px; box-shadow: 0 8px 20px rgba(36,22,30,0.25); padding:5px 10px; font-size:0.75rem; font-weight:600; white-space:nowrap; }
         .variant-chip { background: var(--card-bg-raised); border: 1px solid rgba(36,22,30,0.08); color: var(--text-primary); padding: 10px 6px; border-radius: 10px; cursor: pointer; text-align: center; position:relative; }
         .variant-chip:hover { border-color: var(--accent-color); background: var(--accent-tint); }
         .variant-chip.disabled { opacity: 0.35; cursor: not-allowed; pointer-events: none; }
@@ -1290,6 +1294,9 @@
             <div class="vm-content">
                 <h2 id="vmTitle">Product Name</h2>
                 <p id="vmSku" class="muted">Ref: ---</p>
+                <div class="variant-level-back hidden" id="variantLevelBack" onclick="backToSizeLevel()">
+                    <i class="fas fa-chevron-left"></i> <span id="variantLevelBackLabel"></span>
+                </div>
                 <div class="variant-grid" id="variantGrid"></div>
                 <p class="muted" style="font-size: 0.78rem;" data-i18n="vm.stock_note">Stock shown is for the location you are viewing.</p>
             </div>
@@ -2055,7 +2062,7 @@
             'pos.no_products': 'No products found.', 'pos.in_stock_suffix': 'in stock', 'pos.out_of_stock': 'Out of stock',
             'pos.load_failed': "Couldn't load products.", 'pos.retry': 'Try again',
             'pos.all_categories': 'All', 'pos.uncategorized': 'Uncategorized',
-            'pos.low_suffix': 'low', 'pos.no_barcode': 'No barcode', 'vm.ref': 'Ref:',
+            'pos.low_suffix': 'low', 'pos.no_barcode': 'No barcode', 'vm.ref': 'Ref:', 'vm.back_to_sizes': 'Back to sizes',
             'cart.bag_empty': 'Bag is empty', 'cart.disc_label': 'disc', 'cart.request_options': 'Request Options',
             'cart.charge_prefix': 'Charge',
             'offline.pending_title': 'Pending Sales', 'offline.view_pending': 'View',
@@ -2356,7 +2363,7 @@
             'pos.no_products': 'Prekių nerasta.', 'pos.in_stock_suffix': 'sandėlyje', 'pos.out_of_stock': 'Nėra sandėlyje',
             'pos.load_failed': 'Nepavyko įkelti prekių.', 'pos.retry': 'Bandykite dar kartą',
             'pos.all_categories': 'Visos', 'pos.uncategorized': 'Be kategorijos',
-            'pos.low_suffix': 'mažai', 'pos.no_barcode': 'Nėra kodo', 'vm.ref': 'Kodas:',
+            'pos.low_suffix': 'mažai', 'pos.no_barcode': 'Nėra kodo', 'vm.ref': 'Kodas:', 'vm.back_to_sizes': 'Atgal į dydžius',
             'cart.bag_empty': 'Krepšelis tuščias', 'cart.disc_label': 'nuolaida', 'cart.request_options': 'Užsakymo parinktys',
             'cart.charge_prefix': 'Apmokėti',
             'offline.pending_title': 'Laukiantys pardavimai', 'offline.view_pending': 'Žiūrėti',
@@ -3536,6 +3543,14 @@
     let requestedReorderThisSession = new Set(); // variantId — hides the request-reorder icon (shows a sent checkmark instead) after use, so an accidental double-tap can't queue duplicate requests. Cleared on page reload, same lightweight scope as restockDeclinedThisSession on the Dashboard.
     let requestReorderVariantId = null; // which chip's icon opened requestReorderModal
 
+    // Two-level manual picker: size cards first (one per size, colours
+    // collapsed into small bubbles), tapping one opens the colour cards for
+    // just that size — only THAT tap actually adds to the cart. The scanner
+    // path (resolveScan()/posScanOrSelectVariant()) never goes through
+    // either level; it already resolves straight to an exact SKU.
+    let variantModalLevel = 'size'; // 'size' | 'color'
+    let variantModalSelectedSize = null;
+
     function openProduct(id) {
         const p = products.find(x => x.id === id);
         if (!p) return;
@@ -3550,76 +3565,187 @@
         if (vmNote) vmNote.innerText = isRemoteView()
             ? `${t('vm.stock_at_prefix')} ${STORES.find(s => s.id === VIEW_LOCATION_ID)?.name || ''} — ${t('vm.tap_to_request')}`
             : t('vm.stock_note');
-        // Stock adjustment RPC is available to any authenticated staff member
-        // (this shop runs one person per shift, so restricting it to
-        // manager/admin would block routine receiving/correction work) — the
-        // audit trail (who/when/why) is what provides accountability here,
-        // not blocking the action itself.
-        // Marking an item down / undoing a markdown is NOT available on this
-        // screen on purpose — it lives only in Manage Catalog (Inventory),
-        // next to the print-label action a markdown always needs anyway; see
-        // addSizeRow()'s size-row-existing branch. Keeping a price-changing
-        // control off the checkout screen means a cashier never has an
-        // interactive "create a discount" button anywhere near a live sale —
-        // the SALE badge below is read-only, informational.
-        // Available sizes first (small → large, via the same compareSizes()
-        // used elsewhere for size ordering), truly-unavailable ones after —
-        // so a cashier checking what's actually sellable isn't scanning past
-        // greyed-out sizes to find the ones that matter. "Available" here
-        // matches the chip's own tap-ability below: display stock OR storage
-        // stock counts, only 0-and-0 sorts to the back.
-        const sortedVariants = p.variants.slice().sort((a, b) => {
-            const aUnavail = availableStock(a) <= 0 && (a.storageStock || 0) <= 0;
-            const bUnavail = availableStock(b) <= 0 && (b.storageStock || 0) <= 0;
+        variantModalLevel = 'size';
+        variantModalSelectedSize = null;
+        renderVariantModalLevel();
+        document.getElementById('variantModal').classList.add('active');
+    }
+
+    // Re-renders whichever level is currently showing, without resetting
+    // navigation — this is what refreshPosStockDisplay() calls after a cart
+    // change, so adding one colour from the colour level doesn't bounce the
+    // cashier back to the size list mid-selection.
+    function renderVariantModalLevel() {
+        const p = products.find(x => x.id === currentOpenProductId);
+        if (!p) return;
+        if (variantModalLevel === 'color' && variantModalSelectedSize != null
+            && !p.variants.some(v => v.size === variantModalSelectedSize)) {
+            // The size disappeared from under us (e.g. delisted mid-sale) — fall back.
+            variantModalLevel = 'size';
+            variantModalSelectedSize = null;
+        }
+        const backEl = document.getElementById('variantLevelBack');
+        if (variantModalLevel === 'color' && variantModalSelectedSize != null) {
+            backEl.classList.remove('hidden');
+            document.getElementById('variantLevelBackLabel').innerText = `${t('vm.back_to_sizes')} — ${variantModalSelectedSize}`;
+            renderColorLevel(p, variantModalSelectedSize);
+        } else {
+            backEl.classList.add('hidden');
+            renderSizeLevel(p);
+        }
+    }
+
+    function openSizeColorLevel(size) {
+        variantModalLevel = 'color';
+        variantModalSelectedSize = size;
+        renderVariantModalLevel();
+    }
+
+    function backToSizeLevel() {
+        variantModalLevel = 'size';
+        variantModalSelectedSize = null;
+        renderVariantModalLevel();
+    }
+
+    // Level 1 — one card per size, coloured bubbles for whichever colours
+    // of that size are actually available (display OR storage stock — same
+    // "available" condition renderColorLevel/renderVariantChipHtml use for
+    // sorting), so e.g. size L with 3 in-stock colours shows 3 bubbles.
+    // Tapping the card (not a bubble) opens the colour level for that size;
+    // nothing here ever adds to the cart directly.
+    function renderSizeLevel(p) {
+        const bySize = new Map();
+        for (const v of p.variants) {
+            if (!bySize.has(v.size)) bySize.set(v.size, []);
+            bySize.get(v.size).push(v);
+        }
+        const groups = Array.from(bySize.entries()).map(([size, variants]) => ({ size, variants }));
+        // Available sizes first (small → large), truly-unavailable ones
+        // after — same rule as before, now judged across the whole size
+        // group: a size only sorts to the back once EVERY colour in it is
+        // truly unavailable (0 display and 0 storage).
+        groups.sort((a, b) => {
+            const aUnavail = a.variants.every(v => availableStock(v) <= 0 && (v.storageStock || 0) <= 0);
+            const bUnavail = b.variants.every(v => availableStock(v) <= 0 && (v.storageStock || 0) <= 0);
             if (aUnavail !== bUnavail) return aUnavail ? 1 : -1;
             return compareSizes(a.size, b.size);
         });
-        document.getElementById('variantGrid').innerHTML = sortedVariants.map(v => {
-            const avail = availableStock(v);
-            // storageStock is already scoped to VIEW_LOCATION_ID (see
-            // loadInventory()) — a variant "in storage" here means in
-            // storage at THIS store, never a different one. A chip with
-            // 0 display but storage stock stays TAPPABLE (not disabled) —
-            // tapping it goes through posScanOrSelectVariant(), same
-            // one-tap "sell it anyway" confirmation a hardware scan of
-            // that exact SKU gets. Only a chip with truly nothing
-            // anywhere (0 display AND 0 storage) is disabled.
-            const storageQty = v.storageStock || 0;
-            const trulyUnavailable = avail <= 0 && storageQty <= 0;
-            // Cross-location check for the reorder-request icon below — a
-            // size can be truly unavailable AT THIS STORE (trulyUnavailable
-            // above) while another store still has it, which isn't worth
-            // reordering yet. stockByLocation carries every store's raw
-            // quantity+storage (see loadInventory()), so this is the same
-            // "not available in either location" condition a cashier would
-            // actually mean by "we're out of this."
-            const totalEverywhere = Object.values(v.stockByLocation || {}).reduce((s, loc) => s + (loc.quantity || 0) + (loc.storage || 0), 0);
-            const unavailableEverywhere = trulyUnavailable && totalEverywhere <= 0;
-            const alreadyRequested = requestedReorderThisSession.has(v.id);
+        document.getElementById('variantGrid').innerHTML = groups.map(g => {
+            const avail = g.variants.reduce((s, v) => s + availableStock(v), 0);
+            const storageQty = g.variants.reduce((s, v) => s + (v.storageStock || 0), 0);
+            const trulyUnavailable = g.variants.every(v => availableStock(v) <= 0 && (v.storageStock || 0) <= 0);
             const stockLine = avail > 0
                 ? `<div style="font-size:0.68rem; color:var(--success-color)">${avail} ${t('vm.stock_left_suffix')}</div>`
                 : (storageQty > 0
                     ? `<div style="font-size:0.68rem; color:var(--warning-text, #9a6b0a)">${storageQty} ${t('storage.in_storage_suffix')}</div>`
                     : `<div style="font-size:0.68rem; color:var(--danger-color)">0 ${t('vm.stock_left_suffix')}</div>`);
-            const reorderIconHtml = unavailableEverywhere
-                ? `<div class="reorder-request-icon ${alreadyRequested ? 'sent' : ''}" title="${alreadyRequested ? t('reorderreq.sent_title') : t('reorderreq.icon_title')}"
-                       onclick="event.stopPropagation(); ${alreadyRequested ? '' : `openRequestReorderModal(${v.id}, '${escapeHtml(p.name)} — ${v.colorName} / ${v.size}')`}">
-                       <i class="fas ${alreadyRequested ? 'fa-check' : 'fa-bell-concierge'}"></i>
-                   </div>`
+            const availableColors = g.variants.filter(v => availableStock(v) > 0 || (v.storageStock || 0) > 0);
+            // Click (or hover, via title) shows the colour name in a small
+            // anchored popup — same toggle-on-click pattern as the storage/
+            // other-location hint icons elsewhere on this screen. Always
+            // stops propagation so tapping a bubble never also opens the
+            // colour level underneath it.
+            const bubblesHtml = availableColors.length
+                ? `<div class="color-bubble-row">${availableColors.map(v => `<div class="color-bubble" style="background:${v.colorHex};" title="${escapeHtml(v.colorName)}" onclick="toggleColorBubbleTooltip(event, '${escapeHtml(v.colorName)}')"></div>`).join('')}</div>`
                 : '';
+            const anyClearance = g.variants.some(v => v.isClearance);
             return `
-            <div class="variant-chip ${trulyUnavailable ? 'disabled' : ''}" onclick="posScanOrSelectVariant(${p.id}, ${v.id})">
-                <div class="adj-icon" onclick="event.stopPropagation(); openAdjustModal(${v.id}, '${escapeHtml(p.name)} — ${v.colorName} / ${v.size}')"><i class="fas fa-sliders"></i></div>
-                ${reorderIconHtml}
-                <div style="width:14px; height:14px; border-radius:50%; background:${v.colorHex}; margin:0 auto 6px auto; border:1px solid #fff;"></div>
-                ${v.isClearance ? `<div class="sale-badge" title="${t('clearance.final_sale_title')}">${t('pos.sale_badge')}</div>` : ''}
-                ${avail <= 0 && storageQty > 0 ? `<div class="storage-badge" title="${t('storage.in_storage_title')}">${t('storage.badge')}</div>` : ''}
-                <div style="font-weight:700; font-size:0.85rem;">${v.size}</div>
-                <div style="font-size:0.68rem; opacity:0.7;">€${Number(v.price).toFixed(2)}</div>
+            <div class="variant-chip ${trulyUnavailable ? 'disabled' : ''}" onclick="openSizeColorLevel('${escapeHtml(g.size)}')">
+                ${anyClearance ? `<div class="sale-badge" title="${t('clearance.final_sale_title')}">${t('pos.sale_badge')}</div>` : ''}
+                <div style="font-weight:700; font-size:0.85rem;">${escapeHtml(g.size)}</div>
+                <div style="font-size:0.68rem; opacity:0.7;">€${Number(g.variants[0].price).toFixed(2)}</div>
                 ${stockLine}
+                ${bubblesHtml}
             </div>`;
         }).join('');
-        document.getElementById('variantModal').classList.add('active');
+    }
+
+    // Level 2 — every colour of one size, rendered exactly as every variant
+    // chip always rendered before the two-level split (see
+    // renderVariantChipHtml). Tapping one of these is the only action in
+    // either level that actually adds to the cart.
+    function renderColorLevel(p, size) {
+        const variants = p.variants.filter(v => v.size === size).sort((a, b) => {
+            const aUnavail = availableStock(a) <= 0 && (a.storageStock || 0) <= 0;
+            const bUnavail = availableStock(b) <= 0 && (b.storageStock || 0) <= 0;
+            if (aUnavail !== bUnavail) return aUnavail ? 1 : -1;
+            return (a.colorName || '').localeCompare(b.colorName || '');
+        });
+        document.getElementById('variantGrid').innerHTML = variants.map(v => renderVariantChipHtml(p, v)).join('');
+    }
+
+    function renderVariantChipHtml(p, v) {
+        const avail = availableStock(v);
+        // storageStock is already scoped to VIEW_LOCATION_ID (see
+        // loadInventory()) — a variant "in storage" here means in
+        // storage at THIS store, never a different one. A chip with
+        // 0 display but storage stock stays TAPPABLE (not disabled) —
+        // tapping it goes through posScanOrSelectVariant(), same
+        // one-tap "sell it anyway" confirmation a hardware scan of
+        // that exact SKU gets. Only a chip with truly nothing
+        // anywhere (0 display AND 0 storage) is disabled.
+        const storageQty = v.storageStock || 0;
+        const trulyUnavailable = avail <= 0 && storageQty <= 0;
+        // Cross-location check for the reorder-request icon below — a
+        // size can be truly unavailable AT THIS STORE (trulyUnavailable
+        // above) while another store still has it, which isn't worth
+        // reordering yet. stockByLocation carries every store's raw
+        // quantity+storage (see loadInventory()), so this is the same
+        // "not available in either location" condition a cashier would
+        // actually mean by "we're out of this."
+        const totalEverywhere = Object.values(v.stockByLocation || {}).reduce((s, loc) => s + (loc.quantity || 0) + (loc.storage || 0), 0);
+        const unavailableEverywhere = trulyUnavailable && totalEverywhere <= 0;
+        const alreadyRequested = requestedReorderThisSession.has(v.id);
+        const stockLine = avail > 0
+            ? `<div style="font-size:0.68rem; color:var(--success-color)">${avail} ${t('vm.stock_left_suffix')}</div>`
+            : (storageQty > 0
+                ? `<div style="font-size:0.68rem; color:var(--warning-text, #9a6b0a)">${storageQty} ${t('storage.in_storage_suffix')}</div>`
+                : `<div style="font-size:0.68rem; color:var(--danger-color)">0 ${t('vm.stock_left_suffix')}</div>`);
+        const reorderIconHtml = unavailableEverywhere
+            ? `<div class="reorder-request-icon ${alreadyRequested ? 'sent' : ''}" title="${alreadyRequested ? t('reorderreq.sent_title') : t('reorderreq.icon_title')}"
+                   onclick="event.stopPropagation(); ${alreadyRequested ? '' : `openRequestReorderModal(${v.id}, '${escapeHtml(p.name)} — ${v.colorName} / ${v.size}')`}">
+                   <i class="fas ${alreadyRequested ? 'fa-check' : 'fa-bell-concierge'}"></i>
+               </div>`
+            : '';
+        return `
+        <div class="variant-chip ${trulyUnavailable ? 'disabled' : ''}" onclick="posScanOrSelectVariant(${p.id}, ${v.id})">
+            <div class="adj-icon" onclick="event.stopPropagation(); openAdjustModal(${v.id}, '${escapeHtml(p.name)} — ${v.colorName} / ${v.size}')"><i class="fas fa-sliders"></i></div>
+            ${reorderIconHtml}
+            <div style="width:14px; height:14px; border-radius:50%; background:${v.colorHex}; margin:0 auto 4px auto; border:1px solid #fff;"></div>
+            ${v.isClearance ? `<div class="sale-badge" title="${t('clearance.final_sale_title')}">${t('pos.sale_badge')}</div>` : ''}
+            ${avail <= 0 && storageQty > 0 ? `<div class="storage-badge" title="${t('storage.in_storage_title')}">${t('storage.badge')}</div>` : ''}
+            <!-- Colour name as real text, not just the dot — a similar shade
+                 or an unusual hex value can be genuinely hard to tell apart
+                 by eye alone. -->
+            <div style="font-size:0.62rem; color:var(--text-secondary); line-height:1.2; margin-bottom:2px;" title="${escapeHtml(v.colorName)}">${escapeHtml(v.colorName)}</div>
+            <div style="font-weight:700; font-size:0.85rem;">${v.size}</div>
+            <div style="font-size:0.68rem; opacity:0.7;">€${Number(v.price).toFixed(2)}</div>
+            ${stockLine}
+        </div>`;
+    }
+
+    // Same toggle-on-click / outside-click-closes anchored popup pattern as
+    // toggleStorageSiblingHint()/toggleOtherLocationHint() — never a modal,
+    // never blocks anything, just a glance.
+    function toggleColorBubbleTooltip(event, colorName) {
+        event.stopPropagation();
+        const existing = document.getElementById('colorBubbleTooltip');
+        if (existing) { existing.remove(); document.removeEventListener('click', closeColorBubbleTooltipOnOutsideClick); if (existing.dataset.label === colorName) return; }
+        const bubble = event.currentTarget;
+        const rect = bubble.getBoundingClientRect();
+        const popup = document.createElement('div');
+        popup.id = 'colorBubbleTooltip';
+        popup.className = 'color-bubble-tooltip';
+        popup.dataset.label = colorName;
+        popup.style.top = `${rect.bottom + window.scrollY + 5}px`;
+        popup.style.left = `${Math.max(8, rect.left + window.scrollX - 20)}px`;
+        popup.textContent = colorName;
+        document.body.appendChild(popup);
+        setTimeout(() => document.addEventListener('click', closeColorBubbleTooltipOnOutsideClick), 0);
+    }
+    function closeColorBubbleTooltipOnOutsideClick() {
+        document.getElementById('colorBubbleTooltip')?.remove();
+        document.removeEventListener('click', closeColorBubbleTooltipOnOutsideClick);
     }
 
     // Cashier side of the reorder-request flow (rpc_request_reorder — any
@@ -3647,8 +3773,11 @@
             requestedReorderThisSession.add(requestReorderVariantId);
             toast(t('reorderreq.sent_toast'), 'success');
             closeModal('requestReorderModal');
-            // Re-render so the icon flips to the "sent" checkmark immediately.
-            if (currentOpenProductId != null) openProduct(currentOpenProductId);
+            // Re-render so the icon flips to the "sent" checkmark immediately
+            // — renderVariantModalLevel(), not openProduct(), since this icon
+            // only ever appears on the colour level and resetting to the
+            // size list here would lose the cashier's place.
+            if (currentOpenProductId != null) renderVariantModalLevel();
         } catch (e) {
             toast(t('reorderreq.error_prefix') + ' ' + e.message, 'error');
         }
@@ -3687,7 +3816,10 @@
             renderProducts(applyPosFilters(lastSearchResults !== null ? lastSearchResults : products));
         }
         if (document.getElementById('variantModal').classList.contains('active') && currentOpenProductId != null) {
-            openProduct(currentOpenProductId);
+            // Re-renders whichever level (sizes, or one size's colours) is
+            // currently open — NOT openProduct(), which would reset back to
+            // the size list and lose the cashier's place mid-selection.
+            renderVariantModalLevel();
         }
     }
 
