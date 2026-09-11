@@ -1464,6 +1464,14 @@
             <div class="vm-content">
                 <h2 data-i18n="reorder.title">Reorder list</h2>
                 <div id="reorderCartBody"></div>
+                <!-- Everything already PRINTED but not yet marked ordered —
+                     this is what makes a printed batch an ongoing, revisitable
+                     list instead of a dead end once it leaves the cart above.
+                     See rpc_get_reorder_tracking / rpc_mark_reorder_ordered. -->
+                <div class="reorder-tracking-section" style="margin-top:20px; padding-top:16px; border-top:1px solid rgba(36,22,30,0.08);">
+                    <h3 style="font-size:0.95rem; margin-bottom:8px;" data-i18n="reordertrack.title">Awaiting order</h3>
+                    <div id="reorderTrackingBody"></div>
+                </div>
             </div>
         </div>
     </div>
@@ -1954,6 +1962,12 @@
             'reorderreq.icon_title': 'Request this be reordered', 'reorderreq.sent_title': 'Reorder requested',
             'reorderreq.sent_toast': 'Sent to your manager.', 'reorderreq.error_prefix': "Couldn't send the request:",
             'reorderreq.badge': 'Requested by staff',
+            'reordertrack.title': 'Awaiting order', 'reordertrack.empty': 'Nothing printed yet.',
+            'reordertrack.none_pending': 'Everything printed has been ordered.', 'reordertrack.ordered_history': 'Already ordered',
+            'reordertrack.ordered_by_prefix': 'Ordered by', 'reordertrack.mark_ordered_title': 'Mark as ordered',
+            'reordertrack.undo_title': 'Undo — not actually ordered yet', 'reordertrack.marked_toast': 'Marked as ordered.',
+            'reordertrack.unmarked_toast': 'Moved back to awaiting order.', 'reordertrack.load_error': "Couldn't load:",
+            'reordertrack.error_prefix': "Couldn't update:",
             'nav.customer_note': 'Customer note', 'note.title': 'Quick note', 'note.subtitle': "Product ideas, comments, notes, or customer feedback.",
             'note.type_product': 'Product idea', 'note.type_feedback': 'Feedback', 'note.type_other': 'Other',
             'note.placeholder': 'Type your note here', 'note.submit': 'Save note', 'note.empty_error': 'Write something first.',
@@ -2243,6 +2257,12 @@
             'reorderreq.icon_title': 'Prašyti papildyti šią prekę', 'reorderreq.sent_title': 'Prašymas išsiųstas',
             'reorderreq.sent_toast': 'Išsiųsta', 'reorderreq.error_prefix': 'Nepavyko išsiųsti prašymo:',
             'reorderreq.badge': 'Darbuotojo prašymas',
+            'reordertrack.title': 'Laukiama užsakymo', 'reordertrack.empty': 'Kol kas nieko neatspausdinta.',
+            'reordertrack.none_pending': 'Visos atspausdintos prekės jau užsakytos.', 'reordertrack.ordered_history': 'Jau užsakyta',
+            'reordertrack.ordered_by_prefix': 'Užsakė', 'reordertrack.mark_ordered_title': 'Pažymėti kaip užsakyta',
+            'reordertrack.undo_title': 'Atšaukti — dar neužsakyta', 'reordertrack.marked_toast': 'Pažymėta kaip užsakyta.',
+            'reordertrack.unmarked_toast': 'Grąžinta į laukiančių sąrašą.', 'reordertrack.load_error': 'Nepavyko įkelti:',
+            'reordertrack.error_prefix': 'Nepavyko atnaujinti:',
             'nav.customer_note': 'Pastaba', 'note.title': 'Greita pastaba', 'note.subtitle': 'Prekių idėjos, komentarai, pastabos arba klientų atsiliepimai.',
             'note.type_product': 'Prekės idėja', 'note.type_feedback': 'Atsiliepimas', 'note.type_other': 'Kita',
             'note.placeholder': 'Komentarą rašykite čia', 'note.submit': 'Išsaugoti', 'note.empty_error': 'Pirmiausia parašykite tekstą.',
@@ -7974,6 +7994,96 @@
     function openReorderListModal() {
         renderReorderCartModal();
         document.getElementById('reorderListModal').classList.add('active');
+        loadReorderTracking();
+    }
+
+    /* ============================================================
+       REORDER TRACKING — the "awaiting order" section of the same modal:
+       every PRINTED batch's ADDED lines, split into still-pending (grouped
+       by supplier, same grouping printReorderList() already uses) and an
+       already-ordered history underneath. rpc_get_reorder_tracking is
+       re-fetched fresh every time the modal opens rather than cached —
+       this is deliberately a live, shared, ongoing list across however many
+       managers/sessions touch it, not a per-session cart like reorderCart.
+       ============================================================ */
+    let lastReorderTrackingRows = [];
+
+    async function loadReorderTracking() {
+        const body = document.getElementById('reorderTrackingBody');
+        body.innerHTML = `<p class="muted" style="font-size:0.8rem;"><i class="fas fa-spinner fa-spin"></i> ${t('common.loading')}</p>`;
+        try {
+            const { data, error } = await sb.rpc('rpc_get_reorder_tracking', { p_location_id: null });
+            if (error) throw error;
+            lastReorderTrackingRows = data || [];
+            renderReorderTracking();
+        } catch (e) {
+            body.innerHTML = `<p class="muted" style="font-size:0.8rem; color:var(--danger-color);">${t('reordertrack.load_error')} ${e.message}</p>`;
+        }
+    }
+
+    function renderReorderTracking() {
+        const body = document.getElementById('reorderTrackingBody');
+        const pending = lastReorderTrackingRows.filter(r => !r.ordered_at);
+        const ordered = lastReorderTrackingRows.filter(r => r.ordered_at);
+        if (pending.length === 0 && ordered.length === 0) {
+            body.innerHTML = `<p class="muted" style="font-size:0.8rem;">${t('reordertrack.empty')}</p>`;
+            return;
+        }
+        const bySupplier = {};
+        for (const r of pending) {
+            const key = r.supplier_name || t('reorder.no_supplier');
+            (bySupplier[key] = bySupplier[key] || []).push(r);
+        }
+        const pendingHtml = Object.keys(bySupplier).sort().map(supName => `
+            <div style="font-size:0.75rem; font-weight:700; margin:10px 0 4px;">${escapeHtml(supName)}</div>
+            ${bySupplier[supName].map(renderReorderTrackingRow).join('')}
+        `).join('');
+        const orderedHtml = ordered.length ? `
+            <details style="margin-top:14px;">
+                <summary style="font-size:0.8rem; cursor:pointer;">${t('reordertrack.ordered_history')} (${ordered.length})</summary>
+                ${ordered.map(renderReorderTrackingRow).join('')}
+            </details>` : '';
+        body.innerHTML = (pending.length ? pendingHtml : `<p class="muted" style="font-size:0.8rem;">${t('reordertrack.none_pending')}</p>`) + orderedHtml;
+    }
+
+    function renderReorderTrackingRow(r) {
+        const label = escapeHtml(`${r.product_name} — ${r.color_name} / ${r.size}`);
+        const isOrdered = !!r.ordered_at;
+        const who = isOrdered
+            ? `${t('reordertrack.ordered_by_prefix')} ${escapeHtml(r.ordered_by_name || '')}`
+            : (r.requester_name ? `${t('reorderreq.badge')}: ${escapeHtml(r.requester_name)}${r.comment ? ' — ' + escapeHtml(r.comment) : ''}` : '');
+        return `<div class="reorder-cart-row">
+            <div class="reorder-cart-info">
+                <div class="reorder-cart-name">${label} <span class="ts-sub">· ${escapeHtml(r.sku)} · ${escapeHtml(r.location_name)} · ${t('reorder.col_qty')}: ${isOrdered ? r.ordered_qty : r.decided_qty}</span></div>
+                ${who ? `<div class="ts-sub">${who}</div>` : ''}
+            </div>
+            ${isOrdered
+                ? `<button class="icon-btn-sm" onclick="unmarkReorderOrdered(${r.decision_id})" title="${t('reordertrack.undo_title')}"><i class="fas fa-rotate-left"></i></button>`
+                : `<button class="icon-btn-sm restock-add-btn" onclick="markReorderOrdered(${r.decision_id})" title="${t('reordertrack.mark_ordered_title')}"><i class="fas fa-check"></i></button>`
+            }
+        </div>`;
+    }
+
+    async function markReorderOrdered(decisionId) {
+        try {
+            const { error } = await sb.rpc('rpc_mark_reorder_ordered', { p_decision_id: decisionId, p_ordered_qty: null });
+            if (error) throw error;
+            toast(t('reordertrack.marked_toast'), 'success');
+            loadReorderTracking();
+        } catch (e) {
+            toast(t('reordertrack.error_prefix') + ' ' + e.message, 'error');
+        }
+    }
+
+    async function unmarkReorderOrdered(decisionId) {
+        try {
+            const { error } = await sb.rpc('rpc_unmark_reorder_ordered', { p_decision_id: decisionId });
+            if (error) throw error;
+            toast(t('reordertrack.unmarked_toast'), 'success');
+            loadReorderTracking();
+        } catch (e) {
+            toast(t('reordertrack.error_prefix') + ' ' + e.message, 'error');
+        }
     }
 
     function reorderCartTotals() {
