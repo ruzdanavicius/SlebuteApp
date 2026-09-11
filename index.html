@@ -2807,6 +2807,52 @@
     let scanBuffer = '';
     let scanKeyTimes = [];
 
+    // QA-AUDIT FIX: a hardware scanner emulates a raw US-layout keyboard —
+    // it sends physical scancodes, not characters. `KeyboardEvent.key` runs
+    // those scancodes through whatever OS keyboard layout is active, so on
+    // e.g. Lithuanian layout the scanner's digit keys come out as Lithuanian
+    // letters (ą č ę ė į š ų ū ž — Lithuanian layout requires Shift for
+    // digits) and other symbols. `KeyboardEvent.code` is layout-independent
+    // (it names the physical key), so map that through a fixed US-QWERTY
+    // table ourselves instead of trusting `.key`. This makes scanning work
+    // the same regardless of the PC's keyboard layout — only "ENG INTL"
+    // happened to line up with `.key` before.
+    const US_LAYOUT_CODE_MAP = (() => {
+        const m = {};
+        const digits = [')','!','@','#','$','%','^','&','*','('];
+        for (let i = 0; i <= 9; i++) m['Digit' + i] = { n: String(i), s: digits[i] };
+        for (let i = 0; i < 26; i++) {
+            const ch = String.fromCharCode(97 + i);
+            m['Key' + ch.toUpperCase()] = { n: ch, s: ch.toUpperCase() };
+        }
+        Object.assign(m, {
+            Minus: { n: '-', s: '_' }, Equal: { n: '=', s: '+' },
+            BracketLeft: { n: '[', s: '{' }, BracketRight: { n: ']', s: '}' },
+            Backslash: { n: '\\', s: '|' }, Semicolon: { n: ';', s: ':' },
+            Quote: { n: "'", s: '"' }, Backquote: { n: '`', s: '~' },
+            Comma: { n: ',', s: '<' }, Period: { n: '.', s: '>' },
+            Slash: { n: '/', s: '?' }, Space: { n: ' ', s: ' ' },
+            NumpadDecimal: { n: '.', s: '.' }, NumpadAdd: { n: '+', s: '+' },
+            NumpadSubtract: { n: '-', s: '-' }, NumpadMultiply: { n: '*', s: '*' },
+            NumpadDivide: { n: '/', s: '/' },
+        });
+        for (let i = 0; i <= 9; i++) m['Numpad' + i] = { n: String(i), s: String(i) };
+        return m;
+    })();
+
+    // Resolves a keydown to the character a US-layout keyboard would have
+    // produced for that physical key, or null if it's not a printable key
+    // at all (arrows, Tab, modifiers, etc.) — layout-independent by design.
+    function usLayoutChar(e) {
+        const entry = US_LAYOUT_CODE_MAP[e.code];
+        if (!entry) return null;
+        if (/^Key[A-Z]$/.test(e.code)) {
+            const capsOn = e.getModifierState && e.getModifierState('CapsLock');
+            return (e.shiftKey !== !!capsOn) ? entry.s : entry.n;
+        }
+        return e.shiftKey ? entry.s : entry.n;
+    }
+
     function resetScanBuffer() { scanBuffer = ''; scanKeyTimes = []; }
 
     function looksLikeHardwareScan() {
@@ -2833,7 +2879,7 @@
 
         document.addEventListener('keydown', (e) => {
             const t = performance.now();
-            if (e.key === 'Enter') {
+            if (e.code === 'Enter' || e.code === 'NumpadEnter') {
                 const activeIsBarcodeField = document.activeElement === barcodeInput;
                 const isScan = scanCouldOwnFocus() && looksLikeHardwareScan();
                 if (isScan) {
@@ -2853,16 +2899,17 @@
                 }
                 return;
             }
-            if (e.key === 'Backspace') {
+            if (e.code === 'Backspace') {
                 scanBuffer = scanBuffer.slice(0, -1);
                 scanKeyTimes.pop();
                 return;
             }
-            if (e.key.length === 1) {
-                scanBuffer += e.key;
+            const ch = usLayoutChar(e);
+            if (ch !== null) {
+                scanBuffer += ch;
                 scanKeyTimes.push(t);
                 if (scanBuffer.length > 40) { scanBuffer = scanBuffer.slice(-40); scanKeyTimes = scanKeyTimes.slice(-40); }
-            } else if (e.key !== 'Shift' && e.key !== 'CapsLock') {
+            } else if (e.code !== 'ShiftLeft' && e.code !== 'ShiftRight' && e.code !== 'CapsLock') {
                 resetScanBuffer();
             }
         }, true);
