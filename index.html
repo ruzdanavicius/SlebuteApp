@@ -3477,7 +3477,19 @@
         // control off the checkout screen means a cashier never has an
         // interactive "create a discount" button anywhere near a live sale —
         // the SALE badge below is read-only, informational.
-        document.getElementById('variantGrid').innerHTML = p.variants.map(v => {
+        // Available sizes first (small → large, via the same compareSizes()
+        // used elsewhere for size ordering), truly-unavailable ones after —
+        // so a cashier checking what's actually sellable isn't scanning past
+        // greyed-out sizes to find the ones that matter. "Available" here
+        // matches the chip's own tap-ability below: display stock OR storage
+        // stock counts, only 0-and-0 sorts to the back.
+        const sortedVariants = p.variants.slice().sort((a, b) => {
+            const aUnavail = availableStock(a) <= 0 && (a.storageStock || 0) <= 0;
+            const bUnavail = availableStock(b) <= 0 && (b.storageStock || 0) <= 0;
+            if (aUnavail !== bUnavail) return aUnavail ? 1 : -1;
+            return compareSizes(a.size, b.size);
+        });
+        document.getElementById('variantGrid').innerHTML = sortedVariants.map(v => {
             const avail = availableStock(v);
             // storageStock is already scoped to VIEW_LOCATION_ID (see
             // loadInventory()) — a variant "in storage" here means in
