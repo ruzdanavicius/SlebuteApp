@@ -965,7 +965,7 @@
                             <div class="section-title" data-i18n="inv.style_reference">Style Reference</div>
                             <div class="form-group">
                                 <label data-i18n="inv.base_barcode">Base Barcode (scan tag)</label>
-                                <input type="text" class="form-input" id="new_base_barcode" placeholder="e.g. H-2026-01" onblur="autoFillProduct()" onkeydown="if(event.key === 'Enter'){event.preventDefault(); this.blur();}">
+                                <input type="text" class="form-input kb-toggle-input" inputmode="none" id="new_base_barcode" placeholder="e.g. H-2026-01" onblur="autoFillProduct()" onkeydown="if(event.key === 'Enter'){event.preventDefault(); this.blur();}">
                                 <div class="helper-text" style="display:block;" data-i18n="inv.base_barcode_hint">No barcode on the garment? Leave this blank — a reference like "keln-001" (from the category) is assigned automatically. It won't match future scans the way a real tag barcode would.</div>
                                 <span id="foundMsg" class="helper-text"><i class="fas fa-check-circle"></i> <span data-i18n="inv.loaded_existing">Loaded existing style — editing.</span></span>
                             </div>
@@ -1359,7 +1359,7 @@
                 <p class="muted" style="font-size:0.85rem; margin-bottom:12px;" id="returnsHint"><span data-i18n="returns.hint_prefix">Scan each returned item — stock updates at</span> <span id="returnsStoreLabel" data-i18n="returns.this_store">this store</span> <span data-i18n="returns.hint_suffix">once confirmed.</span></p>
 
                 <div id="returnsLookupBar" style="display:flex; gap:8px; margin-bottom:12px;">
-                    <input type="text" id="returnsOrderInput" class="form-input" data-i18n-placeholder="returns.order_number_placeholder" placeholder="Order number (e.g. SESK-2026-00421)" onkeydown="if(event.key==='Enter'){event.preventDefault(); lookupOrderManual();}">
+                    <input type="text" id="returnsOrderInput" class="form-input kb-toggle-input" inputmode="none" data-i18n-placeholder="returns.order_number_placeholder" placeholder="Order number (e.g. SESK-2026-00421)" onkeydown="if(event.key==='Enter'){event.preventDefault(); lookupOrderManual();}">
                     <button class="btn btn-ghost" onclick="lookupOrderManual()"><i class="fas fa-magnifying-glass"></i> <span data-i18n="returns.lookup">Find</span></button>
                 </div>
 
@@ -2880,7 +2880,8 @@
         document.addEventListener('keydown', (e) => {
             const t = performance.now();
             if (e.code === 'Enter' || e.code === 'NumpadEnter') {
-                const activeIsBarcodeField = document.activeElement === barcodeInput;
+                const active = document.activeElement;
+                const activeIsBarcodeField = active === barcodeInput;
                 const isScan = scanCouldOwnFocus() && looksLikeHardwareScan();
                 if (isScan) {
                     e.preventDefault();
@@ -2890,6 +2891,33 @@
                 } else if (activeIsBarcodeField) {
                     resetScanBuffer();
                     resolveScan(barcodeInput.value, false);
+                } else if (active && active.matches && active.matches('.kb-toggle-input') && looksLikeHardwareScan()) {
+                    // Same layout-independence fix as the POS barcode field
+                    // above, extended to every other field a hardware
+                    // scanner can type into (storage's manual/scan input,
+                    // storage/product/supplier search, the new-product base
+                    // barcode field, returns' order/SKU field — see the
+                    // "kb-toggle-input" class list at KEYBOARD TOGGLE
+                    // below). The OS keyboard layout can still mangle what
+                    // actually lands in .value while the field is focused
+                    // (same root cause as the POS field), so overwrite it
+                    // with the layout-independent buffer before letting this
+                    // field's own Enter/oninput handling run.
+                    //
+                    // Gated on looksLikeHardwareScan() (a burst averaging
+                    // under 40ms/char) as well as Enter, not just Enter
+                    // alone: every one of these fields either has no Enter
+                    // behavior at all (the live-filter search boxes — a
+                    // human never needs Enter there) or is a pure
+                    // SKU/barcode/order-number field where genuine manual
+                    // entry is plain ASCII anyway, so this can't clobber a
+                    // hand-typed search term.
+                    const corrected = scanBuffer;
+                    resetScanBuffer();
+                    if (active.value !== corrected) {
+                        active.value = corrected;
+                        active.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
                 } else {
                     // Focused elsewhere (discount %, cash tendered, split
                     // payment, customer name/phone, price/cost fields, etc.)
@@ -9051,7 +9079,8 @@ ${qrBlock}${field(skuG, qrColX, skuY)}${field(priceG, blockX, mm(1.5))}${compBlo
     /* ============================================================
        KEYBOARD TOGGLE — barcode/search fields (see the "kb-toggle-input"
        class on #barcodeInput, #storageTabSearch, #storageTabScanManualInput,
-       #productSearchBox, #new_supplier, #supplierSearchBox) default to
+       #productSearchBox, #new_supplier, #supplierSearchBox, #new_base_barcode,
+       #returnsOrderInput) default to
        inputmode="none", which tells a touch device not to pop the on-screen
        keyboard on focus. A barcode scanner types into these fields as real
        HID key events — completely unaffected by inputmode — so scanning
