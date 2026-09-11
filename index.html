@@ -3256,6 +3256,15 @@
             };
         });
         lastSearchResults = null; // a fresh catalog load supersedes any in-progress style/barcode search
+        // The search box's own text is part of that same "supersedes" — a
+        // scanned/typed code left in the field after an automatic reload
+        // (returning to this tab, the visibility/online resync in
+        // forceResync(), etc.) would otherwise sit there pointing at a
+        // filter that no longer applies, since the grid above always goes
+        // back to the full (category-filtered) catalog. Never clears mid-
+        // type: every call here is a genuine full reload, not the field's
+        // own oninput handler.
+        barcodeInput.value = '';
         renderCategoryFilterBar();
         renderProducts(applyPosFilters(products));
         if (document.getElementById('view-inventory').classList.contains('active')) renderProductsList();
@@ -9060,6 +9069,13 @@ ${qrBlock}${field(skuG, qrColX, skuY)}${field(priceG, blockX, mm(1.5))}${compBlo
         if (view === 'pos') { barcodeInput.focus(); loadInventory(); }
         else if (view === 'storage') { openStorageTab(); }
         else if (view === 'inventory') {
+            // Same "an automatic refresh must not leave a stale search term
+            // pointing at a filter that no longer applies" rule as POS's
+            // loadInventory() — cleared here (view entry) rather than
+            // inside renderProductsList() itself, since that function is
+            // also the search box's own oninput handler and must never
+            // clear mid-type.
+            document.getElementById('productSearchBox').value = '';
             renderProductsList();
             // Only jump straight into a blank "New Style" form if one was
             // already in progress (colorBlocksContainer non-empty — a draft
@@ -9073,7 +9089,13 @@ ${qrBlock}${field(skuG, qrColX, skuY)}${field(priceG, blockX, mm(1.5))}${compBlo
         else if (view === 'register') { renderRegisterView(); }
         else if (view === 'dailysales') { renderDailySalesView(); }
         else if (view === 'dashboard') { renderDashboardView(); }
-        else if (view === 'suppliers') { loadSuppliers(); }
+        else if (view === 'suppliers') {
+            // Same rule as POS/Manage Catalog above — cleared at view entry,
+            // not inside loadSuppliers() itself, since that also runs after
+            // save/delete while a manager is deliberately still filtered.
+            document.getElementById('supplierSearchBox').value = '';
+            loadSuppliers();
+        }
     }
 
     /* ============================================================
