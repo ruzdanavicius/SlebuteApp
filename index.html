@@ -339,10 +339,6 @@
         .payment-tabs { display:flex; gap:6px; margin-bottom: 10px; }
         .pay-tab { flex:1; text-align:center; padding: 9px 4px; border-radius: 9px; background: var(--input-bg); border: 1px solid rgba(36,22,30,0.08); cursor:pointer; font-size: 0.78rem; font-weight:600; color: var(--text-secondary); }
         .pay-tab.active { background: var(--accent-color); color: white; border-color: var(--accent-color); }
-        .cash-row { display:flex; gap:6px; margin-bottom: 8px; flex-wrap:wrap; }
-        .cash-chip { flex: 1; min-width: 50px; text-align:center; padding: 8px 4px; border-radius: 8px; background: var(--input-bg); border: 1px solid rgba(36,22,30,0.08); cursor:pointer; font-size: 0.78rem; font-weight:600; color: var(--text-primary); }
-        .cash-chip:hover { border-color: var(--accent-color); }
-        .cash-chip-exact { width: 100%; padding: 12px 4px; font-size: 0.88rem; }
         .split-inputs { display:flex; gap:8px; margin-bottom: 8px; }
         .split-field { flex:1; min-width:0; }
         .split-inputs input { width:100%; flex:1; min-width:0; background: var(--input-bg); border: 1px solid rgba(36,22,30,0.14); border-radius: 8px; color: var(--text-primary); padding: 9px; font-size: 0.85rem; outline:none; }
@@ -449,6 +445,11 @@
         .ds-stock-refund-icon:hover { opacity:1; }
         .ds-stock-transfer-icon { cursor:pointer; opacity:0.6; flex-shrink:0; }
         .ds-stock-transfer-icon:hover { opacity:1; color: var(--accent-color); }
+        /* Non-intrusive "sold out of stock" flag — see confirmSellOutOfStock()/
+           rpc_process_pos_sale's oversold override. Hover (desktop) or tap
+           (touch) shows the exact same auto-generated note a manager sees in
+           Customer Notes, via showOversoldNoteFromRow(). */
+        .ds-oos-flag { color: var(--danger-color); margin-left: 5px; cursor: pointer; font-size: 0.8em; }
         .rebalance-store-row { display:flex; align-items:center; gap:10px; padding:10px; background:var(--input-bg); border-radius:8px; }
         .rebalance-store-row input[type=number] { width:60px; text-align:center; -moz-appearance:textfield; }
 
@@ -746,8 +747,6 @@
             .cart-item img { width: 36px; height: 36px; }
             .discount-row select, .discount-row input { padding: 6px 8px; font-size: 0.76rem; }
             .pay-tab { padding: 7px 3px; font-size: 0.75rem; }
-            .cash-chip { padding: 6px 3px; font-size: 0.75rem; }
-            .cash-chip-exact { padding: 8px 4px; font-size: 0.82rem; }
             .totals-row { font-size: 0.8rem; margin-bottom: 4px; }
             .totals-row.grand { font-size: 1.15rem; margin: 4px 0 8px; }
             .pay-btn { padding: 12px; font-size: 0.92rem; }
@@ -1258,7 +1257,6 @@
                 </div>
 
                 <div id="cashPaySection">
-                    <div class="cash-row" id="cashChips"></div>
                     <div class="pay-field-label" data-i18n="cart.cash_tendered">Cash tendered (€)</div>
                     <input type="number" class="form-input" id="cashTenderedInput" placeholder="0.00" oninput="onCashTenderedChange()" style="margin-bottom:6px;">
                 </div>
@@ -2042,7 +2040,8 @@
             'toast.no_variants_print': 'No variants to print labels for.', 'toast.label_sent': 'Label sent to printer.',
             'toast.usb_not_supported': 'This browser does not support direct USB printing.', 'toast.sent_to_printer': 'Sent to printer.',
             'toast.usb_print_failed': 'USB print failed:', 'toast.no_product_found_prefix': 'No product found for',
-            'cart.cash_exact': 'Exact', 'inv.applying': 'Applying...', 'inv.apply_to_all_sizes': 'Apply to all sizes',
+            'inv.applying': 'Applying...', 'inv.apply_to_all_sizes': 'Apply to all sizes',
+            'oos.confirm_suffix': 'is out of stock. Add to basket anyway?',
             'inv.col_sku': 'SKU (blank=auto)', 'inv.col_price': 'Price €', 'inv.col_cost': 'Cost €', 'inv.no_supplier': 'No supplier',
             'inv.supplier_search_placeholder': 'Type to search or add a supplier...', 'inv.add_new_supplier_prefix': '+ Add new supplier:',
             'toast.supplier_created': 'New supplier added.', 'toast.supplier_name_required': 'Type a supplier name first.',
@@ -2344,7 +2343,8 @@
             'toast.no_variants_print': 'Nėra variantų etikečių spausdinimui.', 'toast.label_sent': 'Etiketė išsiųsta į spausdintuvą.',
             'toast.usb_not_supported': 'Ši naršyklė nepalaiko tiesioginio USB spausdinimo.', 'toast.sent_to_printer': 'Išsiųsta į spausdintuvą.',
             'toast.usb_print_failed': 'Nepavyko spausdinti per USB:', 'toast.no_product_found_prefix': 'Prekė nerasta pagal',
-            'cart.cash_exact': 'Tiksliai', 'inv.applying': 'Taikoma...', 'inv.apply_to_all_sizes': 'Taikyti visiems dydžiams',
+            'inv.applying': 'Taikoma...', 'inv.apply_to_all_sizes': 'Taikyti visiems dydžiams',
+            'oos.confirm_suffix': 'nėra likučio. Vis tiek pridėti į krepšelį?',
             'inv.col_sku': 'SKU (tuščia=auto)', 'inv.col_price': 'Kaina €', 'inv.col_cost': 'Savikaina €', 'inv.no_supplier': 'Nėra tiekėjo',
             'inv.supplier_search_placeholder': 'Rašykite, kad ieškotumėte arba pridėtumėte tiekėją...', 'inv.add_new_supplier_prefix': '+ Pridėti naują tiekėją:',
             'toast.supplier_created': 'Naujas tiekėjas pridėtas.', 'toast.supplier_name_required': 'Pirmiausia įveskite tiekėjo pavadinimą.',
@@ -2594,6 +2594,18 @@
 
     const grid = document.getElementById('productGrid');
     const barcodeInput = document.getElementById('barcodeInput');
+    const cashTenderedInputEl = document.getElementById('cashTenderedInput');
+
+    // Puts the cursor wherever a cashier should type next: "cash tendered" once
+    // there's something in the basket and Cash is the tender (the common
+    // case, matching request 2026-09-12 — no extra tap to start typing the
+    // amount), the barcode field otherwise (empty basket, or Card/Split where
+    // there's no free-text amount field to prefill). Scanning still works
+    // with focus on either field — see scanCouldOwnFocus().
+    function focusPosEntryPoint() {
+        if (cart.length > 0 && paymentMethod === 'CASH') cashTenderedInputEl.focus();
+        else barcodeInput.focus();
+    }
 
 
     /* ============================================================
@@ -2885,7 +2897,6 @@
         await loadStores();
         setupLocationSelector();
         setPaymentMethod('CASH');
-        renderCashChips();
         setupScanner();
         subscribeRealtime();
         await loadSupplierPicker(); // needed before loadInventory renders any catalog rows with the supplier dropdown
@@ -2989,7 +3000,14 @@
         return e.shiftKey ? entry.s : entry.n;
     }
 
-    function resetScanBuffer() { scanBuffer = ''; scanKeyTimes = []; }
+    // Snapshot of cashTenderedInput's value from just before the CURRENT
+    // scan burst started (see the char-buffering below) — restored if the
+    // burst turns out to be a hardware scan, so a scanned code's digits can
+    // never leak into a typed cash amount (see the Enter handler's isScan
+    // branch). Stays null whenever there's nothing to roll back.
+    let cashPreScanValue = null;
+
+    function resetScanBuffer() { scanBuffer = ''; scanKeyTimes = []; cashPreScanValue = null; }
 
     function looksLikeHardwareScan() {
         if (scanBuffer.length < 3 || scanKeyTimes.length < 3) return false;
@@ -2999,12 +3017,16 @@
         return avg < 40; // ms/char — real scanners are typically well under this, human typing isn't
     }
 
-    // True only when the barcode field is focused, or nothing meaningfully
-    // focused (activeElement is missing/body) — i.e. there's no other field
-    // whose own Enter behavior this listener could be stepping on.
+    // True when the barcode field is focused, or nothing meaningfully focused
+    // (activeElement is missing/body), or cashTenderedInput is focused — i.e.
+    // there's no other field whose own Enter behavior this listener could be
+    // stepping on. cashTenderedInput is included so a cashier can keep
+    // scanning items straight into the cart while the cursor sits in "cash
+    // tendered" (see focusPosEntryPoint()) — the char-buffering below keeps a
+    // scanned code's digits from ever landing in the typed amount.
     function scanCouldOwnFocus() {
         const el = document.activeElement;
-        return el === barcodeInput || !el || el === document.body;
+        return el === barcodeInput || el === cashTenderedInputEl || !el || el === document.body;
     }
 
     function setupScanner() {
@@ -3022,6 +3044,16 @@
                 if (isScan) {
                     e.preventDefault();
                     const code = scanBuffer;
+                    // A scanned code's characters still land natively in
+                    // cashTenderedInput's own value as they're "typed" (this
+                    // listener never preventDefault()s individual chars) —
+                    // roll the field back to what it held before this burst
+                    // started so none of that leaks into the amount. See the
+                    // snapshot taken below where scanBuffer starts a new
+                    // burst.
+                    if (active === cashTenderedInputEl && cashPreScanValue !== null) {
+                        cashTenderedInputEl.value = cashPreScanValue;
+                    }
                     resetScanBuffer();
                     resolveScan(code, true);
                 } else if (activeIsBarcodeField) {
@@ -3070,6 +3102,13 @@
             }
             const ch = usLayoutChar(e);
             if (ch !== null) {
+                if (scanBuffer.length === 0 && document.activeElement === cashTenderedInputEl) {
+                    // First char of a fresh burst while the amount field is
+                    // focused — snapshot now, before this keystroke's native
+                    // insertion happens (this listener runs in the capture
+                    // phase, ahead of the browser's default action).
+                    cashPreScanValue = cashTenderedInputEl.value;
+                }
                 scanBuffer += ch;
                 scanKeyTimes.push(t);
                 if (scanBuffer.length > 40) { scanBuffer = scanBuffer.slice(-40); scanKeyTimes = scanKeyTimes.slice(-40); }
@@ -3831,7 +3870,7 @@
 
     function closeModal(id) {
         document.getElementById(id).classList.remove('active');
-        if (id === 'variantModal' && document.getElementById('view-pos').classList.contains('active')) barcodeInput.focus();
+        if ((id === 'variantModal' || id === 'receiptModal') && document.getElementById('view-pos').classList.contains('active')) focusPosEntryPoint();
     }
 
     /* ============================================================
@@ -3901,6 +3940,7 @@
         closeModal('variantModal');
         refreshPosStockDisplay(p.id);
         toast(`${t('toast.added_item_prefix')} ${p.name} (${v.size})`, 'success');
+        focusPosEntryPoint();
     }
 
     /* ============================================================
@@ -3931,7 +3971,53 @@
         const storageQty = v.storageStock || 0;
         if (storageQty > 0 && !isRemoteView()) { confirmMoveFromStorage(p.id, v.id); return; }
 
+        // Genuinely nothing anywhere (display or storage) at this store —
+        // offer the out-of-stock override instead of a flat dead-end (own
+        // store only, same scope as "Sell it anyway" above).
+        if (!isRemoteView()) { confirmSellOutOfStock(p, v); return; }
+
         toast(t('toast.no_stock_item'), 'warn');
+    }
+
+    /* ============================================================
+       OUT-OF-STOCK OVERRIDE (request 2026-09-12) — the true last-resort
+       case: the scanned/tapped SKU has nothing on display AND nothing in
+       storage at this store (the "Sell it anyway" rescue above already
+       covers the case where storage still has it). Refusing the sale
+       outright is worse than a one-tap, logged override: confirming adds it
+       to the basket anyway, and rpc_process_pos_sale floors that line's
+       stock at 0 and automatically drops a note into Customer Notes (same
+       feed as manually-submitted feedback) — nothing further for the
+       cashier to fill in. Own-store only.
+       ============================================================ */
+    function confirmSellOutOfStock(p, v) {
+        const label = `${p.name} — ${v.colorName} / ${v.size}`;
+        if (confirm(`${label} ${t('oos.confirm_suffix')}`)) {
+            addOversoldToCart(p, v);
+        }
+    }
+
+    // Deliberately bypasses addToCart()'s stock<=0 guard — only ever reached
+    // via the explicit confirm() above. Marks the line `oversold: true` so
+    // checkout() tells the server to allow it (rpc_process_pos_sale's
+    // p_items[].oversold) instead of rejecting on insufficient stock.
+    function addOversoldToCart(p, v) {
+        const existing = cart.find(c => c.variantId === v.id);
+        if (existing) { existing.qty++; existing.oversold = true; }
+        else {
+            cart.push({
+                variantId: v.id, productId: p.id, name: p.name, img: p.image_url,
+                size: v.size, colorName: v.colorName, colorHex: v.colorHex,
+                price: Number(v.price), qty: 1, maxStock: v.stock, linePct: 0,
+                isClearance: !!v.isClearance,
+                vatRate: Number(v.vatRate) || 0,
+                oversold: true
+            });
+        }
+        updateCartUI();
+        refreshPosStockDisplay(p.id);
+        toast(`${t('toast.added_item_prefix')} ${p.name} (${v.size})`, 'success');
+        focusPosEntryPoint();
     }
 
     // Native confirm() — one tap, same convention as confirmDelistVariant.
@@ -4084,14 +4170,18 @@
         document.removeEventListener('click', closeOtherLocationHintOnOutsideClick);
     }
 
-    function removeFromCart(vid) { const productId = cart.find(c => c.variantId === vid)?.productId; cart = cart.filter(c => c.variantId !== vid); updateCartUI(); refreshPosStockDisplay(productId); }
+    function removeFromCart(vid) { const productId = cart.find(c => c.variantId === vid)?.productId; cart = cart.filter(c => c.variantId !== vid); updateCartUI(); refreshPosStockDisplay(productId); focusPosEntryPoint(); }
 
     function changeQty(vid, delta) {
         const item = cart.find(c => c.variantId === vid);
         if (!item) return;
         const newQty = item.qty + delta;
         if (newQty <= 0) { removeFromCart(vid); return; }
-        if (newQty > item.maxStock) { toast(t('toast.no_stock'), 'warn'); return; }
+        // Only guard on the way up — an oversold line (see addOversoldToCart())
+        // starts with qty already above maxStock (0) by design, and stepping
+        // it down toward 0 must always be allowed, never treated as "not
+        // enough stock".
+        if (delta > 0 && newQty > item.maxStock) { toast(t('toast.no_stock'), 'warn'); return; }
         item.qty = newQty;
         updateCartUI();
         refreshPosStockDisplay(item.productId);
@@ -4305,13 +4395,6 @@
         payBtn.innerText = `${t('cart.charge_prefix')} ${money(total)}`;
     }
 
-    function renderCashChips() {
-        // Only "Exact" — preset denomination buttons removed per request;
-        // one full-width button that fills the tendered amount with the
-        // exact total due.
-        document.getElementById('cashChips').innerHTML = `<div class="cash-chip cash-chip-exact" onclick="setCashExact()">${t('cart.cash_exact')}</div>`;
-    }
-    function setCashExact() { document.getElementById('cashTenderedInput').value = cartGrandTotal().toFixed(2); updateCartUI(); }
     function onCashTenderedChange() { updateCartUI(); }
 
     function onSplitChange(which) {
@@ -4338,6 +4421,7 @@
             document.getElementById('splitCardInput').value = cartGrandTotal().toFixed(2);
         }
         updateCartUI();
+        focusPosEntryPoint();
     }
 
     /* ============================================================
@@ -4383,7 +4467,7 @@
         const originalText = btn.innerText;
         btn.disabled = true; btn.innerText = t('common.processing');
 
-        const items = cart.map(i => ({ variant_id: i.variantId, quantity: i.qty, discount_pct: i.linePct }));
+        const items = cart.map(i => ({ variant_id: i.variantId, quantity: i.qty, discount_pct: i.linePct, oversold: !!i.oversold }));
         const total = cartGrandTotal();
         const discType = document.getElementById('basketDiscType').value;
         const discVal = discType === 'NONE' ? 0 : (parseFloat(document.getElementById('basketDiscValue').value) || 0);
@@ -4446,9 +4530,8 @@
         document.getElementById('basketDiscType').value = 'NONE';
         document.getElementById('basketDiscValue').value = '';
         document.getElementById('cashTenderedInput').value = '';
-        setPaymentMethod('CASH');
+        setPaymentMethod('CASH'); // also refocuses the barcode field, cart is empty at this point
         updateCartUI();
-        barcodeInput.focus();
     }
 
     /* ============================================================
@@ -7442,6 +7525,22 @@
     }
 
     let dailySalesCurrentDate = null;
+    // Cached so the click handler on the out-of-stock flag icon (see
+    // showOversoldNoteFromRow()) can look a line back up by order_item_id
+    // without a second query — same pattern as the storage-sibling popup.
+    let dailySalesLinesCache = [];
+
+    // The flag icon rendered next to a sold line's product name (see
+    // renderDailySalesContent()) whenever rpc_process_pos_sale recorded this
+    // line as an out-of-stock override — brings up the exact same automatic
+    // note a manager sees in Customer Notes. title="" already covers hover;
+    // this covers tap/click on touch/tablet.
+    function showOversoldNoteFromRow(event, orderItemId) {
+        event.stopPropagation();
+        const line = dailySalesLinesCache.find(l => l.order_item_id === orderItemId);
+        if (!line || !line.oversold_note_body) return;
+        toast(line.oversold_note_body, 'warn');
+    }
 
     function todayDateStr() {
         const d = new Date();
@@ -7558,6 +7657,7 @@
 
     function renderDailySalesContent(summary, lines, returns) {
         const wrap = document.getElementById('dailySalesWrap');
+        dailySalesLinesCache = lines;
         const itemsSold = lines.filter(l => l.status === 'COMPLETED' && !l.is_refunded).reduce((a,l) => a + l.quantity, 0);
         const voided = lines.filter(l => l.status !== 'COMPLETED').length;
         const orderSubtotals = computeOrderSubtotals(lines);
@@ -7611,7 +7711,7 @@
                             <tr style="${l.status!=='COMPLETED'||l.is_refunded ? 'opacity:0.5; text-decoration:line-through;' : ''}">
                                 <td>${new Date(l.created_at).toLocaleTimeString(currentLocale(), {hour:'2-digit',minute:'2-digit'})}</td>
                                 <td class="muted${hoverCls}" ${hoverAttr}>${escapeHtml(l.base_barcode || '—')}</td>
-                                <td class="${hoverCls.trim()}" ${hoverAttr}>${escapeHtml(l.product_name)}</td>
+                                <td class="${hoverCls.trim()}" ${hoverAttr}>${escapeHtml(l.product_name)}${l.oversold_note_id ? `<i class="fas fa-triangle-exclamation ds-oos-flag" title="${escapeHtml(l.oversold_note_body || '')}" onclick="showOversoldNoteFromRow(event, ${l.order_item_id})"></i>` : ''}</td>
                                 <td>${escapeHtml(l.color_name)}</td>
                                 <td>${escapeHtml(l.size)}</td>
                                 <td>${l.quantity}</td>
@@ -9690,7 +9790,7 @@ ${qrBlock}${field(skuG, qrColX, skuY)}${field(colourG, qrColX, colourY)}${field(
         // gap as changeViewLocation() (see its comment above). Scanning to
         // check a remote store's stock is normal even though checkout is
         // blocked there, so focus regardless of local/remote.
-        if (view === 'pos') { barcodeInput.focus(); loadInventory(); }
+        if (view === 'pos') { focusPosEntryPoint(); loadInventory(); }
         else if (view === 'storage') { openStorageTab(); }
         else if (view === 'inventory') {
             // Same "an automatic refresh must not leave a stale search term
