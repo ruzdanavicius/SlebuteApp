@@ -2489,6 +2489,17 @@
     // Set false to print a plain QR with no embedded logo (skips the badge
     // entirely) if you ever want to rule the logo out as a scan-issue cause.
     const ZPL_QR_LOGO_ENABLED = true;
+    // White square + size text embedded in the QR's own centre (distinct
+    // from ZPL_QR_LOGO_ENABLED above, which controls the separate logo
+    // printed OUTSIDE the QR). Fraction of the QR's pixel width used for
+    // the square's side. QR is generated at error-correction 'H' (recovers
+    // up to ~30% damage), so a 30%-wide square (~9% of the QR's area) sits
+    // well inside that budget. NOTE: this app previously embedded a logo
+    // badge INSIDE the QR and removed it after real printed labels showed
+    // scan failures a synthetic test hadn't caught (see qrToZplGraphic's
+    // comment) — if the size badge ever causes scan trouble at the
+    // register, set this to 0 to disable it instantly.
+    const ZPL_QR_SIZE_BADGE_FRACTION = 0.30;
     const BRAND_SHOP_LINK = 'www.facebook.com/slebute';   // printed bottom-right on labels — update to your real page/site
     // Your logo, embedded directly so the app stays a single self-contained
     // file — no separate hosting/upload step needed. To change it later,
@@ -8972,7 +8983,7 @@ ${logoBlock}^FO${margin},${linkY}^A0N,${linkH},${linkH}^FB${W - margin*2},1,0,L,
         // there's no logo inside it anymore to worry about) + SKU below ---
         const qrSize = mm(20);
         const qrY = mm(3.3);
-        const qrGraphic = await qrToZplGraphic(String(ctx.sku || ''), qrSize);
+        const qrGraphic = await qrToZplGraphic(String(ctx.sku || ''), qrSize, ctx.size);
         const qrActualWidth = qrGraphic ? qrGraphic.widthDots : qrSize;
         // Centre on the ACTUAL rendered width, not the requested qrSize —
         // moduleSize floor-rounds inside qrToZplGraphic, so the real
@@ -8981,6 +8992,12 @@ ${logoBlock}^FO${margin},${linkY}^A0N,${linkH},${linkH}^FB${W - margin*2},1,0,L,
         const qrBlock = qrGraphic ? `^FO${qrX},${qrY}${qrGraphic.zpl}^FS\n` : '';
         const skuY = qrY + qrActualWidth + mm(0.7), skuH = mm(2.1);
         const skuG = textToZplGraphic(ctx.sku || '', skuH, qrColW, skuH + mm(0.6), 'center', false, true, false);
+        // Colour line, directly under the SKU — same column, same
+        // centring, one notch smaller since it shares the tight strip left
+        // under the QR by design (see "SKU below" comment above; this is
+        // the only addition to that column).
+        const colourY = skuY + skuH + mm(0.8), colourH = mm(1.5);
+        const colourG = textToZplGraphic(ctx.colorName || '', colourH, qrColW, colourH + mm(0.5), 'center', false, false, false);
 
         // --- CENTRE: price (as large as safely fits) + up to 6 composition
         // lines (italic, smaller), the whole block centred as a unit in the
@@ -9052,7 +9069,7 @@ ${logoBlock}^FO${margin},${linkY}^A0N,${linkH},${linkH}^FB${W - margin*2},1,0,L,
         const zpl = `^XA
 ^PW${W}
 ^LL${H}
-${qrBlock}${field(skuG, qrColX, skuY)}${field(priceG, blockX, mm(1.5))}${compBlock}${field(sizeG, rightColX, margin)}${logoBlock}${fbBlock}^PQ${Math.max(1, copies|0)}
+${qrBlock}${field(skuG, qrColX, skuY)}${field(colourG, qrColX, colourY)}${field(priceG, blockX, mm(1.5))}${compBlock}${field(sizeG, rightColX, margin)}${logoBlock}${fbBlock}^PQ${Math.max(1, copies|0)}
 ^XZ`;
         return zpl;
     }
@@ -9240,8 +9257,16 @@ ${qrBlock}${field(skuG, qrColX, skuY)}${field(priceG, blockX, mm(1.5))}${compBlo
        future SKU content, the logo now prints as its own element next to
        the QR (see logoToZplGraphic) — this keeps the QR itself completely
        clean, so its scan reliability no longer depends on logo sizing at
-       all. */
-    async function qrToZplGraphic(text, sizeDots) {
+       all.
+
+       `centerLabel`, if given (the variant's size, e.g. "M" or "42"), is
+       stamped in bold on a small white square at the QR's exact centre —
+       lets staff match a label to a folded/hung item by size without
+       scanning it. Sized off ZPL_QR_SIZE_BADGE_FRACTION, comfortably
+       inside the 'H' error-correction budget. Given the scan-failure
+       history above, keep this conservative and re-test on paper if it's
+       ever made larger. */
+    async function qrToZplGraphic(text, sizeDots, centerLabel) {
         if (!text) return null;
         let qr = null;
         for (let t = 1; t <= 40; t++) {
@@ -9270,6 +9295,46 @@ ${qrBlock}${field(skuG, qrColX, skuY)}${field(priceG, blockX, mm(1.5))}${compBlo
             for (let c = 0; c < count; c++) {
                 if (qr.isDark(r, c)) ctx.fillRect(c * moduleSize, r * moduleSize, moduleSize, moduleSize);
             }
+        }
+
+        const label = String(centerLabel || '').trim();
+        if (label) {
+            const squareSide = Math.round(w * ZPL_QR_SIZE_BADGE_FRACTION);
+            const squareX = Math.round((w - squareSide) / 2), squareY = squareX;
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(squareX, squareY, squareSide, squareSide);
+
+            // Outer white moat between the QR modules and the border below
+            // — the border sits on an inset box, not the cut-out's own
+            // edge, so it visibly stops short of the QR rather than
+            // touching it.
+            const outerMargin = Math.max(1, Math.round(squareSide * 0.06));
+            const innerSide = squareSide - outerMargin * 2;
+            const innerX = squareX + outerMargin, innerY = squareY + outerMargin;
+
+            // Thin black border traces the inset box, drawn fully inside it
+            // (never bleeding into the outer white moat) so it reads as a
+            // clean frame around the size indicator.
+            const borderWidth = Math.max(1, Math.round(innerSide * 0.035));
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = borderWidth;
+            ctx.strokeRect(innerX + borderWidth / 2, innerY + borderWidth / 2, innerSide - borderWidth, innerSide - borderWidth);
+
+            // Small fixed padding keeps the text off the border.
+            const pad = Math.max(2, Math.round(innerSide * 0.08)) + borderWidth;
+            const maxW = innerSide - pad * 2, maxH = innerSide - pad * 2;
+            ctx.fillStyle = '#000';
+            ctx.textBaseline = 'alphabetic';
+            let fontPx = maxH;
+            while (fontPx > 1) {
+                ctx.font = `700 ${fontPx}px 'Helvetica Neue', Arial, 'DejaVu Sans', sans-serif`;
+                if (ctx.measureText(label).width <= maxW) break;
+                fontPx--;
+            }
+            const textWidth = ctx.measureText(label).width;
+            const tx = innerX + (innerSide - textWidth) / 2;
+            const ty = innerY + innerSide / 2 + fontPx * 0.35;
+            ctx.fillText(label, tx, ty);
         }
 
         const px = ctx.getImageData(0, 0, w, h).data;
