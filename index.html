@@ -217,6 +217,12 @@
 
         .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; gap: 20px; flex-wrap: wrap; }
         .header-row h1 { font-family: 'Fraunces', serif; font-size: 1.7rem; font-weight: 600; }
+        /* Scan/search field back in the top-centre of the POS screen (request
+           2026-09-12) — its own flexible middle column between the title and
+           the Sale/Returns buttons, rather than grouped with those buttons on
+           the right, so it centers in the remaining space regardless of how
+           wide either side is. */
+        .pos-search-center { flex: 1; display: flex; justify-content: center; min-width: 200px; }
         .search-wrapper { position: relative; width: 380px; max-width: 45vw; }
         .search-wrapper i { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: var(--text-secondary); }
         .barcode-input { width: 100%; background: var(--card-bg); border: var(--glass-border); padding: 15px 15px 15px 44px; border-radius: 14px; color: var(--text-primary); font-size: 0.95rem; outline: none; transition: 0.2s; }
@@ -624,6 +630,7 @@
         .variant-level-back { display:flex; align-items:center; gap:6px; font-size:0.82rem; font-weight:600; color:var(--accent-color); cursor:pointer; margin-top:10px; }
         .color-bubble-row { display:flex; justify-content:center; gap:4px; margin-top:6px; flex-wrap:wrap; }
         .color-bubble { width:14px; height:14px; border-radius:50%; border:1px solid rgba(0,0,0,0.15); cursor:pointer; }
+        .color-bubble-unavailable { opacity: 0.35; }
         .color-bubble-tooltip { position:fixed; z-index:200; background:var(--sidebar-color); border:var(--glass-border); border-radius:8px; box-shadow: 0 8px 20px rgba(36,22,30,0.25); padding:5px 10px; font-size:0.75rem; font-weight:600; white-space:nowrap; }
         .variant-chip { background: var(--card-bg-raised); border: 1px solid rgba(36,22,30,0.08); color: var(--text-primary); padding: 10px 6px; border-radius: 10px; cursor: pointer; text-align: center; position:relative; }
         .variant-chip:hover { border-color: var(--accent-color); background: var(--accent-tint); }
@@ -872,11 +879,13 @@
                             <select id="locationSelector" class="location-select" onchange="changeViewLocation()"></select>
                         </div>
                     </div>
-                    <div style="display:flex; align-items:center; gap:12px;">
+                    <div class="pos-search-center">
                         <div class="search-wrapper">
                             <i class="fas fa-barcode"></i>
                             <input type="text" id="barcodeInput" class="barcode-input kb-toggle-input" inputmode="none" placeholder="Scan barcode or search style..." data-i18n-placeholder="pos.search_placeholder" autofocus oninput="liveFilterProducts()">
                         </div>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:12px;">
                         <button class="btn btn-ghost" id="saleToggleBtn" onclick="toggleSaleOnly()" title="Show only marked-down items" data-i18n-title="pos.sale_toggle_title"><i class="fas fa-tag"></i> <span data-i18n="pos.sale_toggle">Sale</span></button>
                         <button class="btn btn-ghost" onclick="openReturnsModal()" title="Scan a receipt to void/refund a sale, or scan an item to restock a return" data-i18n-title="pos.returns_title"><i class="fas fa-rotate-left"></i> <span data-i18n="pos.returns">Returns</span></button>
                     </div>
@@ -1740,8 +1749,7 @@
                 </div>
                 <div style="display:flex; gap:10px; margin-top:18px;">
                     <button class="btn btn-ghost" style="flex:1;" onclick="window.print()"><i class="fas fa-print"></i> <span data-i18n="receipt.print">Print</span></button>
-                    <button class="btn btn-ghost hidden" id="escposBtn" style="flex:1;" onclick="printEscPos()"><i class="fas fa-bolt"></i> <span data-i18n="receipt.print_usb">Print via USB</span></button>
-                    <button class="btn btn-primary" style="flex:1;" onclick="closeModal('receiptModal'); startNewSale();" data-i18n="receipt.new_sale">New Sale</button>
+                    <button class="btn btn-primary" style="flex:1;" onclick="closeModal('receiptModal'); startNewSale();" data-i18n="receipt.close">Close</button>
                 </div>
             </div>
         </div>
@@ -1930,7 +1938,7 @@
             'quickopen.hint': 'No shift is open at this store yet — enter the starting cash float to open one, then this sale will go straight through.',
             'quickopen.hint_register': 'Enter the starting cash float to open your shift.',
             'quickopen.float_label': 'Opening cash float (€)', 'quickopen.open_continue': 'Open & Continue Sale',
-            'receipt.print': 'Print', 'receipt.print_usb': 'Print via USB', 'receipt.new_sale': 'New Sale',
+            'receipt.print': 'Print', 'receipt.close': 'Close',
             'inv.title': 'Manage Catalog', 'inv.print_labels': 'Print Labels', 'inv.new_style': 'New Style',
             'inv.select_or_new': 'Select a style from the list, or start a new one.',
             'inv.search_styles': 'Search styles...', 'inv.style_reference': 'Style Reference',
@@ -2038,8 +2046,7 @@
             'toast.enter_reason': 'Enter a reason.', 'toast.recorded': 'Recorded.', 'toast.shift_closed_prefix': 'Shift closed. Difference:',
             'toast.no_open_shift': 'No shift is open at this store right now.',
             'toast.no_variants_print': 'No variants to print labels for.', 'toast.label_sent': 'Label sent to printer.',
-            'toast.usb_not_supported': 'This browser does not support direct USB printing.', 'toast.sent_to_printer': 'Sent to printer.',
-            'toast.usb_print_failed': 'USB print failed:', 'toast.no_product_found_prefix': 'No product found for',
+            'toast.no_product_found_prefix': 'No product found for',
             'inv.applying': 'Applying...', 'inv.apply_to_all_sizes': 'Apply to all sizes',
             'oos.confirm_suffix': 'is out of stock. Add to basket anyway?',
             'inv.col_sku': 'SKU (blank=auto)', 'inv.col_price': 'Price €', 'inv.col_cost': 'Cost €', 'inv.no_supplier': 'No supplier',
@@ -2233,7 +2240,7 @@
             'quickopen.hint': 'Šioje parduotuvėje dar neatidaryta pamaina — įveskite pradinę grynųjų sumą, ir šis pardavimas bus iš karto užbaigtas.',
             'quickopen.hint_register': 'Įveskite pradinę kasos sumą, kad atidarytumėte pamainą.',
             'quickopen.float_label': 'Pradinė kasos suma (€)', 'quickopen.open_continue': 'Atidaryti ir tęsti pardavimą',
-            'receipt.print': 'Spausdinti', 'receipt.print_usb': 'Spausdinti per USB', 'receipt.new_sale': 'Naujas pardavimas',
+            'receipt.print': 'Spausdinti', 'receipt.close': 'Uždaryti',
             'inv.title': 'Prekių valdymas', 'inv.print_labels': 'Spausdinti etiketes', 'inv.new_style': 'Naujas modelis',
             'inv.select_or_new': 'Pasirinkite modelį iš sąrašo arba pradėkite naują.',
             'inv.search_styles': 'Ieškoti modelių...', 'inv.style_reference': 'Modelio informacija',
@@ -2341,8 +2348,7 @@
             'toast.enter_reason': 'Įveskite priežastį.', 'toast.recorded': 'Įrašyta.', 'toast.shift_closed_prefix': 'Pamaina uždaryta. Skirtumas:',
             'toast.no_open_shift': 'Šioje parduotuvėje šiuo metu nėra atidarytos pamainos.',
             'toast.no_variants_print': 'Nėra variantų etikečių spausdinimui.', 'toast.label_sent': 'Etiketė išsiųsta į spausdintuvą.',
-            'toast.usb_not_supported': 'Ši naršyklė nepalaiko tiesioginio USB spausdinimo.', 'toast.sent_to_printer': 'Išsiųsta į spausdintuvą.',
-            'toast.usb_print_failed': 'Nepavyko spausdinti per USB:', 'toast.no_product_found_prefix': 'Prekė nerasta pagal',
+            'toast.no_product_found_prefix': 'Prekė nerasta pagal',
             'inv.applying': 'Taikoma...', 'inv.apply_to_all_sizes': 'Taikyti visiems dydžiams',
             'oos.confirm_suffix': 'nėra likučio. Vis tiek pridėti į krepšelį?',
             'inv.col_sku': 'SKU (tuščia=auto)', 'inv.col_price': 'Kaina €', 'inv.col_cost': 'Savikaina €', 'inv.no_supplier': 'Nėra tiekėjo',
@@ -2890,7 +2896,6 @@
         document.getElementById('navInventory').style.display = (PROFILE.role === 'admin' || PROFILE.role === 'manager') ? 'flex' : 'none';
         document.getElementById('navDashboard').style.display = (PROFILE.role === 'admin' || PROFILE.role === 'manager') ? 'flex' : 'none';
         document.getElementById('navSuppliers').style.display = (PROFILE.role === 'admin' || PROFILE.role === 'manager') ? 'flex' : 'none';
-        document.getElementById('escposBtn').classList.toggle('hidden', !('serial' in navigator));
         updateCachedLoginBanner();
         initWeatherWidget(); // fire-and-forget, never blocks app boot
 
@@ -3692,12 +3697,15 @@
         renderVariantModalLevel();
     }
 
-    // Level 1 — one card per size, coloured bubbles for whichever colours
-    // of that size are actually available (display OR storage stock — same
-    // "available" condition renderColorLevel/renderVariantChipHtml use for
-    // sorting), so e.g. size L with 3 in-stock colours shows 3 bubbles.
-    // Tapping the card (not a bubble) opens the colour level for that size;
-    // nothing here ever adds to the cart directly.
+    // Level 1 — one card per size, a coloured bubble for every colour that
+    // size has ever had (request 2026-09-12): bubbles for colours with no
+    // stock here right now (0 display AND 0 storage) still render, just
+    // washed out, so a cashier can see "we used to carry green" even though
+    // there's nothing to sell in it — click/hover still names the colour.
+    // Tapping the card itself skips straight to the colour level UNLESS
+    // exactly one colour is currently available, in which case it's the same
+    // as tapping that one colour chip directly (posScanOrSelectVariant) —
+    // no point making the cashier pick from a list of one.
     function renderSizeLevel(p) {
         const bySize = new Map();
         for (const v of p.variants) {
@@ -3725,17 +3733,34 @@
                     ? `<div style="font-size:0.68rem; color:var(--warning-text, #9a6b0a)">${storageQty} ${t('storage.in_storage_suffix')}</div>`
                     : `<div style="font-size:0.68rem; color:var(--danger-color)">0 ${t('vm.stock_left_suffix')}</div>`);
             const availableColors = g.variants.filter(v => availableStock(v) > 0 || (v.storageStock || 0) > 0);
-            // Click (or hover, via title) shows the colour name in a small
-            // anchored popup — same toggle-on-click pattern as the storage/
+            // Every colour gets a bubble now, not just the in-stock ones —
+            // washed out (see .color-bubble-unavailable) when it has nothing
+            // here right now, so the size card still shows the full colour
+            // range this style has ever come in. Click (or hover, via title)
+            // shows the colour name in a small anchored popup regardless of
+            // availability — same toggle-on-click pattern as the storage/
             // other-location hint icons elsewhere on this screen. Always
             // stops propagation so tapping a bubble never also opens the
-            // colour level underneath it.
-            const bubblesHtml = availableColors.length
-                ? `<div class="color-bubble-row">${availableColors.map(v => `<div class="color-bubble" style="background:${v.colorHex};" title="${escapeHtml(v.colorName)}" onclick="toggleColorBubbleTooltip(event, '${escapeHtml(v.colorName)}')"></div>`).join('')}</div>`
+            // colour level (or adds to cart) underneath it.
+            const bubblesHtml = g.variants.length
+                ? `<div class="color-bubble-row">${g.variants.map(v => {
+                    const unavail = availableStock(v) <= 0 && (v.storageStock || 0) <= 0;
+                    return `<div class="color-bubble${unavail ? ' color-bubble-unavailable' : ''}" style="background:${v.colorHex};" title="${escapeHtml(v.colorName)}" onclick="toggleColorBubbleTooltip(event, '${escapeHtml(v.colorName)}')"></div>`;
+                  }).join('')}</div>`
                 : '';
             const anyClearance = g.variants.some(v => v.isClearance);
+            // Exactly one colour actually available right now — skip the
+            // colour-selection step entirely and add it straight to the
+            // cart (posScanOrSelectVariant already handles display/storage/
+            // truly-out-of-stock for that single variant, same as tapping
+            // its chip in the colour level would). 2+ available colours, or
+            // none (disabled chip below, never fires), keep the existing
+            // "open the colour level" behaviour.
+            const cardOnclick = (!trulyUnavailable && availableColors.length === 1)
+                ? `posScanOrSelectVariant(${p.id}, ${availableColors[0].id})`
+                : `openSizeColorLevel('${escapeHtml(g.size)}')`;
             return `
-            <div class="variant-chip ${trulyUnavailable ? 'disabled' : ''}" onclick="openSizeColorLevel('${escapeHtml(g.size)}')">
+            <div class="variant-chip ${trulyUnavailable ? 'disabled' : ''}" onclick="${cardOnclick}">
                 ${anyClearance ? `<div class="sale-badge" title="${t('clearance.final_sale_title')}">${t('pos.sale_badge')}</div>` : ''}
                 <div style="font-weight:700; font-size:0.85rem;">${escapeHtml(g.size)}</div>
                 <div style="font-size:0.68rem; opacity:0.7;">€${Number(g.variants[0].price).toFixed(2)}</div>
@@ -8987,8 +9012,7 @@
     // ZPL uses ^ and ~ as command-prefix characters — strip them from any
     // dynamic field data so user-entered text (size range, custom SKU)
     // can never break the command stream. Everything else, including € and
-    // Lithuanian diacritics, prints as real UTF-8 thanks to ^CI28 below —
-    // unlike the ESC/POS path above, ZPL doesn't need asciiFold() here.
+    // Lithuanian diacritics, prints as real UTF-8 thanks to ^CI28 below.
     function zplSafe(s) {
         return String(s ?? '').replace(/[\^~]/g, '');
     }
@@ -9639,90 +9663,6 @@ ${qrBlock}${field(skuG, qrColX, skuY)}${field(colourG, qrColX, colourY)}${field(
         }
     }
 
-    /* ============================================================
-       ESC/POS DIRECT-TO-PRINTER (Web Serial, for USB thermal printers)
-       ------------------------------------------------------------
-       window.print() above is the reliable path for any printer already
-       installed as a system/network printer. This is the faster, dialog-free
-       path for a thermal receipt printer wired in over USB. It only appears
-       when the browser exposes navigator.serial (Chromium-based, HTTPS).
-       Baud rate (9600) and the cut command are the widest-compatible
-       defaults — many printer models accept other rates/commands, so treat
-       these as a starting point to confirm against the actual hardware.
-       Text is transliterated to ASCII because raw ESC/POS text bytes are
-       interpreted through the printer's own codepage, not UTF-8, and that
-       codepage varies by model — the browser-printed receipt above already
-       renders full Lithuanian/€ text correctly and doesn't have this limit.
-       ============================================================ */
-    let lastReceiptContext = null; // { saleResult, soldItems } — for reprint via ESC/POS
-
-    function asciiFold(s) {
-        return String(s || '')
-            .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-            .replace(/€/g, 'EUR').replace(/[^\x00-\x7F]/g, '?');
-    }
-
-    function escposEncode(saleResult, soldItems, store, cashierName, paperChars) {
-        const ESC = 0x1B, GS = 0x1D;
-        const bytes = [];
-        const push = (...b) => bytes.push(...b);
-        const text = (s) => { for (const ch of asciiFold(s)) bytes.push(ch.charCodeAt(0) & 0xFF); };
-        const line = (s = '') => { text(s); push(0x0A); };
-        const center = (on) => push(ESC, 0x61, on ? 1 : 0);
-        const bold = (on) => push(ESC, 0x45, on ? 1 : 0);
-        const padRow = (left, right) => {
-            const gap = Math.max(1, paperChars - left.length - right.length);
-            line(left + ' '.repeat(gap) + right);
-        };
-
-        push(ESC, 0x40); // initialize
-        center(true); bold(true);
-        line(store?.name || t('common.store_fallback'));
-        bold(false);
-        line(new Date().toLocaleString(currentLocale()));
-        line(t('receipt.cashier') + ' ' + cashierName);
-        center(false);
-        line('-'.repeat(paperChars));
-        for (const i of soldItems) {
-            const lineTotal = cartLineTotal(i);
-            padRow(`${i.qty}x ${i.name} (${i.size})${i.isClearance ? ' *' : ''}`.slice(0, paperChars - 8), money(lineTotal));
-        }
-        if (soldItems.some(i => i.isClearance)) { center(true); bold(true); line('* ' + t('receipt.final_sale_note')); bold(false); center(false); }
-        line('-'.repeat(paperChars));
-        padRow(t('cart.subtotal'), money(saleResult.subtotal));
-        padRow(t('receipt.vat_incl'), money(saleResult.tax_total));
-        bold(true);
-        padRow(t('receipt.total_label'), money(saleResult.grand_total));
-        bold(false);
-        if (saleResult.change_due > 0) padRow(t('receipt.change'), money(saleResult.change_due));
-        line('-'.repeat(paperChars));
-        center(true);
-        line(t('receipt.receipt_label') + ' ' + saleResult.order_number);
-        line(t('receipt.thank_you'));
-        push(0x0A, 0x0A, 0x0A);
-        push(GS, 0x56, 0x01); // partial cut
-        return new Uint8Array(bytes);
-    }
-
-    async function printEscPos() {
-        if (!lastReceiptContext) return;
-        if (!('serial' in navigator)) { toast(t('toast.usb_not_supported'), 'warn'); return; }
-        try {
-            const port = await navigator.serial.requestPort();
-            await port.open({ baudRate: 9600 });
-            const store = STORES.find(s => s.id === DEVICE_LOCATION_ID);
-            const paperChars = receiptPaperSize === '58' ? 32 : 42;
-            const payload = escposEncode(lastReceiptContext.saleResult, lastReceiptContext.soldItems, store, PROFILE.full_name, paperChars);
-            const writer = port.writable.getWriter();
-            await writer.write(payload);
-            writer.releaseLock();
-            await port.close();
-            toast(t('toast.sent_to_printer'), 'success');
-        } catch (e) {
-            toast(t('toast.usb_print_failed') + ' ' + e.message, 'error');
-        }
-    }
-
     function setReceiptPaper(size) {
         receiptPaperSize = size;
         document.getElementById('receiptPaper').classList.toggle('paper-58', size === '58');
@@ -9731,7 +9671,6 @@ ${qrBlock}${field(skuG, qrColX, skuY)}${field(colourG, qrColX, colourY)}${field(
     }
 
     function showReceipt(saleResult, soldItems) {
-        lastReceiptContext = { saleResult, soldItems };
         const store = STORES.find(s => s.id === DEVICE_LOCATION_ID);
         const now = new Date();
         const lines = soldItems.map(i => {
