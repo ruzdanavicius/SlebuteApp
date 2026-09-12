@@ -4177,7 +4177,11 @@
         if (!item) return;
         const newQty = item.qty + delta;
         if (newQty <= 0) { removeFromCart(vid); return; }
-        if (newQty > item.maxStock) { toast(t('toast.no_stock'), 'warn'); return; }
+        // Only guard on the way up — an oversold line (see addOversoldToCart())
+        // starts with qty already above maxStock (0) by design, and stepping
+        // it down toward 0 must always be allowed, never treated as "not
+        // enough stock".
+        if (delta > 0 && newQty > item.maxStock) { toast(t('toast.no_stock'), 'warn'); return; }
         item.qty = newQty;
         updateCartUI();
         refreshPosStockDisplay(item.productId);
