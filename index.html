@@ -1267,7 +1267,7 @@
 
                 <div id="cashPaySection">
                     <div class="pay-field-label" data-i18n="cart.cash_tendered">Cash tendered (€)</div>
-                    <input type="number" class="form-input" id="cashTenderedInput" placeholder="0.00" oninput="onCashTenderedChange()" style="margin-bottom:6px;">
+                    <input type="number" class="form-input" id="cashTenderedInput" placeholder="0.00" oninput="onCashTenderedChange()" style="margin-bottom:6px;" onkeydown="if(event.key==='Enter'){event.preventDefault(); confirmCashTenderedEnter();}">
                 </div>
                 <div id="splitPaySection" class="hidden">
                     <div class="split-inputs">
@@ -1633,12 +1633,7 @@
                 <p class="muted" style="font-size:0.85rem; margin: 8px 0 4px;" id="quickOpenHint" data-i18n="quickopen.hint">No shift is open at this store yet — enter the starting cash float to open one, then this sale will go straight through.</p>
                 <div class="form-group mt-14">
                     <label data-i18n="quickopen.float_label">Opening cash float (€)</label>
-                    <input type="number" class="form-input" id="quickOpenFloatInput" placeholder="150.00">
-                </div>
-                <div class="cash-row">
-                    <div class="cash-chip" onclick="document.getElementById('quickOpenFloatInput').value=100">€100</div>
-                    <div class="cash-chip" onclick="document.getElementById('quickOpenFloatInput').value=150">€150</div>
-                    <div class="cash-chip" onclick="document.getElementById('quickOpenFloatInput').value=200">€200</div>
+                    <input type="number" class="form-input" id="quickOpenFloatInput" placeholder="150.00" onkeydown="if(event.key==='Enter'){event.preventDefault(); quickOpenRegisterAndContinue();}">
                 </div>
                 <button class="btn btn-primary btn-block mt-14" onclick="quickOpenRegisterAndContinue()"><i class="fas fa-play"></i> <span data-i18n="quickopen.open_continue">Open &amp; Continue Sale</span></button>
             </div>
@@ -4421,6 +4416,14 @@
     }
 
     function onCashTenderedChange() { updateCartUI(); }
+
+    // Enter in "cash tendered" completes the sale — same action the Charge
+    // button already performs, gated the same way (disabled until the
+    // amount actually covers the total): a cashier who's finished typing
+    // the amount received shouldn't need to reach for the button too.
+    function confirmCashTenderedEnter() {
+        if (!document.getElementById('payBtn').disabled) handleMainAction();
+    }
 
     function onSplitChange(which) {
         const total = cartGrandTotal();
