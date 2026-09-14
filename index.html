@@ -989,7 +989,13 @@
                         </div>
                         <div id="invFormFields" class="hidden">
                         <div class="form-card">
-                            <div class="section-title" data-i18n="inv.style_reference">Style Reference</div>
+                            <div class="section-title">
+                                <span data-i18n="inv.style_reference">Style Reference</span>
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    <button class="btn btn-ghost hidden" id="styleEditDeleteBtn" style="font-size:0.72rem; padding:5px 10px;" onclick="onStyleEditDeleteClick()"><i class="fas fa-pen" id="styleEditDeleteIcon"></i> <span id="styleEditDeleteLabel" data-i18n="inv.edit_delete_toggle">Edit / Delete</span></button>
+                                    <button class="icon-btn hidden" id="styleDeleteCloseBtn" onclick="exitStyleDeleteMode()" title="Close" data-i18n-title="common.close"><i class="fas fa-times"></i></button>
+                                </div>
+                            </div>
                             <div class="form-group">
                                 <label data-i18n="inv.base_barcode">Base Barcode (scan tag)</label>
                                 <input type="text" class="form-input kb-toggle-input" inputmode="none" id="new_base_barcode" placeholder="e.g. H-2026-01" onblur="autoFillProduct()" onkeydown="if(event.key === 'Enter'){event.preventDefault(); this.blur();}">
@@ -1053,7 +1059,6 @@
                         </div>
 
                         <div style="display:flex; gap:12px;">
-                            <button class="btn btn-ghost" onclick="startNewProduct()" data-i18n="common.clear">Clear</button>
                             <button class="btn btn-primary" id="saveBtn" style="flex:1;" onclick="saveMatrixProduct()"><i class="fas fa-save"></i> <span data-i18n="inv.save_style">Save Style</span></button>
                         </div>
                         </div>
@@ -2073,6 +2078,12 @@
             'inv.delist_title': 'Delete this size', 'inv.delist_confirm_zero_prefix': 'Delete', 'inv.delist_confirm_stock_prefix': 'Delete',
             'inv.delist_confirm_stock_middle': '? It still has', 'inv.delist_confirm_stock_suffix': 'units in stock across both stores — they will no longer be sellable.',
             'toast.variant_delisted': 'Size deleted.',
+            'inv.edit_delete_toggle': 'Edit / Delete', 'inv.delete_style': 'Delete Style',
+            'inv.delete_style_confirm_zero_prefix': 'Delete style', 'inv.delete_style_confirm_stock_prefix': 'Delete style',
+            'inv.delete_style_confirm_stock_middle': '? It still has',
+            'inv.delete_style_confirm_stock_suffix': 'units in stock across both stores — the whole style and every color/size will disappear from the catalog.',
+            'inv.delete_style_confirm_zero_suffix': '? This removes every color and size — the whole style will disappear from the catalog.',
+            'toast.style_deleted': 'Style deleted.',
             'labelmodal.print_label_title': 'Print label', 'req.failed_to_load': 'Failed to load requests.',
             'common.store_fallback': 'Store',
             'scantransfer.force_confirm': 'Skip scanning and confirm this transfer manually?',
@@ -2375,6 +2386,12 @@
             'inv.delist_title': 'Ištrinti šį dydį', 'inv.delist_confirm_zero_prefix': 'Ištrinti', 'inv.delist_confirm_stock_prefix': 'Ištrinti',
             'inv.delist_confirm_stock_middle': '? Šiuo metu turima', 'inv.delist_confirm_stock_suffix': 'vnt. atsargų abiejose parduotuvėse — jos daugiau nebus parduodamos.',
             'toast.variant_delisted': 'Dydis ištrintas.',
+            'inv.edit_delete_toggle': 'Redaguoti / Ištrinti', 'inv.delete_style': 'Ištrinti modelį',
+            'inv.delete_style_confirm_zero_prefix': 'Ištrinti modelį', 'inv.delete_style_confirm_stock_prefix': 'Ištrinti modelį',
+            'inv.delete_style_confirm_stock_middle': '? Šiuo metu turima',
+            'inv.delete_style_confirm_stock_suffix': 'vnt. atsargų abiejose parduotuvėse — visas modelis ir visos spalvos/dydžiai dings iš sąrašo.',
+            'inv.delete_style_confirm_zero_suffix': '? Bus pašalintos visos spalvos ir dydžiai — visas modelis dings iš sąrašo.',
+            'toast.style_deleted': 'Modelis ištrintas.',
             'labelmodal.print_label_title': 'Spausdinti etiketę', 'req.failed_to_load': 'Nepavyko įkelti užsakymų.',
             'common.store_fallback': 'Parduotuvė',
             'scantransfer.force_confirm': 'Praleisti nuskaitymą ir patvirtinti šį perkėlimą rankiniu būdu?',
@@ -5639,6 +5656,8 @@
         document.getElementById('upload_status').innerText = t('inv.no_file');
         document.getElementById('foundMsg').style.display = 'none';
         document.getElementById('printAllStyleBtn').classList.add('hidden');
+        document.getElementById('styleEditDeleteBtn').classList.add('hidden');
+        exitStyleDeleteMode();
         document.getElementById('colorBlocksContainer').innerHTML = '';
         addColorBlock();
         renderProductsList();
@@ -5650,6 +5669,8 @@
         showInventoryForm();
         editingProductId = id;
         document.getElementById('printAllStyleBtn').classList.remove('hidden');
+        document.getElementById('styleEditDeleteBtn').classList.remove('hidden');
+        exitStyleDeleteMode();
         document.getElementById('new_base_barcode').value = p.base_barcode || '';
         document.getElementById('new_name').value = p.name || '';
         document.getElementById('new_category').value = p.category || '';
@@ -5722,11 +5743,18 @@
         const div = document.createElement('div');
         div.className = 'color-block';
         div.id = blockId;
+        // A blank colorName means this block is a fresh, unsaved "+ Add color"
+        // draft — its trash icon just undoes that draft and stays visible
+        // regardless of style-delete mode. A non-blank colorName means it was
+        // loaded from an existing, already-saved color (loadProductForEdit) —
+        // that trash icon is real data deletion, so it's gated behind
+        // enterStyleDeleteMode() like every other .style-delete-trash icon.
+        const colorTrashClass = colorName ? 'icon-btn style-delete-trash hidden' : 'icon-btn';
         div.innerHTML = `
             <div class="color-block-head">
                 <input type="color" value="${colorHex}" class="color-hex-input">
                 <input type="text" class="form-input color-name-input" placeholder="${t('inv.color_name_placeholder')}" value="${escapeHtml(colorName)}">
-                <button class="icon-btn" onclick="removeColorBlock('${blockId}')" title="${t('inv.remove_color')}"><i class="fas fa-trash"></i></button>
+                <button class="${colorTrashClass}" onclick="removeColorBlock('${blockId}')" title="${t('inv.remove_color')}"><i class="fas fa-trash"></i></button>
             </div>
             <div class="bulk-price-bar">
                 <label>${t('inv.align_price_label')}</label>
@@ -5801,7 +5829,7 @@
                 </div>
                 ${stockCells}
                 <button class="icon-btn-sm" onclick="openPrintLabelModal(${prefill.variantId})" title="${t('labelmodal.print_label_title')}"><i class="fas fa-print"></i></button>
-                <button class="icon-btn-sm icon-btn-danger" onclick="confirmDelistVariant(${prefill.variantId}, '${escapeHtml(prefill.contextLabel||'')}', ${Object.values(prefill.stockByLocation || {}).reduce((sum, loc) => sum + (loc.quantity || 0), 0)})" title="${t('inv.delist_title')}"><i class="fas fa-trash"></i></button>
+                <button class="icon-btn-sm icon-btn-danger style-delete-trash hidden" onclick="confirmDelistVariant(${prefill.variantId}, '${escapeHtml(prefill.contextLabel||'')}', ${Object.values(prefill.stockByLocation || {}).reduce((sum, loc) => sum + (loc.quantity || 0), 0)})" title="${t('inv.delist_title')}"><i class="fas fa-trash"></i></button>
             `;
             rowsContainer.appendChild(row);
             return;
@@ -5883,7 +5911,11 @@
             copies: Math.max(1, Object.values(v.stock || {}).reduce((a,b) => a + (parseInt(b)||0), 0))
         }));
         await loadInventory();
-        startNewProduct();
+        // Stay on the style just saved (new or existing) instead of resetting to
+        // a blank form — a manager mid-edit shouldn't have to re-find it in the
+        // list after every save. "Naujas modelis" is the explicit way to start
+        // a fresh blank style now that Save no longer doubles as a clear button.
+        loadProductForEdit(data.product_id);
         if (newLabelItems.length) {
             openLabelPrintModal(t('labelmodal.title'), t('labelmodal.just_saved_subtitle'), newLabelItems);
         }
@@ -6074,6 +6106,69 @@
         toast(t('toast.variant_delisted'), 'success');
         await loadInventory();
         if (editingProductId) loadProductForEdit(editingProductId);
+    }
+
+    // Whole-style delete ("Redaguoti / Ištrinti" -> "Ištrinti modelį"). Off by
+    // default: every per-color/per-size trash icon on an already-saved style
+    // (.style-delete-trash) stays hidden until a manager deliberately opts into
+    // delete mode, so a stray tap mid-edit can't silently remove a real SKU.
+    // The toggle button itself becomes the destructive action once in this
+    // mode — matches the app's icon-button + native confirm() convention (no
+    // custom modal) for the final step.
+    let styleDeleteModeOn = false;
+
+    function onStyleEditDeleteClick() {
+        if (!styleDeleteModeOn) enterStyleDeleteMode();
+        else confirmDeleteStyle();
+    }
+
+    function enterStyleDeleteMode() {
+        styleDeleteModeOn = true;
+        document.querySelectorAll('.style-delete-trash').forEach(b => b.classList.remove('hidden'));
+        document.getElementById('styleEditDeleteBtn').classList.add('btn-danger');
+        document.getElementById('styleEditDeleteBtn').classList.remove('btn-ghost');
+        document.getElementById('styleEditDeleteIcon').className = 'fas fa-trash';
+        document.getElementById('styleEditDeleteLabel').textContent = t('inv.delete_style');
+        document.getElementById('styleDeleteCloseBtn').classList.remove('hidden');
+    }
+
+    function exitStyleDeleteMode() {
+        styleDeleteModeOn = false;
+        document.querySelectorAll('.style-delete-trash').forEach(b => b.classList.add('hidden'));
+        const btn = document.getElementById('styleEditDeleteBtn');
+        if (btn) { btn.classList.remove('btn-danger'); btn.classList.add('btn-ghost'); }
+        const icon = document.getElementById('styleEditDeleteIcon');
+        if (icon) icon.className = 'fas fa-pen';
+        const label = document.getElementById('styleEditDeleteLabel');
+        if (label) label.textContent = t('inv.edit_delete_toggle');
+        const closeBtn = document.getElementById('styleDeleteCloseBtn');
+        if (closeBtn) closeBtn.classList.add('hidden');
+    }
+
+    function confirmDeleteStyle() {
+        if (!editingProductId) return;
+        const p = products.find(x => x.id === editingProductId);
+        const name = p ? p.name : document.getElementById('new_name').value;
+        const totalStock = p ? p.variants.reduce((sum, v) => sum + Object.values(v.stockByLocation || {}).reduce((s, loc) => s + (loc.quantity || 0), 0), 0) : 0;
+        const msg = totalStock > 0
+            ? `${t('inv.delete_style_confirm_stock_prefix')} "${name}"${t('inv.delete_style_confirm_stock_middle')} ${totalStock} ${t('inv.delete_style_confirm_stock_suffix')}`
+            : `${t('inv.delete_style_confirm_zero_prefix')} "${name}"${t('inv.delete_style_confirm_zero_suffix')}`;
+        if (!confirm(msg)) return;
+        deleteStyle(editingProductId);
+    }
+
+    async function deleteStyle(productId) {
+        const btn = document.getElementById('styleEditDeleteBtn');
+        btn.disabled = true;
+        const { error } = await sb.rpc('rpc_delist_product', { p_product_id: productId });
+        btn.disabled = false;
+        if (error) { toast(error.message, 'error'); return; }
+        toast(t('toast.style_deleted'), 'success');
+        editingProductId = null;
+        document.getElementById('invFormFields').classList.add('hidden');
+        document.getElementById('invFormEmpty').classList.remove('hidden');
+        await loadInventory();
+        renderProductsList();
     }
 
     // Bulk "align price" — sets one price/cost across every existing size
