@@ -293,6 +293,13 @@
         .product-card { background: var(--card-bg); border: var(--glass-border); border-radius: 16px; padding: 10px; cursor: pointer; transition: 0.15s; position: relative; overflow: hidden; contain: content; }
         .product-card:hover { transform: translateY(-4px); box-shadow: 0 10px 30px var(--shadow-color); border-color: rgba(107,37,69,0.3); }
         .product-img { width: 100%; height: 170px; object-fit: cover; border-radius: 12px; margin-bottom: 10px; background: var(--card-bg-raised); }
+        /* "No photo" placeholder — swapped in for any product/style image
+           slot with no cover image (or one that fails to load), instead
+           of the browser's broken-image icon. */
+        .img-placeholder { display:flex; align-items:center; justify-content:center; background: var(--card-bg-raised); }
+        .img-placeholder img { width:36%; max-width:56px; height:auto; object-fit:contain; opacity:0.22; filter: grayscale(1); }
+        .img-placeholder.img-placeholder-label { flex-direction:column; gap:8px; }
+        .img-placeholder-text { font-size:0.72rem; color: var(--text-secondary); text-align:center; padding:0 8px; }
         .product-info h3 { font-size: 0.92rem; font-weight: 600; margin-bottom: 3px; display: flex; align-items: center; gap: 5px; }
         .product-info h3 .p-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .product-info p { color: var(--text-secondary); font-size: 0.78rem; display:flex; justify-content:space-between; align-items:center; gap: 6px; }
@@ -357,10 +364,10 @@
         /* FORMS (Inventory / matrix) */
         .split-layout { display:flex; gap: 22px; height: 100%; min-height:0; }
         .products-side { width: 260px; flex-shrink:0; display:flex; flex-direction:column; }
-        .products-list { overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:6px; margin-top:10px; }
+        .products-list { overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:6px; margin-top:10px; padding-right:8px; }
         .products-list-item { display:flex; align-items:center; gap:10px; padding:8px; border-radius:10px; cursor:pointer; background: var(--card-bg); border: 1px solid transparent; }
         .products-list-item:hover, .products-list-item.active { border-color: var(--accent-color); }
-        .products-list-item img { width:34px; height:34px; border-radius:6px; object-fit:cover; background: var(--card-bg-raised); }
+        .products-list-thumb { width:34px; height:34px; flex-shrink:0; border-radius:6px; object-fit:cover; background: var(--card-bg-raised); }
         .products-list-item span { font-size:0.82rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
         .form-scroll { flex: 1; overflow-y: auto; padding-right: 4px; min-width: 0; transform: translate3d(0, 0, 0); will-change: transform; }
@@ -1826,7 +1833,7 @@
             'nav.register': 'Cash Register', 'nav.dailysales': 'Daily Sales', 'nav.dashboard': 'Dashboard',
             'nav.suppliers': 'Suppliers', 'nav.logout': 'Log out',
             'common.save': 'Save', 'common.cancel': 'Cancel', 'common.clear': 'Clear', 'common.close': 'Close',
-            'common.confirm': 'Confirm', 'common.loading': 'Loading...', 'common.none': 'None', 'common.optional': 'Optional',
+            'common.confirm': 'Confirm', 'common.loading': 'Loading...', 'common.none': 'None', 'common.optional': 'Optional', 'common.no_photo': 'No photo',
             'common.active': 'Active', 'common.inactive': 'Inactive', 'common.notes': 'Notes',
             'remote.banner_prefix': 'Remote Mode:', 'remote.banner_suffix': '. Items added will be treated as requests, not sales.',
             'remote.viewing': 'Viewing inventory for',
@@ -2128,7 +2135,7 @@
             'nav.register': 'Kasos aparatas', 'nav.dailysales': 'Dienos pardavimai', 'nav.dashboard': 'Suvestinė',
             'nav.suppliers': 'Tiekėjai', 'nav.logout': 'Atsijungti',
             'common.save': 'Išsaugoti', 'common.cancel': 'Atšaukti', 'common.clear': 'Išvalyti', 'common.close': 'Uždaryti',
-            'common.confirm': 'Patvirtinti', 'common.loading': 'Kraunama...', 'common.none': 'Nėra', 'common.optional': 'Neprivaloma',
+            'common.confirm': 'Patvirtinti', 'common.loading': 'Kraunama...', 'common.none': 'Nėra', 'common.optional': 'Neprivaloma', 'common.no_photo': 'Nuotraukos nėra',
             'common.active': 'Aktyvus', 'common.inactive': 'Neaktyvus', 'common.notes': 'Pastabos',
             'remote.banner_prefix': 'Nuotolinis režimas:', 'remote.banner_suffix': '. Pridėtos prekės bus laikomos užsakymais, ne pardavimais.',
             'remote.viewing': 'Peržiūrimos prekės iš',
@@ -3570,7 +3577,7 @@
                 ? `<i class="fas fa-store otherloc-hint-icon" title="${t('otherloc.hint_title')}" onclick="toggleOtherLocationHint(event, ${p.id})"></i>`
                 : '';
             return `<div class="product-card" data-product-id="${p.id}" onclick="openProduct(${p.id})">
-                <img src="${p.image_url || ''}" class="product-img" loading="lazy" decoding="async" onerror="this.style.opacity=0.2">
+                ${photoTagHTML(p.image_url, 'product-img', true)}
                 <div class="product-info">
                     <h3><span class="p-name">${escapeHtml(p.name)}</span>${storageHint}${otherLocHint}</h3>
                     <p><span>${p.base_barcode || t('pos.no_barcode')}</span><span class="stock-pill ${meta.pillClass}">${meta.pillText}</span></p>
@@ -3623,6 +3630,18 @@
     }
 
     function escapeHtml(s) { const d = document.createElement('div'); d.innerText = s || ''; return d.innerHTML; }
+
+    /* Shared "no photo" rendering for every product/cover image slot
+       (POS catalog cards, the Manage Catalog style list, request cards…):
+       a faded brand mark instead of the browser's broken-image icon, with
+       a caption on slots big enough to fit one. withLabel=true adds it. */
+    function placeholderPhotoHTML(cssClass, withLabel) {
+        return `<div class="${cssClass} img-placeholder${withLabel ? ' img-placeholder-label' : ''}"><img src="${BRAND_LOGO_URL}" alt="">${withLabel ? `<span class="img-placeholder-text" data-i18n="common.no_photo">${t('common.no_photo')}</span>` : ''}</div>`;
+    }
+    function photoTagHTML(url, cssClass, withLabel) {
+        if (!url) return placeholderPhotoHTML(cssClass, withLabel);
+        return `<img src="${url}" class="${cssClass}" loading="lazy" decoding="async" onerror="this.outerHTML=placeholderPhotoHTML('${cssClass}', ${!!withLabel})">`;
+    }
 
     let currentOpenProductId = null; // lets refreshPosStockDisplay() live-update the open variant modal after a cart change
     let requestedReorderThisSession = new Set(); // variantId — hides the request-reorder icon (shows a sent checkmark instead) after use, so an accidental double-tap can't queue duplicate requests. Cleared on page reload, same lightweight scope as restockDeclinedThisSession on the Dashboard.
@@ -4929,7 +4948,7 @@
         const panel = document.getElementById('productsListPanel');
         panel.innerHTML = list.map(p => `
             <div class="products-list-item ${editingProductId === p.id ? 'active' : ''}" onclick="loadProductForEdit(${p.id})">
-                <img src="${p.image_url||''}" loading="lazy" decoding="async" onerror="this.style.opacity=0.2">
+                ${photoTagHTML(p.image_url, 'products-list-thumb', false)}
                 <span>${escapeHtml(p.name)}${productHasClearanceVariant(p) ? ` <span class="sale-badge" title="${t('clearance.final_sale_title')}">${t('pos.sale_badge')}</span>` : ''}</span>
             </div>`).join('') || `<p class="muted" style="font-size:0.8rem; padding:8px;">${t('inv.no_styles')}</p>`;
     }
