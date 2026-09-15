@@ -992,6 +992,10 @@
                             <div class="section-title">
                                 <span data-i18n="inv.style_reference">Style Reference</span>
                                 <div style="display:flex; align-items:center; gap:8px;">
+                                    <label class="hidden" id="featuredOnlineLabel" style="display:flex; align-items:center; gap:5px; font-size:0.72rem; font-weight:normal; cursor:pointer;">
+                                        <input type="checkbox" id="featuredOnlineCheckbox" onchange="onFeaturedOnlineToggle()">
+                                        <span data-i18n="inv.featured_online">Feature on website</span>
+                                    </label>
                                     <button class="btn btn-ghost hidden" id="styleEditDeleteBtn" style="font-size:0.72rem; padding:5px 10px;" onclick="onStyleEditDeleteClick()"><i class="fas fa-pen" id="styleEditDeleteIcon"></i> <span id="styleEditDeleteLabel" data-i18n="inv.edit_delete_toggle">Edit / Delete</span></button>
                                     <button class="icon-btn hidden" id="styleDeleteCloseBtn" onclick="exitStyleDeleteMode()" title="Close" data-i18n-title="common.close"><i class="fas fa-times"></i></button>
                                 </div>
@@ -2078,6 +2082,7 @@
             'inv.delist_title': 'Delete this size', 'inv.delist_confirm_zero_prefix': 'Delete', 'inv.delist_confirm_stock_prefix': 'Delete',
             'inv.delist_confirm_stock_middle': '? It still has', 'inv.delist_confirm_stock_suffix': 'units in stock across both stores — they will no longer be sellable.',
             'toast.variant_delisted': 'Size deleted.',
+            'inv.featured_online': 'Feature on website', 'toast.featured_on': 'Added to the website showcase.', 'toast.featured_off': 'Removed from the website showcase.',
             'inv.edit_delete_toggle': 'Edit / Delete', 'inv.delete_style': 'Delete Style',
             'inv.delete_style_confirm_zero_prefix': 'Delete style', 'inv.delete_style_confirm_stock_prefix': 'Delete style',
             'inv.delete_style_confirm_stock_middle': '? It still has',
@@ -2386,6 +2391,7 @@
             'inv.delist_title': 'Ištrinti šį dydį', 'inv.delist_confirm_zero_prefix': 'Ištrinti', 'inv.delist_confirm_stock_prefix': 'Ištrinti',
             'inv.delist_confirm_stock_middle': '? Šiuo metu turima', 'inv.delist_confirm_stock_suffix': 'vnt. atsargų abiejose parduotuvėse — jos daugiau nebus parduodamos.',
             'toast.variant_delisted': 'Dydis ištrintas.',
+            'inv.featured_online': 'Rodyti svetainėje', 'toast.featured_on': 'Pridėta į svetainės vitriną.', 'toast.featured_off': 'Pašalinta iš svetainės vitrinos.',
             'inv.edit_delete_toggle': 'Redaguoti / Ištrinti', 'inv.delete_style': 'Ištrinti modelį',
             'inv.delete_style_confirm_zero_prefix': 'Ištrinti modelį', 'inv.delete_style_confirm_stock_prefix': 'Ištrinti modelį',
             'inv.delete_style_confirm_stock_middle': '? Šiuo metu turima',
@@ -3401,7 +3407,8 @@
                         product_variants ( id, size, sku, price, cost_price, vat_rate, is_active, is_clearance, clearance_reason, source_variant_id,
                             inventory ( quantity, reserved_quantity, storage_quantity, location_id, safety_stock_threshold )
                         )
-                    )`)
+                    ),
+                    featured_products ( is_active )`)
                 .eq('is_active', true)
                 .order('name'));
         } else {
@@ -3446,11 +3453,16 @@
                     });
                 }
             }
+            // PostgREST embeds a to-one relation (product_id is UNIQUE on
+            // featured_products) as either an object or a single-item array
+            // depending on version — handle both rather than assuming.
+            const featuredRow = Array.isArray(prod.featured_products) ? prod.featured_products[0] : prod.featured_products;
             return {
                 id: prod.id, name: prod.name, base_barcode: prod.base_barcode, description: prod.description,
                 image_url: prod.image_url, category: prod.category, size_range: prod.size_range,
                 composition: prod.composition,
                 supplierId: prod.supplier_id, // style-level, not per-SKU — a shop sources a whole style from one supplier
+                isFeaturedOnline: !!(featuredRow && featuredRow.is_active),
                 variants
             };
         });
@@ -5657,6 +5669,7 @@
         document.getElementById('foundMsg').style.display = 'none';
         document.getElementById('printAllStyleBtn').classList.add('hidden');
         document.getElementById('styleEditDeleteBtn').classList.add('hidden');
+        document.getElementById('featuredOnlineLabel').classList.add('hidden'); // a style must be saved (have an id) before it can be featured
         exitStyleDeleteMode();
         document.getElementById('colorBlocksContainer').innerHTML = '';
         addColorBlock();
@@ -5670,6 +5683,9 @@
         editingProductId = id;
         document.getElementById('printAllStyleBtn').classList.remove('hidden');
         document.getElementById('styleEditDeleteBtn').classList.remove('hidden');
+        const featuredLabel = document.getElementById('featuredOnlineLabel');
+        featuredLabel.classList.toggle('hidden', !isManagerOrAdmin());
+        document.getElementById('featuredOnlineCheckbox').checked = !!p.isFeaturedOnline;
         exitStyleDeleteMode();
         document.getElementById('new_base_barcode').value = p.base_barcode || '';
         document.getElementById('new_name').value = p.name || '';
@@ -6169,6 +6185,28 @@
         document.getElementById('invFormEmpty').classList.remove('hidden');
         await loadInventory();
         renderProductsList();
+    }
+
+    // Manager/admin "feature online" checkbox — takes effect immediately
+    // (like the delete action above), not bundled into the style Save button.
+    // Site side: rpc_get_featured_products() picks a rotating 12 of whatever's
+    // checked here, and drops a product automatically (unchecking here) the
+    // moment it hits zero stock everywhere — see fn_unfeature_when_out_of_stock.
+    async function onFeaturedOnlineToggle() {
+        if (!editingProductId) return;
+        const checkbox = document.getElementById('featuredOnlineCheckbox');
+        const wantFeatured = checkbox.checked;
+        checkbox.disabled = true;
+        const { error } = await sb.rpc('rpc_toggle_featured_product', { p_product_id: editingProductId, p_featured: wantFeatured });
+        checkbox.disabled = false;
+        if (error) {
+            checkbox.checked = !wantFeatured; // revert on failure
+            toast(error.message, 'error');
+            return;
+        }
+        toast(wantFeatured ? t('toast.featured_on') : t('toast.featured_off'), 'success');
+        const p = products.find(x => x.id === editingProductId);
+        if (p) p.isFeaturedOnline = wantFeatured;
     }
 
     // Bulk "align price" — sets one price/cost across every existing size
