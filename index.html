@@ -1036,12 +1036,11 @@
                                 <div class="category-suggest-box" id="supplierSuggestBox"></div>
                             </div>
                             <div class="form-group">
-                                <label data-i18n="inv.cover_image">Cover Image</label>
+                                <label data-i18n="inv.product_photos">Photos (up to 4)</label>
+                                <div id="photoGallery" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:8px;"></div>
                                 <div style="display:flex; gap:12px; align-items:center;">
-                                    <input type="text" id="new_image" style="display:none;">
-                                    <label for="img_uploader" class="btn btn-ghost btn-sm" style="cursor:pointer;"><i class="fas fa-upload"></i> <span data-i18n="inv.upload">Upload</span></label>
+                                    <label for="img_uploader" class="btn btn-ghost btn-sm" id="photoUploadBtn" style="cursor:pointer;"><i class="fas fa-upload"></i> <span data-i18n="inv.upload">Upload</span></label>
                                     <input type="file" id="img_uploader" accept="image/*" style="display:none;" onchange="uploadImage()">
-                                    <img id="img_preview" src="" style="width: 42px; height: 42px; border-radius: 8px; object-fit: cover; display: none; border: 1px solid rgba(255,255,255,0.2);">
                                     <span id="upload_status" style="font-size:0.78rem; color:var(--text-secondary);" data-i18n="inv.no_file">No file chosen</span>
                                 </div>
                             </div>
@@ -1957,7 +1956,9 @@
             'inv.product_name': 'Product Name', 'inv.category': 'Category',
             'inv.size_range': 'Size Range', 'inv.size_range_hint': '(printed on labels, e.g. "XS-XL")',
             'inv.composition': 'Composition', 'inv.composition_hint': '(optional, printed on labels — up to 8 items, e.g. "65% Cotton, 35% Polyester")',
-            'inv.cover_image': 'Cover Image', 'inv.upload': 'Upload', 'inv.no_file': 'No file chosen',
+            'inv.product_photos': 'Photos (up to 4)', 'inv.upload': 'Upload', 'inv.no_file': 'No file chosen',
+            'inv.remove_photo': 'Remove photo', 'inv.confirm_delete_photo': 'Delete this photo? The others will stay.',
+            'toast.photo_deleted': 'Photo deleted.', 'toast.photo_limit_reached': 'Maximum 4 photos per style.',
             'inv.description': 'Description', 'inv.colors_sizes': 'Colors & Sizes',
             'inv.print_all_style': 'Print all labels for this style', 'inv.save_style': 'Save Style',
             'req.title': 'Dispatch Board', 'req.refresh': 'Refresh',
@@ -2266,7 +2267,9 @@
             'inv.product_name': 'Prekės pavadinimas', 'inv.category': 'Kategorija',
             'inv.size_range': 'Dydžių intervalas', 'inv.size_range_hint': '(spausdinama etiketėse, pvz. „XS-XL“)',
             'inv.composition': 'Sudėtis', 'inv.composition_hint': '(neprivaloma, spausdinama etiketėse — iki 8 punktų, pvz. „65% medvilnė, 35% poliesteris“)',
-            'inv.cover_image': 'Viršelio nuotrauka', 'inv.upload': 'Įkelti', 'inv.no_file': 'Failas nepasirinktas',
+            'inv.product_photos': 'Nuotraukos (iki 4)', 'inv.upload': 'Įkelti', 'inv.no_file': 'Failas nepasirinktas',
+            'inv.remove_photo': 'Šalinti nuotrauką', 'inv.confirm_delete_photo': 'Ištrinti šią nuotrauką? Kitos liks.',
+            'toast.photo_deleted': 'Nuotrauka ištrinta.', 'toast.photo_limit_reached': 'Daugiausiai 4 nuotraukos vienam modeliui.',
             'inv.description': 'Aprašymas', 'inv.colors_sizes': 'Spalvos ir dydžiai',
             'inv.print_all_style': 'Spausdinti visas šio modelio etiketes', 'inv.save_style': 'Išsaugoti',
             'req.title': 'Pervežimai', 'req.refresh': 'Atnaujinti',
@@ -3408,7 +3411,8 @@
                             inventory ( quantity, reserved_quantity, storage_quantity, location_id, safety_stock_threshold )
                         )
                     ),
-                    featured_products ( is_active )`)
+                    featured_products ( is_active ),
+                    product_images ( id, image_url, sort_order )`)
                 .eq('is_active', true)
                 .order('name'));
         } else {
@@ -3457,12 +3461,19 @@
             // featured_products) as either an object or a single-item array
             // depending on version — handle both rather than assuming.
             const featuredRow = Array.isArray(prod.featured_products) ? prod.featured_products[0] : prod.featured_products;
+            // Cover photo (image_url) first, then the extra gallery angles in
+            // sort_order — the same ordered list the Manage Catalogue photo
+            // strip and rpc_get_featured_products() both use. Max 4, enforced
+            // server-side too (product_images_limit_trg).
+            const galleryUrls = (prod.product_images || []).slice().sort((a, b) => a.sort_order - b.sort_order).map(i => i.image_url);
+            const images = prod.image_url ? [prod.image_url, ...galleryUrls] : galleryUrls;
             return {
                 id: prod.id, name: prod.name, base_barcode: prod.base_barcode, description: prod.description,
                 image_url: prod.image_url, category: prod.category, size_range: prod.size_range,
                 composition: prod.composition,
                 supplierId: prod.supplier_id, // style-level, not per-SKU — a shop sources a whole style from one supplier
                 isFeaturedOnline: !!(featuredRow && featuredRow.is_active),
+                images,
                 variants
             };
         });
@@ -4965,6 +4976,11 @@
        ============================================================ */
     let editingProductId = null;
     let colorBlockSeq = 0;
+    // Ordered list of this style's photo URLs (index 0 = cover photo,
+    // mirrored to products.image_url; index 1-3 = the extra gallery angles,
+    // stored in product_images). Max 4 — see PHOTO_MAX below.
+    let currentPhotoUrls = [];
+    const PHOTO_MAX = 4;
 
     // Reuses the exact same tokenized, multi-field search as the POS grid
     // (searchProducts(), above) — a manager typing "sale supplier" here
@@ -5661,10 +5677,11 @@
     function startNewProduct() {
         showInventoryForm();
         editingProductId = null;
-        ['new_base_barcode','new_name','new_category','new_size_range','new_composition','new_description','new_image'].forEach(id => document.getElementById(id).value = '');
+        ['new_base_barcode','new_name','new_category','new_size_range','new_composition','new_description'].forEach(id => document.getElementById(id).value = '');
         document.getElementById('new_supplier').value = '';
         document.getElementById('new_supplier_id').value = '';
-        document.getElementById('img_preview').style.display = 'none';
+        currentPhotoUrls = [];
+        renderPhotoGallery();
         document.getElementById('upload_status').innerText = t('inv.no_file');
         document.getElementById('foundMsg').style.display = 'none';
         document.getElementById('printAllStyleBtn').classList.add('hidden');
@@ -5696,8 +5713,8 @@
         const matchedSupplier = supplierPicker.find(sp => sp.id === p.supplierId);
         document.getElementById('new_supplier').value = matchedSupplier ? matchedSupplier.name : '';
         document.getElementById('new_supplier_id').value = p.supplierId || '';
-        document.getElementById('new_image').value = p.image_url || '';
-        if (p.image_url) { document.getElementById('img_preview').src = p.image_url; document.getElementById('img_preview').style.display = 'block'; }
+        currentPhotoUrls = (p.images || []).slice();
+        renderPhotoGallery();
         document.getElementById('foundMsg').style.display = 'block';
 
         const byColor = {};
@@ -5903,13 +5920,25 @@
             size_range: document.getElementById('new_size_range').value.trim() || null,
             composition: document.getElementById('new_composition').value.trim() || null,
             description: document.getElementById('new_description').value.trim() || null,
-            image_url: document.getElementById('new_image').value || null,
+            image_url: currentPhotoUrls[0] || null,
             supplier_id: document.getElementById('new_supplier_id').value || null
         };
         const { data, error } = await sb.rpc('rpc_upsert_fashion_product', { p_product: payload_product, p_variants: variants });
         btn.disabled = false; btn.innerText = t('inv.save_style');
 
         if (error) { toast(error.message, 'error'); return; }
+        // A brand-new style has no product_id until this save returns, so any
+        // photos beyond the cover (uploaded to Storage already, just queued
+        // in currentPhotoUrls) only get their product_images rows now. For an
+        // existing style these were already persisted per add/delete via
+        // persistPhotosForExistingProduct() — this insert is then a no-op
+        // rewrite of the same rows, cheap at ≤3.
+        if (currentPhotoUrls.length > 1) {
+            await sb.from('product_images').delete().eq('product_id', data.product_id);
+            const extraRows = currentPhotoUrls.slice(1).map((url, i) => ({ product_id: data.product_id, image_url: url, sort_order: i }));
+            const { error: galleryErr } = await sb.from('product_images').insert(extraRows);
+            if (galleryErr) toast(galleryErr.message, 'error');
+        }
         toast(t('toast.style_saved'), 'success');
         // v_variants_out on the RPC side is built only from what THIS call
         // submitted (p_variants) — never the style's pre-existing untouched
@@ -5966,6 +5995,11 @@
         const fileInput = document.getElementById('img_uploader');
         const file = fileInput.files[0];
         if (!file) return;
+        if (currentPhotoUrls.length >= PHOTO_MAX) {
+            toast(t('toast.photo_limit_reached'), 'warn');
+            fileInput.value = '';
+            return;
+        }
         const status = document.getElementById('upload_status');
         status.innerText = t('inv.compressing');
 
@@ -5984,10 +6018,81 @@
         if (error) { toast(error.message, 'error'); status.innerText = t('common.error'); return; }
 
         const { data } = sb.storage.from('pos-images').getPublicUrl(filePath);
-        document.getElementById('new_image').value = data.publicUrl;
-        document.getElementById('img_preview').src = data.publicUrl;
-        document.getElementById('img_preview').style.display = 'block';
+        fileInput.value = '';
         status.innerText = `${t('inv.uploaded_prefix')} (${(blob.size/1024).toFixed(0)}KB)`;
+
+        currentPhotoUrls.push(data.publicUrl);
+        if (editingProductId) {
+            const ok = await persistPhotosForExistingProduct();
+            if (!ok) currentPhotoUrls.pop();
+        }
+        renderPhotoGallery();
+    }
+
+    // Extracts the Storage object path back out of a pos-images public URL,
+    // so a deleted photo's row removal also frees the underlying file.
+    function storagePathFromUrl(url) {
+        const marker = '/pos-images/';
+        const i = (url || '').indexOf(marker);
+        return i === -1 ? null : url.slice(i + marker.length);
+    }
+
+    // Rewrites this style's cover photo + gallery rows from currentPhotoUrls
+    // as a whole — simpler and safer than tracking individual product_images
+    // row ids through add/delete, and cheap at ≤4 rows per product. Returns
+    // false (and toasts the error) on failure so the caller can roll back
+    // its optimistic change to currentPhotoUrls.
+    async function persistPhotosForExistingProduct() {
+        const cover = currentPhotoUrls[0] || null;
+        const { error: coverErr } = await sb.from('products').update({ image_url: cover }).eq('id', editingProductId);
+        if (coverErr) { toast(coverErr.message, 'error'); return false; }
+
+        const { error: delErr } = await sb.from('product_images').delete().eq('product_id', editingProductId);
+        if (delErr) { toast(delErr.message, 'error'); return false; }
+
+        const extraRows = currentPhotoUrls.slice(1).map((url, i) => ({ product_id: editingProductId, image_url: url, sort_order: i }));
+        if (extraRows.length) {
+            const { error: insErr } = await sb.from('product_images').insert(extraRows);
+            if (insErr) { toast(insErr.message, 'error'); return false; }
+        }
+
+        const p = products.find(x => x.id === editingProductId);
+        if (p) { p.image_url = cover; p.images = currentPhotoUrls.slice(); }
+        renderProductsList();
+        return true;
+    }
+
+    function renderPhotoGallery() {
+        const box = document.getElementById('photoGallery');
+        box.innerHTML = currentPhotoUrls.map((url, i) => `
+            <div style="position:relative; width:52px; height:52px;">
+                <img src="${url}" style="width:52px; height:52px; border-radius:8px; object-fit:cover; border:1px solid rgba(255,255,255,0.2);">
+                <button class="icon-btn-sm icon-btn-danger" onclick="deletePhoto(${i})" title="${t('inv.remove_photo')}"
+                    style="position:absolute; top:-6px; right:-6px; width:18px; height:18px; min-width:18px; padding:0; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:0.65rem;">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        `).join('');
+        const uploadBtn = document.getElementById('photoUploadBtn');
+        if (uploadBtn) uploadBtn.classList.toggle('hidden', currentPhotoUrls.length >= PHOTO_MAX);
+    }
+
+    async function deletePhoto(index) {
+        const url = currentPhotoUrls[index];
+        if (!url) return;
+        if (!confirm(t('inv.confirm_delete_photo'))) return;
+
+        const removed = currentPhotoUrls.splice(index, 1)[0];
+
+        if (editingProductId) {
+            const ok = await persistPhotosForExistingProduct();
+            if (!ok) { currentPhotoUrls.splice(index, 0, removed); renderPhotoGallery(); return; }
+        }
+        renderPhotoGallery();
+
+        const path = storagePathFromUrl(removed);
+        if (path) await sb.storage.from('pos-images').remove([path]);
+        toast(t('toast.photo_deleted'), 'success');
     }
 
     /* ============================================================
