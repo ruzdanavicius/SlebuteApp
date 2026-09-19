@@ -409,6 +409,7 @@
         .sre-qty.low { color: var(--warning-text); }
         .sre-qty.zero { color: var(--danger-color); }
         .sre-quickadd-input { width: 34px; background: var(--card-bg); border: 1px solid rgba(36,22,30,0.16); border-radius: 6px; padding: 4px 3px; font-size: 0.75rem; color: var(--text-primary); outline:none; text-align:center; }
+        .sre-incoming-badge { font-size: 0.65rem; font-weight: 600; color: var(--accent-color); background: var(--accent-tint); border-radius: 6px; padding: 2px 5px; white-space: nowrap; }
 
         /* STORAGE TAB — one row per SKU already holding storage stock,
            both stores shown side by side (per-store move buttons only
@@ -1401,7 +1402,7 @@
                     <button class="btn btn-ghost" style="flex:1;" onclick="closeScanTransferModal()" data-i18n="common.cancel">Cancel</button>
                     <button class="btn btn-primary" style="flex:1;" id="scanTransferConfirmBtn" disabled onclick="confirmScanTransfer()"><i class="fas fa-check"></i> <span data-i18n="scantransfer.confirm">Confirm</span></button>
                 </div>
-                <p class="muted" style="font-size:0.75rem; text-align:center; margin-top:12px; cursor:pointer; text-decoration:underline;" onclick="forceCompleteScan()" data-i18n="scantransfer.manual">Scanner not working? Confirm manually instead.</p>
+                <p class="muted" id="scanTransferManualHint" style="font-size:0.75rem; text-align:center; margin-top:12px; cursor:pointer; text-decoration:underline;" onclick="forceCompleteScan()" data-i18n="scantransfer.manual">Scanner not working? Confirm manually instead.</p>
             </div>
         </div>
     </div>
@@ -1547,10 +1548,8 @@
                 <div class="form-group">
                     <label data-i18n="adjust.reason_label">Reason</label>
                     <select class="form-input" id="adjustReason">
-                        <option value="ARRIVAL" data-i18n="adjust.reason_arrival">Arrival</option>
                         <option value="CORRECTION" data-i18n="adjust.reason_correction">Correction</option>
                         <option value="DAMAGED" data-i18n="adjust.reason_damaged">Damaged</option>
-                        <option value="TRANSFER" data-i18n="adjust.reason_transfer">Transfer</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -2048,7 +2047,7 @@
             'toast.add_size_required': 'Add at least one size with a price.', 'toast.style_saved': 'Style saved!',
             'toast.session_expired': 'Session expired — signing you in again.',
             'toast.image_process_failed': 'Could not process that image:', 'toast.enter_qty_add': 'Enter a quantity to add.',
-            'toast.added_qty_suffix': 'added.', 'toast.enter_valid_price': 'Enter a valid price.', 'toast.price_updated': 'Price updated.',
+            'toast.added_qty_suffix': 'added.', 'toast.incoming_qty_suffix': 'queued as incoming — see Pervežimai.', 'toast.enter_valid_price': 'Enter a valid price.', 'toast.price_updated': 'Price updated.',
             'toast.supplier_updated': 'Supplier updated.', 'toast.no_existing_sizes': 'No existing sizes in this color to update.',
             'toast.price_updated_for': 'Price updated for', 'toast.sizes_suffix': 'size(s).',
             'toast.enter_nonzero_qty': 'Enter a non-zero quantity change.', 'toast.stock_updated_now_prefix': 'Stock updated — now',
@@ -2073,8 +2072,11 @@
             'common.email_placeholder': 'Email', 'common.password_placeholder': 'Password',
             'common.processing': 'Processing...', 'common.error': 'Error', 'common.error_prefix': 'Error:',
             'adjust.at_label': 'at', 'inv.saving': 'Saving...', 'inv.compressing': 'Compressing...',
-            'scantransfer.not_part_suffix': 'is not part of this transfer.', 'scantransfer.already_scanned_suffix': 'is already fully scanned',
+            'scantransfer.not_part_suffix': 'is not part of any open shipment.', 'scantransfer.already_scanned_suffix': 'is already fully scanned',
             'scantransfer.scanned_prefix': 'Scanned', 'returns.not_match_suffix': "doesn't match any known SKU.",
+            'scantransfer.headed_elsewhere_prefix': 'is headed to', 'scantransfer.receive_here_anyway': 'Receive here anyway',
+            'scantransfer.request_completed_suffix': 'received.', 'scantransfer.redirected_suffix': 'redirected to this store.',
+            'receive.nothing_to_receive': 'Nothing waiting to be received here.', 'receive.all_done': 'Everything scanned in.',
             'labels.printing_prefix': 'Printing', 'labels.printed_prefix': 'Printed',
             'labels.skipped_prefix': 'Skipped', 'labels.skipped_zero_suffix': '(0 copies — already labeled)',
             'scantransfer.leaving': 'leaving', 'scantransfer.arriving_at': 'arriving at',
@@ -2095,6 +2097,7 @@
             'scantransfer.force_confirm': 'Skip scanning and confirm this transfer manually?',
             'vm.stock_left_suffix': 'left', 'inv.color_name_placeholder': 'Color name (e.g. Black)',
             'inv.align_price_label': 'Align price for all sizes in this color:', 'inv.add_size': 'Add Size',
+            'inv.incoming_badge_title': 'Queued as incoming, not yet received at this store', 'inv.incoming_badge_suffix': 'incoming',
             'inv.uploading_prefix': 'Uploading', 'inv.uploaded_prefix': 'Uploaded',
             'register.title': 'Cash Register',
             'ds.title': 'Daily Sales',
@@ -2359,7 +2362,7 @@
             'toast.add_size_required': 'Pridėkite bent vieną dydį su kaina.', 'toast.style_saved': 'Modelis išsaugotas!',
             'toast.session_expired': 'Sesija baigėsi — prisijungiama iš naujo.',
             'toast.image_process_failed': 'Nepavyko apdoroti nuotraukos:', 'toast.enter_qty_add': 'Įveskite pridedamą kiekį.',
-            'toast.added_qty_suffix': 'pridėta.', 'toast.enter_valid_price': 'Įveskite galiojančią kainą.', 'toast.price_updated': 'Kaina atnaujinta.',
+            'toast.added_qty_suffix': 'pridėta.', 'toast.incoming_qty_suffix': 'įtraukta į atvykstančias prekes — žr. Pervežimai.', 'toast.enter_valid_price': 'Įveskite galiojančią kainą.', 'toast.price_updated': 'Kaina atnaujinta.',
             'toast.supplier_updated': 'Tiekėjas atnaujintas.', 'toast.no_existing_sizes': 'Šioje spalvoje nėra esamų dydžių atnaujinimui.',
             'toast.price_updated_for': 'Kaina atnaujinta:', 'toast.sizes_suffix': 'dydžiui(-iams).',
             'toast.enter_nonzero_qty': 'Įveskite nenulinį kiekio pokytį.', 'toast.stock_updated_now_prefix': 'Likutis atnaujintas — dabar',
@@ -2384,8 +2387,11 @@
             'common.email_placeholder': 'El. paštas', 'common.password_placeholder': 'Slaptažodis',
             'common.processing': 'Apdorojama...', 'common.error': 'Klaida', 'common.error_prefix': 'Klaida:',
             'adjust.at_label': 'parduotuvė:', 'inv.saving': 'Saugoma...', 'inv.compressing': 'Suspaudžiama...',
-            'scantransfer.not_part_suffix': 'nepriklauso šiam perkėlimui.', 'scantransfer.already_scanned_suffix': 'jau visiškai nuskaityta',
+            'scantransfer.not_part_suffix': 'nepriklauso jokiam laukiamam siuntimui.', 'scantransfer.already_scanned_suffix': 'jau visiškai nuskaityta',
             'scantransfer.scanned_prefix': 'Nuskaityta', 'returns.not_match_suffix': 'neatitinka jokio žinomo SKU.',
+            'scantransfer.headed_elsewhere_prefix': 'vyksta į', 'scantransfer.receive_here_anyway': 'Vis tiek priimti čia',
+            'scantransfer.request_completed_suffix': 'gauta.', 'scantransfer.redirected_suffix': 'nukreipta į šią parduotuvę.',
+            'receive.nothing_to_receive': 'Čia nėra ko priimti.', 'receive.all_done': 'Viskas nuskaityta.',
             'labels.printing_prefix': 'Spausdinama', 'labels.printed_prefix': 'Atspausdinta',
             'labels.skipped_prefix': 'Praleista', 'labels.skipped_zero_suffix': '(0 kopijų — jau su etikete)',
             'scantransfer.leaving': 'išvyksta iš', 'scantransfer.arriving_at': 'atvyksta į',
@@ -2406,6 +2412,7 @@
             'scantransfer.force_confirm': 'Praleisti nuskaitymą ir patvirtinti šį perkėlimą rankiniu būdu?',
             'vm.stock_left_suffix': 'liko', 'inv.color_name_placeholder': 'Spalvos pavadinimas (pvz. Juoda)',
             'inv.align_price_label': 'Suvienodinti kainą visiems šios spalvos dydžiams:', 'inv.add_size': 'Pridėti dydį',
+            'inv.incoming_badge_title': 'Įtraukta kaip atvykstanti prekė, dar negauta šioje parduotuvėje', 'inv.incoming_badge_suffix': 'atvyksta',
             'inv.uploading_prefix': 'Įkeliama', 'inv.uploaded_prefix': 'Įkelta',
             'register.title': 'Kasos aparatas',
             'ds.title': 'Dienos pardavimai',
@@ -2546,7 +2553,32 @@
     let PROFILE = null;              // { id, full_name, role, store_id, stores:{name,code} }
     let DEVICE_LOCATION_ID = null;   // fixed to the terminal's home store (profile.store_id)
     let VIEW_LOCATION_ID = null;     // which store's catalog we're browsing
-    let STORES = [];                 // [{id, code, name}, ...]
+    let STORES = [];                 // [{id, code, name}, ...] -- real (sellable) stores only
+    let INCOMING_STORE_ID = null;    // "Atvykstančios prekės" virtual store -- never in STORES/UI, only used to build incoming-goods requests
+    let INCOMING_SUMMARY = {};       // `${variantId}:${targetLocationId}` -> qty still incoming (not yet received) -- see loadIncomingSummary()
+
+    // Powers the "+N atvyksta" hint next to a store's stock count in Prekių
+    // valdymas, so a quick-add doesn't look like it silently did nothing —
+    // the unit is real (logged via rpc_add_incoming_stock) but only lands in
+    // `inventory.quantity` once a shop scans it in. Scoped to that screen
+    // only (called from switchView('inventory') + the two write actions),
+    // never from loadInventory() itself, so it never adds a round-trip to
+    // the POS/checkout path.
+    async function loadIncomingSummary() {
+        if (!INCOMING_STORE_ID) { INCOMING_SUMMARY = {}; return; }
+        const { data, error } = await sb.rpc('rpc_get_stock_requests');
+        if (error) return;
+        const summary = {};
+        for (const r of (data || [])) {
+            if (r.source?.id !== INCOMING_STORE_ID) continue;
+            if (!['PENDING', 'ACCEPTED', 'IN_TRANSIT'].includes(r.status)) continue;
+            for (const it of (r.stock_request_items || [])) {
+                const key = `${it.product_variants?.id}:${r.target.id}`;
+                summary[key] = (summary[key] || 0) + it.quantity;
+            }
+        }
+        INCOMING_SUMMARY = summary;
+    }
     // QA-AUDIT FIX (offline lockout): true while PROFILE was loaded from the
     // local cache rather than verified against the server this session — see
     // loadProfileFromCache() / reverifyProfileIfCached() in AUTH & INIT.
@@ -2953,8 +2985,11 @@
     }
 
     async function loadStores() {
-        const { data, error } = await sb.from('stores').select('id, code, name').order('id');
-        if (!error && data) STORES = data;
+        const { data, error } = await sb.from('stores').select('id, code, name, is_virtual').order('id');
+        if (!error && data) {
+            STORES = data.filter(s => !s.is_virtual);
+            INCOMING_STORE_ID = (data.find(s => s.is_virtual) || {}).id || null;
+        }
     }
 
     function setupLocationSelector() {
@@ -3208,6 +3243,7 @@
     function resolveScan(rawCode, isHardwareScan) {
         const code = (rawCode || '').trim();
         if (!code) return;
+        if (receiveContext) { handleReceiveScan(code); return; }
         if (scanTransferContext) { handleTransferScan(code); return; }
         if (returnsModalOpen) { handleReturnScan(code); return; }
         // Storage tab is a self-contained scan-in/scan-out screen while
@@ -5831,12 +5867,17 @@
                 const loc = (prefill.stockByLocation || {})[s.id] || { quantity: 0 };
                 const qty = loc.quantity;
                 const cls = qty <= 0 ? 'zero' : (qty <= 2 ? 'low' : '');
+                const incomingQty = INCOMING_SUMMARY[`${prefill.variantId}:${s.id}`] || 0;
+                const incomingBadge = incomingQty > 0
+                    ? `<span class="sre-incoming-badge" title="${t('inv.incoming_badge_title')}">+${incomingQty} ${t('inv.incoming_badge_suffix')}</span>`
+                    : '';
                 const markdownBtn = prefill.isClearance
                     ? `<button class="icon-btn-sm" onclick="openUndoMarkdownModal(${prefill.variantId}, '${escapeHtml(prefill.contextLabel||'')}', ${s.id})" title="${t('markdown.undo_title')} — ${escapeHtml(s.name)}"><i class="fas fa-rotate-left"></i></button>`
                     : `<button class="icon-btn-sm" onclick="openMarkdownModal(${prefill.variantId}, '${escapeHtml(prefill.contextLabel||'')}', ${Number(prefill.price)||0}, ${s.id})" title="${t('markdown.mark_down_title')} — ${escapeHtml(s.name)}"><i class="fas fa-tag"></i></button>`;
                 return `<div class="sre-stock">
                     <span class="sre-loc">${escapeHtml(s.name)}</span>
                     <span class="sre-qty ${cls}">${qty}</span>
+                    ${incomingBadge}
                     <input type="number" min="1" placeholder="+" class="sre-quickadd-input" title="Quantity received at ${escapeHtml(s.name)}"
                         onkeydown="if(event.key==='Enter'){event.preventDefault(); this.nextElementSibling.click();}">
                     <button class="icon-btn-sm" onclick="quickAddStock(${prefill.variantId}, ${s.id}, this)" title="Add received stock at ${escapeHtml(s.name)}"><i class="fas fa-plus"></i></button>
@@ -5886,7 +5927,15 @@
         const name = document.getElementById('new_name').value.trim();
         if (!name) { toast(t('toast.product_name_required'), 'warn'); return; }
 
+        // Initial stock for a brand-new size no longer seeds real inventory
+        // directly — it queues the same way a quick-add does (see
+        // rpc_add_incoming_stock), so it rides through Pervežimai and only
+        // actually lands at the store once scanned in on receipt. Tracked
+        // in parallel to `variants` (same order, zipped with the RPC's
+        // returned variant IDs below) since the upsert payload itself no
+        // longer carries a `stock` key.
         const variants = [];
+        const initialStockByRow = [];
         document.querySelectorAll('#colorBlocksContainer .color-block').forEach(block => {
             const colorName = block.querySelector('.color-name-input').value.trim() || 'Standard';
             const colorHex = block.querySelector('.color-hex-input').value;
@@ -5898,10 +5947,8 @@
                 const sku = row.querySelector('.sku-input').value.trim();
                 const s1 = parseInt(row.querySelector('.stock1-input').value) || 0;
                 const s2 = parseInt(row.querySelector('.stock2-input').value) || 0;
-                const stock = {};
-                if (STORES[0]) stock[STORES[0].id] = s1;
-                if (STORES[1]) stock[STORES[1].id] = s2;
-                variants.push({ color_name: colorName, color_hex: colorHex, size, sku, price, cost_price: cost, stock });
+                variants.push({ color_name: colorName, color_hex: colorHex, size, sku, price, cost_price: cost });
+                initialStockByRow.push({ [STORES[0]?.id]: s1, [STORES[1]?.id]: s2 });
             });
         });
         // A brand-new product genuinely needs at least one size to be sellable.
@@ -5927,6 +5974,25 @@
         btn.disabled = false; btn.innerText = t('inv.save_style');
 
         if (error) { toast(error.message, 'error'); return; }
+
+        // Queue any typed-in initial stock as incoming shipments now that the
+        // variant IDs exist. Best-effort per line — a failure here doesn't
+        // undo the style save that already succeeded, just gets surfaced.
+        const incomingCalls = [];
+        (data.variants || []).forEach((v, i) => {
+            const byStore = initialStockByRow[i] || {};
+            for (const [storeId, qty] of Object.entries(byStore)) {
+                if (storeId === 'undefined' || !qty || qty <= 0) continue;
+                incomingCalls.push(
+                    sb.rpc('rpc_add_incoming_stock', {
+                        p_variant_id: v.variant_id, p_target_location_id: parseInt(storeId),
+                        p_quantity: qty, p_notes: 'Naujas modelis (Prekių valdymas)'
+                    }).then(({ error: e }) => e && toast(`${v.sku}: ${e.message}`, 'error'))
+                );
+            }
+        });
+        if (incomingCalls.length) await Promise.all(incomingCalls);
+
         // A brand-new style has no product_id until this save returns, so any
         // photos beyond the cover (uploaded to Storage already, just queued
         // in currentPhotoUrls) only get their product_images rows now. For an
@@ -5950,12 +6016,12 @@
         // item objects, so adjusting a quantity here would silently mutate
         // whatever's sitting in the header queue too, and printing from
         // here would leave duplicates behind to accidentally reprint later.
-        const newLabelItems = (data.variants || []).map(v => ({
+        const newLabelItems = (data.variants || []).map((v, i) => ({
             productName: data.product_name, sizeRange: data.size_range, composition: data.composition,
             colorName: v.color_name, size: v.size, price: v.price, sku: v.sku,
-            copies: Math.max(1, Object.values(v.stock || {}).reduce((a,b) => a + (parseInt(b)||0), 0))
+            copies: Math.max(1, Object.values(initialStockByRow[i] || {}).reduce((a,b) => a + (parseInt(b)||0), 0))
         }));
-        await loadInventory();
+        await Promise.all([loadInventory(), loadIncomingSummary()]);
         // Stay on the style just saved (new or existing) instead of resetting to
         // a blank form — a manager mid-edit shouldn't have to re-find it in the
         // list after every save. "Naujas modelis" is the explicit way to start
@@ -6165,23 +6231,29 @@
     // modal, for the common case (a shipment just arrived and needs
     // distributing across sizes/stores). Full Adjust Stock (with a reason
     // picker) is still there via the sliders icon for corrections/damage.
+    //
+    // Doesn't credit the store directly any more — logs the arrival at the
+    // "Atvykstančios prekės" virtual store and queues/extends a pending
+    // transfer to this store, same as a store-to-store transfer, visible in
+    // Pervežimai. Real inventory (and the reorder-conflict check) only
+    // updates once someone actually scans it in on receipt — see
+    // rpc_add_incoming_stock and the receiving-scan rework.
     async function quickAddStock(variantId, locationId, btn) {
         const input = btn.parentElement.querySelector('.sre-quickadd-input');
         const qty = parseInt(input.value);
         if (!qty || qty <= 0) { toast(t('toast.enter_qty_add'), 'warn'); return; }
         btn.disabled = true;
-        const { data, error } = await sb.rpc('rpc_record_stock_adjustment', {
-            p_variant_id: variantId, p_location_id: locationId,
-            p_quantity_change: qty, p_reason: 'ARRIVAL', p_notes: 'Quick add (Manage Catalog)'
+        const { data, error } = await sb.rpc('rpc_add_incoming_stock', {
+            p_variant_id: variantId, p_target_location_id: locationId,
+            p_quantity: qty, p_notes: 'Quick add (Manage Catalog)'
         });
         btn.disabled = false;
         if (error) { toast(error.message, 'error'); return; }
         input.value = '';
-        toast(`+${qty} ${t('toast.added_qty_suffix')}`, 'success');
+        toast(`+${qty} ${t('toast.incoming_qty_suffix')}`, 'success');
         const ctx = findVariantContext(variantId);
         if (ctx) addToPendingLabels([{ ...ctx, copies: qty }]);
-        checkReorderConflict(variantId, locationId, qty);
-        await loadInventory();
+        await Promise.all([loadInventory(), loadIncomingSummary()]);
         if (editingProductId) loadProductForEdit(editingProductId);
     }
 
@@ -6502,10 +6574,10 @@
             r.status === 'IN_TRANSIT' && r.request_type === 'STORE_TRANSFER' && (r.target.id === DEVICE_LOCATION_ID || isAdmin));
         if (incomingTransit.length > 0) {
             switchReqTab('transit');
-            // Exactly one thing arriving — skip the list too and go
-            // straight into scanning. More than one, land on the tab but
-            // let them pick which box they're actually holding.
-            if (incomingTransit.length === 1) openScanTransferModal(incomingTransit[0].id, 'receive');
+            // Something's arriving — go straight into scanning. The pooled
+            // receive modal handles one box or several the same way, so
+            // there's no need to make them pick which request first.
+            openReceiveStockModal(DEVICE_LOCATION_ID);
         }
     }
 
@@ -6575,13 +6647,13 @@
             out.push(`<button class="btn btn-danger btn-sm" onclick="manageRequest(${r.id}, 'CANCELLED')"><i class="fas fa-trash"></i></button>`);
         } else if (r.status === 'ACCEPTED' && iAmSource) {
             if (r.request_type === 'STORE_TRANSFER') {
-                out.push(`<button class="btn btn-primary btn-sm" onclick="openScanTransferModal(${r.id}, 'ship')"><i class="fas fa-truck"></i> ${t('req.scan_out')}</button>`);
+                out.push(`<button class="btn btn-primary btn-sm" onclick="openScanTransferModal(${r.id})"><i class="fas fa-truck"></i> ${t('req.scan_out')}</button>`);
             } else {
                 out.push(`<button class="btn btn-primary btn-sm" onclick="openPickupPayModal(${r.id})"><i class="fas fa-check-double"></i> ${t('req.complete')}</button>`);
             }
             out.push(`<button class="btn btn-danger btn-sm" onclick="manageRequest(${r.id}, 'CANCELLED')"><i class="fas fa-trash"></i></button>`);
         } else if (r.status === 'IN_TRANSIT' && iAmTarget && r.request_type === 'STORE_TRANSFER') {
-            out.push(`<button class="btn btn-success btn-sm" onclick="openScanTransferModal(${r.id}, 'receive')"><i class="fas fa-box-open"></i> ${t('req.scan_in')}</button>`);
+            out.push(`<button class="btn btn-success btn-sm" onclick="openReceiveStockModal(${r.target.id})"><i class="fas fa-box-open"></i> ${t('req.scan_in')}</button>`);
         }
         if (isAdmin && !['COMPLETED','CANCELLED'].includes(r.status)) {
             out.push(`<button class="btn btn-ghost btn-sm" onclick="manageRequest(${r.id}, 'CANCELLED')" title="${t('req.admin_cancel')}"><i class="fas fa-ban"></i></button>`);
@@ -6599,18 +6671,23 @@
     }
 
     /* ============================================================
-       SCAN-CONFIRMED SHIP / RECEIVE
+       SCAN-CONFIRMED SHIP (per request) / RECEIVE (pooled across requests)
        ------------------------------------------------------------
-       Ship (ACCEPTED -> IN_TRANSIT) and Receive (IN_TRANSIT -> COMPLETED)
-       for stock transfers go through this instead of a single click —
-       each physical item gets scanned to confirm it's actually the right
-       one, catching mis-picks before stock moves in the system.
-       resolveScan() checks scanTransferContext first and routes scans
-       here instead of the normal POS add-to-cart flow while this is open.
+       Shipping (ACCEPTED -> IN_TRANSIT) stays a deliberate single-batch
+       action on one request — you're standing at Atvykstančios prekės
+       packing exactly that box. Receiving is different: a cashier may have
+       several boxes/transfers arriving at once (warehouse arrivals AND
+       store-to-store transfers mixed together), and picking "which request
+       is this SKU on" before scanning was pure friction. openReceiveStockModal
+       pools every IN_TRANSIT transfer targeting one store into a single scan
+       session — resolveScan() checks receiveContext before scanTransferContext,
+       either of which (never both at once) is handled instead of the normal
+       POS add-to-cart flow while its modal is open.
        ============================================================ */
-    let scanTransferContext = null; // { requestId, direction, targetStatus, items: [...] }
+    let scanTransferContext = null; // { requestId, targetStatus, items: [...] } -- ship only now
+    let receiveContext = null;      // { locationId, targetName, items: [{requestId, requestNumber, ...}] } -- pooled receive
 
-    function openScanTransferModal(requestId, direction) {
+    function openScanTransferModal(requestId) {
         const r = requestsCache.find(x => x.id === requestId);
         if (!r) return;
         const items = (r.stock_request_items || []).map(it => ({
@@ -6622,36 +6699,39 @@
             requiredQty: it.quantity,
             scannedQty: 0
         }));
+        receiveContext = null;
         scanTransferContext = {
-            requestId, direction,
-            targetStatus: direction === 'ship' ? 'IN_TRANSIT' : 'COMPLETED',
-            fromLabel: r.source.name, toLabel: r.target.name, targetLocationId: r.target.id, requestNumber: r.request_number,
+            requestId, targetStatus: 'IN_TRANSIT',
+            fromLabel: r.source.name, toLabel: r.target.name, requestNumber: r.request_number,
             items
         };
+        document.getElementById('scanTransferConfirmBtn').classList.remove('hidden');
+        document.getElementById('scanTransferManualHint').classList.remove('hidden');
         document.getElementById('scanTransferStatus').style.color = '';
         document.getElementById('scanTransferStatus').innerText = t('scantransfer.hint');
         renderScanTransferModal();
         document.getElementById('scanTransferModal').classList.add('active');
-        // QA-AUDIT FIX: this modal has no input field of its own — scanning
-        // here relies entirely on the same global keydown listener the POS
-        // screen uses, which only treats keystrokes as a scan when nothing
-        // (or body) is focused (see scanCouldOwnFocus()). The "Scan Out"/
-        // "Scan In" button that opened this modal stayed focused after the
-        // click, so the very first scan (and every scan after it, until the
-        // user clicked somewhere on the popup to blur the button) was
-        // silently dropped. Blurring here — right when the modal opens —
-        // drops focus back to document.body immediately, so scanning works
-        // the instant the popup appears, with no extra click needed.
+        blurScanTransferOpener();
+    }
+
+    // QA-AUDIT FIX: this modal has no input field of its own — scanning
+    // relies entirely on the same global keydown listener the POS screen
+    // uses, which only treats keystrokes as a scan when nothing (or body)
+    // is focused (see scanCouldOwnFocus()). Whatever button opened the
+    // modal stays focused after the click, so the very first scan would be
+    // silently dropped otherwise. Blurring right when the modal opens drops
+    // focus back to document.body immediately, so scanning works the
+    // instant the popup appears, with no extra click needed.
+    function blurScanTransferOpener() {
         if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
     }
 
     function renderScanTransferModal() {
         const ctx = scanTransferContext;
         if (!ctx) return;
-        const isShip = ctx.direction === 'ship';
-        document.getElementById('scanTransferTitle').innerText = isShip ? t('scantransfer.out_title') : t('scantransfer.in_title');
+        document.getElementById('scanTransferTitle').innerText = t('scantransfer.out_title');
         document.getElementById('scanTransferSubtitle').innerText =
-            `${ctx.requestNumber} — ${isShip ? t('scantransfer.leaving') + ' ' + ctx.fromLabel : t('scantransfer.arriving_at') + ' ' + ctx.toLabel}`;
+            `${ctx.requestNumber} — ${t('scantransfer.leaving')} ${ctx.fromLabel}`;
 
         document.getElementById('scanTransferRows').innerHTML = ctx.items.map(it => {
             const done = it.scannedQty >= it.requiredQty;
@@ -6702,21 +6782,152 @@
     async function confirmScanTransfer() {
         const ctx = scanTransferContext;
         if (!ctx) return;
-        const ok = await manageRequest(ctx.requestId, ctx.targetStatus);
-        // Receiving a transfer (targetStatus COMPLETED) increases stock at
-        // the target store — same reorder-conflict check as any other
-        // restock path. Shipping (IN_TRANSIT) doesn't change stock anywhere
-        // yet, so no check there.
-        if (ok && ctx.targetStatus === 'COMPLETED') {
-            for (const it of ctx.items) checkReorderConflict(it.variantId, ctx.targetLocationId, it.scannedQty || it.requiredQty);
-        }
+        await manageRequest(ctx.requestId, ctx.targetStatus);
         scanTransferContext = null;
         closeModal('scanTransferModal');
     }
 
     function closeScanTransferModal() {
         scanTransferContext = null;
+        receiveContext = null;
         closeModal('scanTransferModal');
+    }
+
+    // Pools every IN_TRANSIT STORE_TRANSFER targeting one store (regardless
+    // of which request it's on — a warehouse arrival and an ordinary
+    // store-to-store transfer look identical here) into one scan session.
+    // A request auto-completes the instant its own lines finish — no
+    // separate "confirm all" click, so a cashier can keep scanning a whole
+    // pile without stopping.
+    function openReceiveStockModal(locationId) {
+        const targetLocationId = locationId || DEVICE_LOCATION_ID;
+        if (!targetLocationId) return;
+        const isAdmin = PROFILE.role === 'admin';
+        const relevant = requestsCache.filter(r =>
+            r.status === 'IN_TRANSIT' && r.request_type === 'STORE_TRANSFER' &&
+            r.target.id === targetLocationId && (r.target.id === DEVICE_LOCATION_ID || isAdmin));
+        if (!relevant.length) { toast(t('receive.nothing_to_receive'), 'warn'); return; }
+
+        const items = [];
+        for (const r of relevant) {
+            for (const it of (r.stock_request_items || [])) {
+                items.push({
+                    requestId: r.id, requestNumber: r.request_number,
+                    variantId: it.product_variants?.id, sku: it.product_variants?.sku || '',
+                    name: it.product_variants?.product_colors?.products?.name || '',
+                    size: it.product_variants?.size || '', colorName: it.product_variants?.product_colors?.color_name || '',
+                    requiredQty: it.quantity, scannedQty: 0
+                });
+            }
+        }
+        scanTransferContext = null;
+        receiveContext = { locationId: targetLocationId, targetName: relevant[0].target.name, items };
+        document.getElementById('scanTransferConfirmBtn').classList.add('hidden');
+        document.getElementById('scanTransferManualHint').classList.add('hidden');
+        document.getElementById('scanTransferStatus').style.color = '';
+        document.getElementById('scanTransferStatus').innerText = t('scantransfer.hint');
+        renderReceiveModal();
+        document.getElementById('scanTransferModal').classList.add('active');
+        blurScanTransferOpener();
+    }
+
+    function renderReceiveModal() {
+        const ctx = receiveContext;
+        if (!ctx) return;
+        document.getElementById('scanTransferTitle').innerText = t('scantransfer.in_title');
+        document.getElementById('scanTransferSubtitle').innerText = `${t('scantransfer.arriving_at')} ${ctx.targetName}`;
+        if (!ctx.items.length) {
+            document.getElementById('scanTransferRows').innerHTML = `<div class="empty-state"><i class="fas fa-check-circle"></i>${t('receive.all_done')}</div>`;
+            return;
+        }
+        document.getElementById('scanTransferRows').innerHTML = ctx.items.map(it => {
+            const done = it.scannedQty >= it.requiredQty;
+            return `<div class="scan-item-row ${done ? 'done' : ''}">
+                <div class="scan-item-info">
+                    <div class="si-name">${escapeHtml(it.name)} — ${escapeHtml(it.colorName)} / ${escapeHtml(it.size)}</div>
+                    <div class="si-sub">${escapeHtml(it.sku)} · ${escapeHtml(it.requestNumber)}</div>
+                </div>
+                <div class="scan-item-progress ${done ? 'done' : ''}">${done ? '<i class="fas fa-check-circle"></i> ' : ''}${it.scannedQty}/${it.requiredQty}</div>
+            </div>`;
+        }).join('');
+    }
+
+    // Called from resolveScan() when the pooled receive modal is open.
+    // Returns true if the scan was handled here (matched, mismatched, or
+    // rejected) so normal POS scan-handling is skipped either way.
+    function handleReceiveScan(code) {
+        const ctx = receiveContext;
+        if (!ctx) return false;
+        const status = document.getElementById('scanTransferStatus');
+        const norm = code.toLowerCase();
+
+        const item = ctx.items.find(it => it.sku && it.sku.toLowerCase() === norm && it.scannedQty < it.requiredQty);
+        if (item) {
+            item.scannedQty++;
+            status.innerText = `${t('scantransfer.scanned_prefix')} ${item.sku} (${item.scannedQty}/${item.requiredQty})`;
+            status.style.color = 'var(--success-color)';
+            renderReceiveModal();
+            maybeCompleteReceiveRequest(item.requestId);
+            return true;
+        }
+
+        // Not expected here -- is it on an open transfer bound for a
+        // DIFFERENT store? Warn, but let the cashier redirect it on the spot
+        // instead of hard-rejecting a real physical item in their hands.
+        const mismatchReq = requestsCache.find(r =>
+            r.status === 'IN_TRANSIT' && r.request_type === 'STORE_TRANSFER' && r.target.id !== ctx.locationId &&
+            (r.stock_request_items || []).some(it => (it.product_variants?.sku || '').toLowerCase() === norm));
+        if (mismatchReq) {
+            const mi = mismatchReq.stock_request_items.find(it => (it.product_variants?.sku || '').toLowerCase() === norm);
+            const msg = `"${code}" ${t('scantransfer.headed_elsewhere_prefix')} ${mismatchReq.target.name}.`;
+            status.innerText = msg;
+            status.style.color = 'var(--warning-text)';
+            toast(msg, 'warn', {
+                label: t('scantransfer.receive_here_anyway'),
+                onClick: () => confirmRedirectItem(mismatchReq.id, mi.product_variants.id, ctx.locationId, code)
+            });
+            return true;
+        }
+
+        status.innerText = `"${code}" ${t('scantransfer.not_part_suffix')}`;
+        status.style.color = 'var(--danger-color)';
+        return true;
+    }
+
+    // Fires the moment a pooled request's own lines are all scanned --
+    // no separate "confirm all" step. Removes that request's now-completed
+    // lines from the live session so the modal only ever shows what's left.
+    async function maybeCompleteReceiveRequest(requestId) {
+        const ctx = receiveContext;
+        if (!ctx) return;
+        const linesForRequest = ctx.items.filter(it => it.requestId === requestId);
+        if (!linesForRequest.length || !linesForRequest.every(it => it.scannedQty >= it.requiredQty)) return;
+
+        const { error } = await sb.rpc('rpc_update_stock_request_status', { p_request_id: requestId, p_new_status: 'COMPLETED' });
+        if (error) { toast(error.message, 'error'); return; }
+        toast(`${linesForRequest[0].requestNumber} ${t('scantransfer.request_completed_suffix')}`, 'success');
+        for (const it of linesForRequest) checkReorderConflict(it.variantId, ctx.locationId, it.requiredQty);
+
+        await loadRequests();
+        await loadInventory();
+        if (receiveContext) {
+            receiveContext.items = receiveContext.items.filter(it => it.requestId !== requestId);
+            renderReceiveModal();
+        }
+    }
+
+    // The "wrong shop" redirect: credits the scanning store immediately and
+    // shrinks the original line by one unit (see rpc_redirect_transfer_item)
+    // -- the correct shop simply expects one less now, no manual cleanup.
+    async function confirmRedirectItem(requestId, variantId, receivingLocationId, sku) {
+        const { data, error } = await sb.rpc('rpc_redirect_transfer_item', {
+            p_request_id: requestId, p_variant_id: variantId, p_receiving_location_id: receivingLocationId
+        });
+        if (error) { toast(error.message, 'error'); return; }
+        toast(`${sku} ${t('scantransfer.redirected_suffix')}`, 'success');
+        checkReorderConflict(variantId, receivingLocationId, 1);
+        await loadRequests();
+        await loadInventory();
     }
 
     /* ============================================================
@@ -9999,6 +10210,7 @@ ${qrBlock}${field(skuG, qrColX, skuY)}${field(colourG, qrColX, colourY)}${field(
             // also the search box's own oninput handler and must never
             // clear mid-type.
             document.getElementById('productSearchBox').value = '';
+            loadIncomingSummary().then(() => renderProductsList());
             renderProductsList();
             // Only jump straight into a blank "New Style" form if one was
             // already in progress (colorBlocksContainer non-empty — a draft
