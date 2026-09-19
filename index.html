@@ -5831,9 +5831,10 @@
                 <input type="number" class="bulk-cost-input" step="0.01" placeholder="${t('inv.col_cost')}">
                 <button class="btn btn-ghost btn-sm bulk-apply-btn" onclick="applyBulkPrice('${blockId}')">${t('inv.apply_to_all_sizes')}</button>
             </div>
+            ${colorName ? '' : `
             <div class="size-row-head">
                 <span>${t('ds.col_size')}</span><span>${t('inv.col_sku')}</span><span>${t('inv.col_price')}</span><span>${t('inv.col_cost')}</span><span>${STORES[0]?.name||'Store 1'}</span><span>${STORES[1]?.name||'Store 2'}</span><span></span>
-            </div>
+            </div>`}
             <div class="size-rows"></div>
             <button class="btn btn-ghost btn-sm mt-8" onclick="addSizeRow('${blockId}')"><i class="fas fa-plus"></i> ${t('inv.add_size')}</button>
         `;
@@ -5911,12 +5912,12 @@
 
         row.className = 'size-row';
         row.innerHTML = `
-            <input type="text" class="size-input" placeholder="M" value="${escapeHtml(prefill.size||'')}">
-            <input type="text" class="sku-input" placeholder="auto" value="${escapeHtml(prefill.sku||'')}">
-            <input type="number" class="price-input" placeholder="0.00" value="${prefill.price||''}" step="0.01">
-            <input type="number" class="cost-input" placeholder="0.00" step="0.01">
-            <input type="number" class="stock1-input" placeholder="0" value="${prefill.stock1||''}">
-            <input type="number" class="stock2-input" placeholder="0" value="${prefill.stock2||''}">
+            <input type="text" class="size-input" placeholder="M" title="${t('ds.col_size')}" value="${escapeHtml(prefill.size||'')}">
+            <input type="text" class="sku-input" placeholder="auto" title="${t('inv.col_sku')}" value="${escapeHtml(prefill.sku||'')}">
+            <input type="number" class="price-input" placeholder="0.00" title="${t('inv.col_price')}" value="${prefill.price||''}" step="0.01">
+            <input type="number" class="cost-input" placeholder="0.00" title="${t('inv.col_cost')}" step="0.01">
+            <input type="number" class="stock1-input" placeholder="0" title="${STORES[0]?.name||'Store 1'}" value="${prefill.stock1||''}">
+            <input type="number" class="stock2-input" placeholder="0" title="${STORES[1]?.name||'Store 2'}" value="${prefill.stock2||''}">
             <button class="icon-btn" onclick="this.closest('.size-row').remove()" title="${t('common.remove')}"><i class="fas fa-times"></i></button>
         `;
         rowsContainer.appendChild(row);
