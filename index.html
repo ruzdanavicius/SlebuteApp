@@ -3705,7 +3705,7 @@
         return true;
     }
 
-    function escapeHtml(s) { const d = document.createElement('div'); d.innerText = s || ''; return d.innerHTML; }
+    function escapeHtml(s) { const d = document.createElement('div'); d.innerText = s || ''; return d.innerHTML.replace(/'/g, '&#39;'); }
 
     /* Shared "no photo" rendering for every product/cover image slot
        (POS catalog cards, the Manage Catalog style list, request cards…):
