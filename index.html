@@ -281,18 +281,29 @@
         .category-chip.active .category-chip-count { opacity: 0.85; }
 
         /* PRODUCT GRID */
-        .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 18px; padding-bottom: 40px; overflow-y: auto; }
-        /* contain: content tells Chrome this card's contents can't affect
-           layout/paint outside its own box, so patchProductCard()'s
+        /* Fixed 5-column layout (desktop/mouse kiosk) instead of
+           auto-fill/minmax — auto-fill recomputes the column count from
+           the available CSS-pixel width, which shifts with browser zoom
+           (e.g. 6 columns at 100%, 7 at 90%). A fixed column count keeps
+           tile size predictable regardless of zoom level. */
+        .product-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 18px; padding-bottom: 40px; overflow-y: auto; }
+        /* contain: layout (not the former `contain: content`, which also
+           implies `paint`) still tells Chrome this card's contents can't
+           affect layout outside its own box, so patchProductCard()'s
            in-place badge/pill updates (see JS) can't force a wider
-           repaint of the grid. Safe here specifically because nothing
-           that visually escapes a card (storage-sibling popup, image
-           hover preview, keyboard-close button) is actually nested
-           inside .product-card in the DOM — they're all appended to
-           document.body — so nothing gets clipped by this. */
-        .product-card { background: var(--card-bg); border: var(--glass-border); border-radius: 16px; padding: 10px; cursor: pointer; transition: 0.15s; position: relative; overflow: hidden; contain: content; }
+           repaint of the grid. `paint` containment was dropped: it's a
+           known trigger for a Chromium/Windows GPU-compositing bug where
+           text inside a paint-contained box fails to paint at certain
+           browser zoom levels until something forces a repaint (matches
+           the reported "tiles show text only after Ctrl+- to 90%" symptom
+           exactly). Safe here specifically because nothing that visually
+           escapes a card (storage-sibling popup, image hover preview,
+           keyboard-close button) is actually nested inside .product-card
+           in the DOM — they're all appended to document.body — so nothing
+           gets clipped by this. */
+        .product-card { background: var(--card-bg); border: var(--glass-border); border-radius: 16px; padding: 10px; cursor: pointer; transition: 0.15s; position: relative; overflow: hidden; contain: layout style; }
         .product-card:hover { transform: translateY(-4px); box-shadow: 0 10px 30px var(--shadow-color); border-color: rgba(107,37,69,0.3); }
-        .product-img { width: 100%; height: 170px; object-fit: cover; border-radius: 12px; margin-bottom: 10px; background: var(--card-bg-raised); }
+        .product-img { width: 100%; height: 200px; object-fit: cover; border-radius: 12px; margin-bottom: 10px; background: var(--card-bg-raised); }
         /* "No photo" placeholder — swapped in for any product/style image
            slot with no cover image (or one that fails to load), instead
            of the browser's broken-image icon. */
@@ -306,9 +317,9 @@
         /* On a caption-less slot the mark can afford to be a bit bigger. */
         .img-placeholder:not(.img-placeholder-label) img.ph-mark { width:52%; }
         .photo-gallery-thumb { width:52px; height:52px; border-radius:8px; object-fit:cover; border:1px solid rgba(255,255,255,0.2); background: var(--card-bg-raised); }
-        .product-info h3 { font-size: 0.92rem; font-weight: 600; margin-bottom: 3px; display: flex; align-items: center; gap: 5px; }
+        .product-info h3 { font-size: 0.98rem; font-weight: 600; margin-bottom: 3px; display: flex; align-items: center; gap: 5px; }
         .product-info h3 .p-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .product-info p { color: var(--text-secondary); font-size: 0.78rem; display:flex; justify-content:space-between; align-items:center; gap: 6px; }
+        .product-info p { color: var(--text-secondary); font-size: 0.82rem; display:flex; justify-content:space-between; align-items:center; gap: 6px; }
         .product-info p span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .stock-pill { font-size: 0.68rem; font-weight: 700; padding: 2px 7px; border-radius: 20px; flex-shrink: 0; white-space: nowrap; }
         .stock-pill.ok { background: var(--success-tint); color: var(--success-color); }
