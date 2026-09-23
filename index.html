@@ -297,9 +297,15 @@
            slot with no cover image (or one that fails to load), instead
            of the browser's broken-image icon. */
         .img-placeholder { display:flex; align-items:center; justify-content:center; background: var(--card-bg-raised); }
-        .img-placeholder img { width:36%; max-width:56px; height:auto; object-fit:contain; opacity:0.22; filter: grayscale(1); }
+        /* Class-qualified so a slot-specific rule (e.g. `.cart-item .cart-thumb`)
+           can never stretch the brand mark to fill the slot — the placeholder div
+           wears the slot's own class, the mark inside it must stay small. */
+        .img-placeholder img.ph-mark { width:36%; max-width:56px; height:auto; object-fit:contain; opacity:0.22; filter: grayscale(1); }
         .img-placeholder.img-placeholder-label { flex-direction:column; gap:8px; }
         .img-placeholder-text { font-size:0.72rem; color: var(--text-secondary); text-align:center; padding:0 8px; }
+        /* On a caption-less slot the mark can afford to be a bit bigger. */
+        .img-placeholder:not(.img-placeholder-label) img.ph-mark { width:52%; }
+        .photo-gallery-thumb { width:52px; height:52px; border-radius:8px; object-fit:cover; border:1px solid rgba(255,255,255,0.2); background: var(--card-bg-raised); }
         .product-info h3 { font-size: 0.92rem; font-weight: 600; margin-bottom: 3px; display: flex; align-items: center; gap: 5px; }
         .product-info h3 .p-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .product-info p { color: var(--text-secondary); font-size: 0.78rem; display:flex; justify-content:space-between; align-items:center; gap: 6px; }
@@ -323,7 +329,7 @@
         .cart-items { flex: 1; overflow-y: auto; margin: 14px 0; min-height: 60px; }
         .cart-item { background: var(--card-bg-raised); padding: 10px; border-radius: 12px; margin-bottom: 8px; position: relative; }
         .cart-item-top { display:flex; align-items:center; }
-        .cart-item img { width: 42px; height: 42px; border-radius: 8px; object-fit: cover; margin-right: 10px; flex-shrink:0; }
+        .cart-item .cart-thumb { width: 42px; height: 42px; border-radius: 8px; object-fit: cover; margin-right: 10px; flex-shrink:0; background: var(--card-bg-raised); }
         .item-details { flex: 1; min-width: 0; }
         .item-details h4 { font-size: 0.85rem; margin-bottom: 3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
         .cart-variant-row { display: flex; align-items: center; gap: 6px; }
@@ -469,7 +475,11 @@
 
         /* Floating image preview (hover over item code/name in Daily Sales) */
         .img-hover-preview { position: fixed; z-index: 999; display: none; pointer-events: none; background: var(--card-bg); border: var(--glass-border); border-radius: 12px; padding: 6px; box-shadow: 0 12px 32px var(--shadow-color); }
-        .img-hover-preview img { display: block; width: 150px; height: 150px; object-fit: cover; border-radius: 8px; background: var(--card-bg-raised); }
+        /* Sizing applies to the real photo AND to the "no photo" placeholder that
+           replaces it on a load failure; display:block is scoped to the <img> so
+           it can't override the placeholder's own flex centring. */
+        .img-hover-preview .hover-thumb { width: 150px; height: 150px; object-fit: cover; border-radius: 8px; background: var(--card-bg-raised); }
+        .img-hover-preview img.hover-thumb { display: block; }
         .ds-hoverable { cursor: zoom-in; }
         .bulk-price-bar { display:flex; align-items:center; gap:8px; background: var(--input-bg); border-radius: 9px; padding: 8px 10px; margin-bottom: 10px; flex-wrap:wrap; }
         .bulk-price-bar label { font-size: 0.72rem; color: var(--text-secondary); }
@@ -759,7 +769,7 @@
             #cartControls { flex-shrink: 0; }
             .totals-block { margin-top: auto; flex-shrink: 0; padding-top: 10px; }
             .cart-item { padding: 8px; border-radius: 10px; margin-bottom: 6px; }
-            .cart-item img { width: 36px; height: 36px; }
+            .cart-item .cart-thumb { width: 36px; height: 36px; }
             .discount-row select, .discount-row input { padding: 6px 8px; font-size: 0.76rem; }
             .pay-tab { padding: 7px 3px; font-size: 0.75rem; }
             .totals-row { font-size: 0.8rem; margin-bottom: 4px; }
@@ -781,7 +791,7 @@
             .product-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
             .product-img { height: 118px; }
             .cart-panel { width: 260px; padding: 12px; }
-            .cart-item img { width: 32px; height: 32px; }
+            .cart-item .cart-thumb { width: 32px; height: 32px; }
         }
 
         /* Safety net for any narrower touch viewport — same model still,
@@ -802,7 +812,7 @@
     <!-- Floating image preview — shown on hover over a barcode/name cell in Daily Sales.
          Single reusable node, positioned in JS to follow the cursor; fixed positioning
          so it's never clipped by a scrolling table wrapper. -->
-    <div id="imgHoverPreview" class="img-hover-preview"><img alt=""></div>
+    <div id="imgHoverPreview" class="img-hover-preview"><img id="imgHoverPreviewImg" class="hover-thumb" alt=""></div>
 
     <!-- LOGIN SCREEN -->
     <div id="loginOverlay">
@@ -1148,7 +1158,7 @@
                                     <input type="text" id="sup_image" style="display:none;">
                                     <label for="sup_img_uploader" class="btn btn-ghost btn-sm" style="cursor:pointer;"><i class="fas fa-camera"></i> <span data-i18n="inv.upload">Upload</span></label>
                                     <input type="file" id="sup_img_uploader" accept="image/*" style="display:none;" onchange="uploadSupplierImage()">
-                                    <img id="sup_img_preview" src="" style="width: 42px; height: 42px; border-radius: 8px; object-fit: cover; display: none; border: 1px solid rgba(255,255,255,0.2);">
+                                    <img id="sup_img_preview" alt="" onerror="this.style.display='none'" style="width: 42px; height: 42px; border-radius: 8px; object-fit: cover; display: none; border: 1px solid rgba(255,255,255,0.2);">
                                     <span id="sup_upload_status" style="font-size:0.78rem; color:var(--text-secondary);" data-i18n="inv.no_file">No file chosen</span>
                                 </div>
                             </div>
@@ -1313,7 +1323,8 @@
     <div class="modal-overlay" id="variantModal">
         <div class="modal-box">
             <div class="close-modal" onclick="closeModal('variantModal')"><i class="fas fa-times"></i></div>
-            <img src="" class="vm-image" id="vmImage">
+            <!-- Replaced wholesale by setPhotoNode() in openProduct() — real <img> when the style has a cover photo, the "no photo" placeholder when it does not. No src here so an unopened modal never fires a request for the page URL. -->
+            <img class="vm-image" id="vmImage" alt="">
             <div class="vm-content">
                 <h2 id="vmTitle">Product Name</h2>
                 <p id="vmSku" class="muted">Ref: ---</p>
@@ -3711,12 +3722,28 @@
        (POS catalog cards, the Manage Catalog style list, request cards…):
        a faded brand mark instead of the browser's broken-image icon, with
        a caption on slots big enough to fit one. withLabel=true adds it. */
-    function placeholderPhotoHTML(cssClass, withLabel) {
-        return `<div class="${cssClass} img-placeholder${withLabel ? ' img-placeholder-label' : ''}"><img src="${BRAND_LOGO_URL}" alt="">${withLabel ? `<span class="img-placeholder-text" data-i18n="common.no_photo">${t('common.no_photo')}</span>` : ''}</div>`;
+    function placeholderPhotoHTML(cssClass, withLabel, id) {
+        const idAttr = id ? ` id="${id}"` : '';
+        return `<div${idAttr} class="${cssClass} img-placeholder${withLabel ? ' img-placeholder-label' : ''}"><img class="ph-mark" src="${BRAND_LOGO_URL}" alt="">${withLabel ? `<span class="img-placeholder-text" data-i18n="common.no_photo">${t('common.no_photo')}</span>` : ''}</div>`;
     }
-    function photoTagHTML(url, cssClass, withLabel) {
-        if (!url) return placeholderPhotoHTML(cssClass, withLabel);
-        return `<img src="${url}" class="${cssClass}" loading="lazy" decoding="async" onerror="this.outerHTML=placeholderPhotoHTML('${cssClass}', ${!!withLabel})">`;
+    /* eager=true for a slot that is on screen the moment it's built (a modal
+       photo, the hover preview). loading="lazy" defers the request until the
+       browser decides the element is in view — which also defers the onerror
+       that swaps in the placeholder, so a lazy modal image can sit there as a
+       broken icon. Lazy still pays off in the scrolling POS/style grids. */
+    function photoTagHTML(url, cssClass, withLabel, id, eager) {
+        if (!url) return placeholderPhotoHTML(cssClass, withLabel, id);
+        const idAttr = id ? ` id="${id}"` : '';
+        return `<img${idAttr} src="${url}" class="${cssClass}"${eager ? '' : ' loading="lazy"'} decoding="async" onerror="this.outerHTML=placeholderPhotoHTML('${cssClass}', ${!!withLabel}, ${id ? `'${id}'` : 'null'})">`;
+    }
+    /* Same thing for a photo slot that already exists in the DOM instead of
+       being built into an innerHTML string. Swaps the node itself — so a slot
+       that was a placeholder last time becomes a real <img> when a photo
+       finally is uploaded, and back again — keeping its id either way.
+       Use this instead of assigning .src on a product/style image. */
+    function setPhotoNode(id, url, cssClass, withLabel) {
+        const el = document.getElementById(id);
+        if (el) el.outerHTML = photoTagHTML(url, cssClass, withLabel, id, true);
     }
 
     let currentOpenProductId = null; // lets refreshPosStockDisplay() live-update the open variant modal after a cart change
@@ -3735,7 +3762,7 @@
         const p = products.find(x => x.id === id);
         if (!p) return;
         currentOpenProductId = id;
-        document.getElementById('vmImage').src = p.image_url || '';
+        setPhotoNode('vmImage', p.image_url, 'vm-image', true);
         document.getElementById('vmTitle').innerText = p.name;
         document.getElementById('vmSku').innerText = t('vm.ref') + ' ' + (p.base_barcode || '---');
         // Make it unmistakable which store's numbers these are — the picker is
@@ -4439,7 +4466,7 @@
                     : '';
                 return `<div class="cart-item">
                     <div class="cart-item-top">
-                        <img src="${i.img || ''}" decoding="async" onerror="this.style.opacity=0.2">
+                        ${photoTagHTML(i.img, 'cart-thumb', false)}
                         <div class="item-details">
                             <h4>${escapeHtml(i.name)} ${storageHint}</h4>
                             <div class="cart-variant-row">
@@ -6133,7 +6160,7 @@
         const box = document.getElementById('photoGallery');
         box.innerHTML = currentPhotoUrls.map((url, i) => `
             <div style="position:relative; width:52px; height:52px;">
-                <img src="${url}" style="width:52px; height:52px; border-radius:8px; object-fit:cover; border:1px solid rgba(255,255,255,0.2);">
+                ${photoTagHTML(url, 'photo-gallery-thumb', false)}
                 <button class="icon-btn-sm icon-btn-danger" onclick="deletePhoto(${i})" title="${t('inv.remove_photo')}"
                     style="position:absolute; top:-6px; right:-6px; width:18px; height:18px; min-width:18px; padding:0; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:0.65rem;">
                     <i class="fas fa-times"></i>
@@ -6618,7 +6645,7 @@
             const needsAction = requestNeedsAction(r);
             const actions = buildRequestActions(r);
             return `<div class="req-item ${isPickup?'type-pickup':'type-transfer'} ${needsAction && currentReqTab==='incoming' ? 'needs-action':''}">
-                <img src="${img}" class="req-img" loading="lazy" decoding="async" onerror="this.style.opacity=0.2">
+                ${photoTagHTML(img, 'req-img', false)}
                 <div class="req-info">
                     <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px; flex-wrap:wrap;">
                         <span class="req-badge ${isPickup?'badge-pickup':'badge-transfer'}">${isPickup?t('req.client_pickup'):t('req.stock_transfer')}</span>
@@ -7999,7 +8026,7 @@
     function showImgPreview(evt, url) {
         if (!url) return;
         const el = document.getElementById('imgHoverPreview');
-        el.querySelector('img').src = url;
+        setPhotoNode('imgHoverPreviewImg', url, 'hover-thumb', true);
         el.style.display = 'block';
         positionImgPreview(evt);
     }
