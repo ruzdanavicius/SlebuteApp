@@ -422,19 +422,21 @@
         .size-row { display:grid; grid-template-columns: 70px 1fr 90px 90px 70px 70px 34px; gap: 8px; align-items:center; margin-bottom: 8px; }
         .size-row input { background: var(--input-bg); border: 1px solid rgba(36,22,30,0.14); border-radius: 7px; color: var(--text-primary); padding: 8px; font-size: 0.8rem; outline:none; width:100%; }
         .size-row-head { display:grid; grid-template-columns: 70px 1fr 90px 90px 70px 70px 34px; gap: 8px; font-size: 0.68rem; color: var(--text-secondary); margin-bottom: 6px; text-transform:uppercase; letter-spacing:0.03em; }
+        .sre-grid { display:grid; grid-template-columns: minmax(140px, 1fr) auto repeat(var(--sre-stores, 2), auto) auto; column-gap: 10px; overflow-x: auto; }
+        .sre-grid > * { grid-column: 1 / -1; }
+        .sre-grid > .size-row-existing, .sre-grid > .sre-row-head { display:grid; grid-template-columns: subgrid; align-items:center; }
         .size-row-existing { display:flex; align-items:center; gap: 10px; padding: 9px 10px; border-radius: 9px; background: var(--card-bg); margin-bottom: 8px; flex-wrap: wrap; }
-        .sre-main { flex: 0 0 150px; min-width: 140px; display:flex; flex-direction:column; gap:3px; }
+        .sre-main { min-width: 0; display:flex; flex-direction:column; gap:3px; }
+        .sre-actions { display:flex; align-items:center; gap: 5px; }
         .sre-main .sre-size { font-weight: 700; font-size: 0.86rem; }
         .sre-main .sre-sub { font-size: 0.72rem; color: var(--text-secondary); }
         .sre-price-group { display:flex; align-items:center; gap: 6px; }
-        .sre-price-group + .sre-stock { margin-left: auto; }
         .sre-field { display:flex; flex-direction:column; gap:2px; }
         .sre-field-label { font-size: 0.6rem; color: var(--text-secondary); text-transform:uppercase; letter-spacing:0.03em; white-space:nowrap; }
         .sre-price-group input { width: 62px; background: var(--input-bg); border: 1px solid rgba(36,22,30,0.14); border-radius: 6px; padding: 4px 6px; font-size: 0.75rem; color: var(--text-primary); outline:none; }
         .sre-price-save { margin-bottom: 1px; }
-        .sre-row-head { display:flex; align-items:center; gap: 10px; padding: 0 10px; margin-bottom: 6px; font-size: 0.6rem; color: var(--text-secondary); text-transform:uppercase; letter-spacing:0.03em; }
-        .sre-row-head .sre-main { flex: 0 0 150px; min-width: 140px; }
-        .sre-row-head .sre-price-group span { width: 62px; }
+        .sre-row-head { padding: 0 10px; margin-bottom: 6px; font-size: 0.6rem; color: var(--text-secondary); text-transform:uppercase; letter-spacing:0.03em; }
+        .sre-row-head .sre-price-group span { width: 62px; white-space: nowrap; }
         .sre-stock { display:flex; align-items:center; gap: 5px; background: var(--input-bg); border-radius: 8px; padding: 5px 8px; }
         .sre-stock .sre-loc { font-size: 0.68rem; color: var(--text-secondary); }
         .sre-qty { font-weight: 700; font-size: 0.9rem; min-width: 16px; text-align:center; }
@@ -5894,14 +5896,16 @@
                 <button class="btn btn-ghost btn-sm bulk-apply-btn" onclick="applyBulkPrice('${blockId}')">${t('inv.apply_to_all_sizes')}</button>
             </div>
             ${colorName ? `
-            <div class="sre-row-head">
-                <span class="sre-main"></span>
-                <span class="sre-price-group"><span>${t('inv.col_price')}</span><span>${t('inv.col_cost')}</span></span>
+            <div class="size-rows sre-grid" style="--sre-stores:${STORES.length}">
+                <div class="sre-row-head">
+                    <span class="sre-main"></span>
+                    <span class="sre-price-group"><span>${t('inv.col_price')}</span><span>${t('inv.col_cost')}</span></span>
+                </div>
             </div>` : `
             <div class="size-row-head">
                 <span>${t('ds.col_size')}</span><span>${t('inv.col_sku')}</span><span>${t('inv.col_price')}</span><span>${t('inv.col_cost')}</span><span>${STORES[0]?.name||'Store 1'}</span><span>${STORES[1]?.name||'Store 2'}</span><span></span>
-            </div>`}
-            <div class="size-rows"></div>
+            </div>
+            <div class="size-rows"></div>`}
             <button class="btn btn-ghost btn-sm mt-8" onclick="addSizeRow('${blockId}')"><i class="fas fa-plus"></i> ${t('inv.add_size')}</button>
         `;
         container.appendChild(div);
@@ -5967,8 +5971,10 @@
                     <button class="icon-btn-sm sre-price-save" onclick="updateVariantPriceCost(${prefill.variantId}, this)" title="${t('inv.save_price_cost')}"><i class="fas fa-check"></i></button>
                 </div>
                 ${stockCells}
-                <button class="icon-btn-sm" onclick="openPrintLabelModal(${prefill.variantId})" title="${t('labelmodal.print_label_title')}"><i class="fas fa-print"></i></button>
-                <button class="icon-btn-sm icon-btn-danger style-delete-trash hidden" onclick="confirmDelistVariant(${prefill.variantId}, '${escapeHtml(prefill.contextLabel||'')}', ${Object.values(prefill.stockByLocation || {}).reduce((sum, loc) => sum + (loc.quantity || 0), 0)})" title="${t('inv.delist_title')}"><i class="fas fa-trash"></i></button>
+                <div class="sre-actions">
+                    <button class="icon-btn-sm" onclick="openPrintLabelModal(${prefill.variantId})" title="${t('labelmodal.print_label_title')}"><i class="fas fa-print"></i></button>
+                    <button class="icon-btn-sm icon-btn-danger style-delete-trash hidden" onclick="confirmDelistVariant(${prefill.variantId}, '${escapeHtml(prefill.contextLabel||'')}', ${Object.values(prefill.stockByLocation || {}).reduce((sum, loc) => sum + (loc.quantity || 0), 0)})" title="${t('inv.delist_title')}"><i class="fas fa-trash"></i></button>
+                </div>
             `;
             rowsContainer.appendChild(row);
             return;
