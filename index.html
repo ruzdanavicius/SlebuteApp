@@ -397,6 +397,14 @@
         .products-list-item:hover, .products-list-item.active { border-color: var(--accent-color); }
         .products-list-thumb { width:34px; height:34px; flex-shrink:0; border-radius:6px; object-fit:cover; background: var(--card-bg-raised); }
         .products-list-item span { font-size:0.82rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .pli-text { flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
+        .pli-colors { align-self:flex-end; flex-shrink:0; display:flex; gap:4px; }
+        .pli-color { position:relative; width:14px; height:14px; padding:0; border-radius:50%; border:1px solid rgba(36,22,30,0.25); cursor:pointer; }
+        .pli-color::before { content:''; position:absolute; inset:-4px; }
+        .pli-color-more { width:auto; min-width:14px; padding:0 3px; border-radius:7px; background: var(--card-bg-raised); color: var(--text-secondary); font-size:0.58rem; font-weight:600; line-height:12px; }
+        .pli-color::after { content:attr(data-tip); position:absolute; right:-4px; bottom:calc(100% + 6px); z-index:5; padding:3px 7px; border-radius:6px; background: var(--text-primary); color: var(--card-bg); font-size:0.7rem; font-weight:500; white-space:nowrap; pointer-events:none; opacity:0; transition:opacity .12s; }
+        .pli-color:hover::after, .pli-color.tip-open::after { opacity:1; }
+        .pli-code { font-size:0.72rem; color: var(--text-secondary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
         .form-scroll { flex: 1; overflow-y: auto; padding-right: 4px; min-width: 0; transform: translate3d(0, 0, 0); will-change: transform; }
         .form-card { background: var(--card-bg); border: var(--glass-border); border-radius: 16px; padding: 22px; margin-bottom: 18px; }
@@ -5087,6 +5095,38 @@
     // finds the same set of styles a cashier searching the same phrase on
     // the POS screen would land on, instead of Manage Catalog having its
     // own narrower name/barcode-only matcher.
+    const PLI_MAX_BUBBLES = 6;
+
+    function productInStockColors(p) {
+        const colors = new Map();
+        for (const v of p.variants) {
+            const units = Object.values(v.stockByLocation || {}).reduce((sum, loc) => sum + (loc.quantity || 0) + (loc.storage || 0), 0);
+            if (units <= 0 || colors.has(v.colorId)) continue;
+            colors.set(v.colorId, { name: v.colorName || '', hex: /^#[0-9a-f]{3,8}$/i.test(v.colorHex || '') ? v.colorHex : '#cccccc' });
+        }
+        return [...colors.values()];
+    }
+
+    function productColorBubblesHTML(p) {
+        const colors = productInStockColors(p);
+        if (!colors.length) return '';
+        const attr = s => escapeHtml(s).replace(/"/g, '&quot;');
+        const shown = colors.slice(0, PLI_MAX_BUBBLES);
+        const rest = colors.slice(PLI_MAX_BUBBLES);
+        return `<div class="pli-colors">${shown.map(c =>
+            `<button type="button" class="pli-color" style="background:${c.hex}" data-tip="${attr(c.name)}" aria-label="${attr(c.name)}" onclick="togglePliTip(event, this)"></button>`
+        ).join('')}${rest.length ? `<button type="button" class="pli-color pli-color-more" data-tip="${attr(rest.map(c => c.name).join(', '))}" onclick="togglePliTip(event, this)">+${rest.length}</button>` : ''}</div>`;
+    }
+
+    // Tap support: hover covers mouse, this pins the tooltip on touch without opening the model.
+    function togglePliTip(event, el) {
+        event.stopPropagation();
+        const wasOpen = el.classList.contains('tip-open');
+        document.querySelectorAll('.pli-color.tip-open').forEach(b => b.classList.remove('tip-open'));
+        if (!wasOpen) el.classList.add('tip-open');
+    }
+    document.addEventListener('click', () => document.querySelectorAll('.pli-color.tip-open').forEach(b => b.classList.remove('tip-open')));
+
     function renderProductsList() {
         const q = document.getElementById('productSearchBox').value || '';
         const list = searchProducts(q);
@@ -5094,7 +5134,11 @@
         panel.innerHTML = list.map(p => `
             <div class="products-list-item ${editingProductId === p.id ? 'active' : ''}" onclick="loadProductForEdit(${p.id})">
                 ${photoTagHTML(p.image_url, 'products-list-thumb', false)}
-                <span>${escapeHtml(p.name)}${productHasClearanceVariant(p) ? ` <span class="sale-badge" title="${t('clearance.final_sale_title')}">${t('pos.sale_badge')}</span>` : ''}</span>
+                <div class="pli-text">
+                    <span>${escapeHtml(p.name)}${productHasClearanceVariant(p) ? ` <span class="sale-badge" title="${t('clearance.final_sale_title')}">${t('pos.sale_badge')}</span>` : ''}</span>
+                    ${p.base_barcode ? `<div class="pli-code">${escapeHtml(p.base_barcode)}</div>` : ''}
+                </div>
+                ${productColorBubblesHTML(p)}
             </div>`).join('') || `<p class="muted" style="font-size:0.8rem; padding:8px;">${t('inv.no_styles')}</p>`;
     }
 
