@@ -424,6 +424,7 @@
         input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
         input[type="color"]::-webkit-color-swatch { border: 1px solid rgba(36,22,30,0.14); border-radius: 8px; }
         .helper-text { font-size: 0.75rem; color: var(--success-color); display: none; margin-top:4px; }
+        .delisted-msg { color: var(--text-primary); background: var(--warning-bg); border-radius: 8px; padding: 8px 10px; align-items: center; gap: 10px; flex-wrap: wrap; }
 
         .color-block { background: var(--card-bg-raised); border: var(--glass-border); border-radius: 14px; padding: 16px; margin-bottom: 14px; }
         .color-block-head { display:flex; align-items:center; gap: 10px; margin-bottom: 14px; }
@@ -1053,6 +1054,7 @@
                                 <input type="text" class="form-input kb-toggle-input" inputmode="none" id="new_base_barcode" placeholder="e.g. H-2026-01" onblur="autoFillProduct()" onkeydown="if(event.key === 'Enter'){event.preventDefault(); this.blur();}">
                                 <div class="helper-text" style="display:block;" data-i18n="inv.base_barcode_hint">No barcode on the garment? Leave this blank — a reference like "keln-001" (from the category) is assigned automatically. It won't match future scans the way a real tag barcode would.</div>
                                 <span id="foundMsg" class="helper-text"><i class="fas fa-check-circle"></i> <span data-i18n="inv.loaded_existing">Loaded existing style — editing.</span></span>
+                                <div id="delistedMsg" class="helper-text delisted-msg"></div>
                             </div>
                             <div class="form-grid">
                                 <div class="form-group">
@@ -2000,6 +2002,8 @@
             'inv.select_or_new': 'Select a style from the list, or start a new one.',
             'inv.search_styles': 'Search styles...', 'inv.style_reference': 'Style Reference',
             'inv.base_barcode': 'Base Barcode (scan tag)', 'inv.base_barcode_hint': 'No barcode on the garment? Leave this blank — a reference like "keln-001" (from the category) is assigned automatically. It won\u2019t match future scans the way a real tag barcode would.', 'inv.loaded_existing': 'Loaded existing style — editing.',
+            'inv.delisted_code_prefix': 'This code belongs to the removed style', 'inv.restore_style': 'Restore style', 'toast.style_restored': 'Style restored — add the new stock.', 'toast.barcode_taken': 'This barcode is already in use by another style.',
+            'inv.delist_blocked_prefix': 'Can’t delete — there are still', 'inv.delist_blocked_suffix': 'units (on display, in storage or incoming). Write them off or move them first.', 'inv.delist_blocked_server': 'Can’t delete — there is still stock, or an open transfer / pickup reservation. Write off or move the stock first.',
             'inv.product_name': 'Product Name', 'inv.category': 'Category',
             'inv.size_range': 'Size Range', 'inv.size_range_hint': '(printed on labels, e.g. "XS-XL")',
             'inv.composition': 'Composition', 'inv.composition_hint': '(optional, printed on labels — up to 8 items, e.g. "65% Cotton, 35% Polyester")',
@@ -2132,14 +2136,11 @@
             'common.live_updates': 'Live — updates automatically', 'common.show_keyboard': 'Show keyboard',
             'inv.remove_color': 'Remove color', 'inv.save_price_cost': 'Save price/cost', 'inv.supplier_label': 'Supplier',
             'inv.add_color': 'Add color',
-            'inv.delist_title': 'Delete this size', 'inv.delist_confirm_zero_prefix': 'Delete', 'inv.delist_confirm_stock_prefix': 'Delete',
-            'inv.delist_confirm_stock_middle': '? It still has', 'inv.delist_confirm_stock_suffix': 'units in stock across both stores — they will no longer be sellable.',
+            'inv.delist_title': 'Delete this size', 'inv.delist_confirm_zero_prefix': 'Delete',
             'toast.variant_delisted': 'Size deleted.',
             'inv.featured_online': 'Feature on website', 'toast.featured_on': 'Added to the website showcase.', 'toast.featured_off': 'Removed from the website showcase.',
             'inv.edit_delete_toggle': 'Edit / Delete', 'inv.delete_style': 'Delete Style',
-            'inv.delete_style_confirm_zero_prefix': 'Delete style', 'inv.delete_style_confirm_stock_prefix': 'Delete style',
-            'inv.delete_style_confirm_stock_middle': '? It still has',
-            'inv.delete_style_confirm_stock_suffix': 'units in stock across both stores — the whole style and every color/size will disappear from the catalog.',
+            'inv.delete_style_confirm_zero_prefix': 'Delete style',
             'inv.delete_style_confirm_zero_suffix': '? This removes every color and size — the whole style will disappear from the catalog.',
             'toast.style_deleted': 'Style deleted.',
             'labelmodal.print_label_title': 'Print label', 'req.failed_to_load': 'Failed to load requests.',
@@ -2319,6 +2320,8 @@
             'inv.select_or_new': 'Pasirinkite modelį iš sąrašo arba pradėkite naują.',
             'inv.search_styles': 'Ieškoti modelių...', 'inv.style_reference': 'Modelio informacija',
             'inv.base_barcode': 'Pagrindinis brūkšninis kodas', 'inv.base_barcode_hint': 'Ant drabužio nėra brūkšninio kodo? Palikite tuščią — nuoroda, pvz. „keln-001“ (iš kategorijos), bus priskirta automatiškai. Ji neatpažins būsimų skenavimų taip, kaip tikras kodas ant etiketės.', 'inv.loaded_existing': 'Įkeltas esamas modelis — redaguojama.',
+            'inv.delisted_code_prefix': 'Šis kodas priklauso išimtam modeliui', 'inv.restore_style': 'Atkurti modelį', 'toast.style_restored': 'Modelis atkurtas — pridėkite naujas prekes.', 'toast.barcode_taken': 'Šis brūkšninis kodas jau naudojamas kitam modeliui.',
+            'inv.delist_blocked_prefix': 'Negalima ištrinti — dar yra', 'inv.delist_blocked_suffix': 'vnt. (vitrinoje, sandėlyje arba atvyksta). Pirmiausia nurašykite arba perkelkite juos.', 'inv.delist_blocked_server': 'Negalima ištrinti — dar yra prekių arba neužbaigtas pervežimas / rezervacija. Pirmiausia nurašykite arba perkelkite prekes.',
             'inv.product_name': 'Prekės pavadinimas', 'inv.category': 'Kategorija',
             'inv.size_range': 'Dydžių intervalas', 'inv.size_range_hint': '(spausdinama etiketėse, pvz. „XS-XL“)',
             'inv.composition': 'Sudėtis', 'inv.composition_hint': '(neprivaloma, spausdinama etiketėse — iki 8 punktų, pvz. „65% medvilnė, 35% poliesteris“)',
@@ -2451,14 +2454,11 @@
             'common.live_updates': 'Tiesiogiai — atnaujinama automatiškai', 'common.show_keyboard': 'Rodyti klaviatūrą',
             'inv.remove_color': 'Šalinti spalvą', 'inv.save_price_cost': 'Išsaugoti kainą/savikainą', 'inv.supplier_label': 'Tiekėjas',
             'inv.add_color': 'Pridėti spalvą',
-            'inv.delist_title': 'Ištrinti šį dydį', 'inv.delist_confirm_zero_prefix': 'Ištrinti', 'inv.delist_confirm_stock_prefix': 'Ištrinti',
-            'inv.delist_confirm_stock_middle': '? Šiuo metu turima', 'inv.delist_confirm_stock_suffix': 'vnt. atsargų abiejose parduotuvėse — jos daugiau nebus parduodamos.',
+            'inv.delist_title': 'Ištrinti šį dydį', 'inv.delist_confirm_zero_prefix': 'Ištrinti',
             'toast.variant_delisted': 'Dydis ištrintas.',
             'inv.featured_online': 'Rodyti svetainėje', 'toast.featured_on': 'Pridėta į svetainės vitriną.', 'toast.featured_off': 'Pašalinta iš svetainės vitrinos.',
             'inv.edit_delete_toggle': 'Redaguoti / Ištrinti', 'inv.delete_style': 'Ištrinti modelį',
-            'inv.delete_style_confirm_zero_prefix': 'Ištrinti modelį', 'inv.delete_style_confirm_stock_prefix': 'Ištrinti modelį',
-            'inv.delete_style_confirm_stock_middle': '? Šiuo metu turima',
-            'inv.delete_style_confirm_stock_suffix': 'vnt. atsargų abiejose parduotuvėse — visas modelis ir visos spalvos/dydžiai dings iš sąrašo.',
+            'inv.delete_style_confirm_zero_prefix': 'Ištrinti modelį',
             'inv.delete_style_confirm_zero_suffix': '? Bus pašalintos visos spalvos ir dydžiai — visas modelis dings iš sąrašo.',
             'toast.style_deleted': 'Modelis ištrintas.',
             'labelmodal.print_label_title': 'Spausdinti etiketę', 'req.failed_to_load': 'Nepavyko įkelti užsakymų.',
@@ -5837,6 +5837,7 @@
         renderPhotoGallery();
         document.getElementById('upload_status').innerText = t('inv.no_file');
         document.getElementById('foundMsg').style.display = 'none';
+        document.getElementById('delistedMsg').style.display = 'none';
         document.getElementById('printAllStyleBtn').classList.add('hidden');
         document.getElementById('styleEditDeleteBtn').classList.add('hidden');
         document.getElementById('featuredOnlineLabel').classList.add('hidden'); // a style must be saved (have an id) before it can be featured
@@ -5869,6 +5870,7 @@
         currentPhotoUrls = (p.images || []).slice();
         renderPhotoGallery();
         document.getElementById('foundMsg').style.display = 'block';
+        document.getElementById('delistedMsg').style.display = 'none';
 
         const byColor = {};
         for (const v of p.variants) {
@@ -5895,6 +5897,32 @@
         const existing = products.find(p => p.base_barcode === b);
         if (existing) { loadProductForEdit(existing.id); return; }
         document.getElementById('foundMsg').style.display = 'none';
+        if (!editingProductId) await showDelistedNotice(b);
+    }
+
+    // `products` only holds active styles, but base_barcode is unique across
+    // delisted ones too — offer to bring the old style back instead of failing on save.
+    async function showDelistedNotice(code) {
+        const box = document.getElementById('delistedMsg');
+        box.style.display = 'none';
+        const { data } = await sb.from('products').select('id, name').eq('base_barcode', code).eq('is_active', false).maybeSingle();
+        if (!data || document.getElementById('new_base_barcode').value.trim() !== code) return false;
+        box.innerHTML = `<span>${t('inv.delisted_code_prefix')} „${escapeHtml(data.name)}“.</span>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="restoreDelistedProduct(${data.id}, this)"><i class="fas fa-rotate-left"></i> ${t('inv.restore_style')}</button>`;
+        box.style.display = 'flex';
+        return true;
+    }
+
+    async function restoreDelistedProduct(productId, btn) {
+        btn.disabled = true;
+        const { error } = await sb.rpc('rpc_restore_product', { p_product_id: productId });
+        btn.disabled = false;
+        if (error) { toast(error.message, 'error'); return; }
+        document.getElementById('delistedMsg').style.display = 'none';
+        toast(t('toast.style_restored'), 'success');
+        await loadInventory();
+        renderProductsList();
+        loadProductForEdit(productId);
     }
 
     // Keeps the size list always ordered small-to-top, large-to-bottom —
@@ -6026,7 +6054,7 @@
                 ${stockCells}
                 <div class="sre-actions">
                     <button class="icon-btn-sm" onclick="openPrintLabelModal(${prefill.variantId})" title="${t('labelmodal.print_label_title')}"><i class="fas fa-print"></i></button>
-                    <button class="icon-btn-sm icon-btn-danger style-delete-trash hidden" onclick="confirmDelistVariant(${prefill.variantId}, '${escapeHtml(prefill.contextLabel||'')}', ${Object.values(prefill.stockByLocation || {}).reduce((sum, loc) => sum + (loc.quantity || 0), 0)})" title="${t('inv.delist_title')}"><i class="fas fa-trash"></i></button>
+                    <button class="icon-btn-sm icon-btn-danger style-delete-trash hidden" onclick="confirmDelistVariant(${prefill.variantId}, '${escapeHtml(prefill.contextLabel||'')}')" title="${t('inv.delist_title')}"><i class="fas fa-trash"></i></button>
                 </div>
             `;
             rowsContainer.appendChild(row);
@@ -6097,6 +6125,11 @@
         const { data, error } = await sb.rpc('rpc_upsert_fashion_product', { p_product: payload_product, p_variants: variants });
         btn.disabled = false; btn.innerText = t('inv.save_style');
 
+        if (error && error.code === '23505' && error.message.includes('base_barcode')) {
+            const delisted = await showDelistedNotice(payload_product.base_barcode);
+            toast(delisted ? `${t('inv.delisted_code_prefix')}.` : t('toast.barcode_taken'), 'warn');
+            return;
+        }
         if (error) { toast(error.message, 'error'); return; }
 
         // Queue any typed-in initial stock as incoming shipments now that the
@@ -6409,17 +6442,30 @@
     // triggered manually here instead). Sales history / order_items FKs stay
     // intact; the size just stops being sellable and disappears from POS.
     // Re-saving the same size later (Save Style) already un-delists it.
-    function confirmDelistVariant(variantId, label, totalStock) {
-        const msg = totalStock > 0
-            ? `${t('inv.delist_confirm_stock_prefix')} ${label}${t('inv.delist_confirm_stock_middle')} ${totalStock} ${t('inv.delist_confirm_stock_suffix')}`
-            : `${t('inv.delist_confirm_zero_prefix')} ${label}?`;
-        if (!confirm(msg)) return;
+    // Blocked while units remain (display, storage or incoming): delisting would
+    // hide that stock. rpc_delist_* enforce the same rule (STOCK_REMAINING) and
+    // also catch store-to-store transfers / pickups the client can't see.
+    function variantOpenUnits(v) {
+        const onHand = Object.values(v.stockByLocation || {}).reduce((sum, loc) => sum + Math.max(loc.quantity || 0, 0) + Math.max(loc.storage || 0, 0), 0);
+        const incoming = STORES.reduce((sum, s) => sum + (INCOMING_SUMMARY[`${v.id}:${s.id}`] || 0), 0);
+        return onHand + incoming;
+    }
+
+    function delistBlockedToast(units) {
+        toast(units > 0 ? `${t('inv.delist_blocked_prefix')} ${units} ${t('inv.delist_blocked_suffix')}` : t('inv.delist_blocked_server'), 'warn');
+    }
+
+    function confirmDelistVariant(variantId, label) {
+        const v = products.flatMap(p => p.variants).find(x => x.id === variantId);
+        const units = v ? variantOpenUnits(v) : 0;
+        if (units > 0) { delistBlockedToast(units); return; }
+        if (!confirm(`${t('inv.delist_confirm_zero_prefix')} ${label}?`)) return;
         delistVariant(variantId);
     }
 
     async function delistVariant(variantId) {
         const { error } = await sb.rpc('rpc_delist_variant', { p_variant_id: variantId });
-        if (error) { toast(error.message, 'error'); return; }
+        if (error) { error.message.startsWith('STOCK_REMAINING') ? delistBlockedToast(0) : toast(error.message, 'error'); return; }
         toast(t('toast.variant_delisted'), 'success');
         await loadInventory();
         if (editingProductId) loadProductForEdit(editingProductId);
@@ -6466,11 +6512,9 @@
         if (!editingProductId) return;
         const p = products.find(x => x.id === editingProductId);
         const name = p ? p.name : document.getElementById('new_name').value;
-        const totalStock = p ? p.variants.reduce((sum, v) => sum + Object.values(v.stockByLocation || {}).reduce((s, loc) => s + (loc.quantity || 0), 0), 0) : 0;
-        const msg = totalStock > 0
-            ? `${t('inv.delete_style_confirm_stock_prefix')} "${name}"${t('inv.delete_style_confirm_stock_middle')} ${totalStock} ${t('inv.delete_style_confirm_stock_suffix')}`
-            : `${t('inv.delete_style_confirm_zero_prefix')} "${name}"${t('inv.delete_style_confirm_zero_suffix')}`;
-        if (!confirm(msg)) return;
+        const units = p ? p.variants.reduce((sum, v) => sum + variantOpenUnits(v), 0) : 0;
+        if (units > 0) { delistBlockedToast(units); return; }
+        if (!confirm(`${t('inv.delete_style_confirm_zero_prefix')} "${name}"${t('inv.delete_style_confirm_zero_suffix')}`)) return;
         deleteStyle(editingProductId);
     }
 
@@ -6479,7 +6523,7 @@
         btn.disabled = true;
         const { error } = await sb.rpc('rpc_delist_product', { p_product_id: productId });
         btn.disabled = false;
-        if (error) { toast(error.message, 'error'); return; }
+        if (error) { error.message.startsWith('STOCK_REMAINING') ? delistBlockedToast(0) : toast(error.message, 'error'); return; }
         toast(t('toast.style_deleted'), 'success');
         editingProductId = null;
         document.getElementById('invFormFields').classList.add('hidden');
