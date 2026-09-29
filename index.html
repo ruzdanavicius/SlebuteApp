@@ -397,6 +397,8 @@
         .products-list-item:hover, .products-list-item.active { border-color: var(--accent-color); }
         .products-list-thumb { width:34px; height:34px; flex-shrink:0; border-radius:6px; object-fit:cover; background: var(--card-bg-raised); }
         .products-list-item span { font-size:0.82rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .pli-text { min-width:0; display:flex; flex-direction:column; gap:2px; }
+        .pli-code { font-size:0.72rem; color: var(--text-secondary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
         .form-scroll { flex: 1; overflow-y: auto; padding-right: 4px; min-width: 0; transform: translate3d(0, 0, 0); will-change: transform; }
         .form-card { background: var(--card-bg); border: var(--glass-border); border-radius: 16px; padding: 22px; margin-bottom: 18px; }
@@ -5094,7 +5096,10 @@
         panel.innerHTML = list.map(p => `
             <div class="products-list-item ${editingProductId === p.id ? 'active' : ''}" onclick="loadProductForEdit(${p.id})">
                 ${photoTagHTML(p.image_url, 'products-list-thumb', false)}
-                <span>${escapeHtml(p.name)}${productHasClearanceVariant(p) ? ` <span class="sale-badge" title="${t('clearance.final_sale_title')}">${t('pos.sale_badge')}</span>` : ''}</span>
+                <div class="pli-text">
+                    <span>${escapeHtml(p.name)}${productHasClearanceVariant(p) ? ` <span class="sale-badge" title="${t('clearance.final_sale_title')}">${t('pos.sale_badge')}</span>` : ''}</span>
+                    ${p.base_barcode ? `<div class="pli-code">${escapeHtml(p.base_barcode)}</div>` : ''}
+                </div>
             </div>`).join('') || `<p class="muted" style="font-size:0.8rem; padding:8px;">${t('inv.no_styles')}</p>`;
     }
 
