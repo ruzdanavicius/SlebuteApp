@@ -401,6 +401,7 @@
         .pli-colors { align-self:flex-end; flex-shrink:0; display:flex; gap:4px; }
         .pli-color { position:relative; width:14px; height:14px; padding:0; border-radius:50%; border:1px solid rgba(36,22,30,0.25); cursor:pointer; }
         .pli-color::before { content:''; position:absolute; inset:-4px; }
+        .pli-color-incoming { border:1.5px dashed var(--accent-color); }
         .pli-color-more { width:auto; min-width:14px; padding:0 3px; border-radius:7px; background: var(--card-bg-raised); color: var(--text-secondary); font-size:0.58rem; font-weight:600; line-height:12px; }
         .pli-color::after { content:attr(data-tip); position:absolute; right:-4px; bottom:calc(100% + 6px); z-index:5; padding:3px 7px; border-radius:6px; background: var(--text-primary); color: var(--card-bg); font-size:0.7rem; font-weight:500; white-space:nowrap; pointer-events:none; opacity:0; transition:opacity .12s; }
         .pli-color:hover::after, .pli-color.tip-open::after { opacity:1; }
@@ -5097,12 +5098,18 @@
     // own narrower name/barcode-only matcher.
     const PLI_MAX_BUBBLES = 6;
 
+    // A colour counts once any size has units on hand (display or storage) or
+    // still in transfer to a shop; "incoming" only matters when nothing is on hand yet.
     function productInStockColors(p) {
         const colors = new Map();
         for (const v of p.variants) {
-            const units = Object.values(v.stockByLocation || {}).reduce((sum, loc) => sum + (loc.quantity || 0) + (loc.storage || 0), 0);
-            if (units <= 0 || colors.has(v.colorId)) continue;
-            colors.set(v.colorId, { name: v.colorName || '', hex: /^#[0-9a-f]{3,8}$/i.test(v.colorHex || '') ? v.colorHex : '#cccccc' });
+            const onHand = Object.values(v.stockByLocation || {}).reduce((sum, loc) => sum + (loc.quantity || 0) + (loc.storage || 0), 0);
+            const incoming = STORES.reduce((sum, s) => sum + (INCOMING_SUMMARY[`${v.id}:${s.id}`] || 0), 0);
+            if (onHand <= 0 && incoming <= 0) continue;
+            const c = colors.get(v.colorId) || { name: v.colorName || '', hex: /^#[0-9a-f]{3,8}$/i.test(v.colorHex || '') ? v.colorHex : '#cccccc', onHand: 0, incoming: 0 };
+            c.onHand += Math.max(onHand, 0);
+            c.incoming += incoming;
+            colors.set(v.colorId, c);
         }
         return [...colors.values()];
     }
@@ -5113,9 +5120,11 @@
         const attr = s => escapeHtml(s).replace(/"/g, '&quot;');
         const shown = colors.slice(0, PLI_MAX_BUBBLES);
         const rest = colors.slice(PLI_MAX_BUBBLES);
-        return `<div class="pli-colors">${shown.map(c =>
-            `<button type="button" class="pli-color" style="background:${c.hex}" data-tip="${attr(c.name)}" aria-label="${attr(c.name)}" onclick="togglePliTip(event, this)"></button>`
-        ).join('')}${rest.length ? `<button type="button" class="pli-color pli-color-more" data-tip="${attr(rest.map(c => c.name).join(', '))}" onclick="togglePliTip(event, this)">+${rest.length}</button>` : ''}</div>`;
+        return `<div class="pli-colors">${shown.map(c => {
+            const incomingOnly = c.onHand <= 0;
+            const tip = incomingOnly ? `${c.name} · +${c.incoming} ${t('inv.incoming_badge_suffix')}` : c.name;
+            return `<button type="button" class="pli-color${incomingOnly ? ' pli-color-incoming' : ''}" style="background:${c.hex}" data-tip="${attr(tip)}" aria-label="${attr(tip)}" onclick="togglePliTip(event, this)"></button>`;
+        }).join('')}${rest.length ? `<button type="button" class="pli-color pli-color-more" data-tip="${attr(rest.map(c => c.name).join(', '))}" onclick="togglePliTip(event, this)">+${rest.length}</button>` : ''}</div>`;
     }
 
     // Tap support: hover covers mouse, this pins the tooltip on touch without opening the model.
