@@ -6381,7 +6381,7 @@
     function findVariantContext(variantId) {
         for (const p of products) {
             const v = (p.variants || []).find(x => x.id === variantId);
-            if (v) return { productId: p.id, productName: p.name, sizeRange: p.size_range || null, composition: p.composition || null, colorName: v.colorName, colorHex: v.colorHex, size: v.size, price: v.price, sku: v.sku };
+            if (v) return { productId: p.id, productName: p.name, sizeRange: p.size_range || null, composition: p.composition || null, colorName: v.colorName, colorHex: v.colorHex, size: v.size, price: v.price, costPrice: v.costPrice, sku: v.sku };
         }
         return null;
     }
@@ -6581,7 +6581,10 @@
         if (existingRows.length === 0) return;
         const variants = Array.from(existingRows).map(row => {
             const ctx = findVariantContext(parseInt(row.dataset.variantId));
-            return ctx ? { color_name: ctx.colorName, color_hex: ctx.colorHex, size: ctx.size, price, cost_price: cost } : null;
+            // Blank bulk cost keeps each size's saved cost — the RPC would
+            // otherwise coalesce a missing cost_price to 0.
+            const costPrice = costRaw !== '' ? cost : (ctx?.costPrice ?? 0);
+            return ctx ? { color_name: ctx.colorName, color_hex: ctx.colorHex, size: ctx.size, price, cost_price: costPrice } : null;
         }).filter(Boolean);
         const btn = block.querySelector('.bulk-apply-btn');
         btn.disabled = true; btn.innerText = t('inv.applying');
@@ -6597,7 +6600,7 @@
         if (hasUnsavedRows) {
             existingRows.forEach(row => {
                 row.querySelector('.sre-price-input').value = price;
-                row.querySelector('.sre-cost-input').value = cost || '';
+                if (costRaw !== '') row.querySelector('.sre-cost-input').value = cost || '';
             });
         } else if (editingProductId) loadProductForEdit(editingProductId);
     }
