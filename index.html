@@ -2100,7 +2100,8 @@
             'toast.session_expired': 'Session expired — signing you in again.',
             'toast.image_process_failed': 'Could not process that image:', 'toast.enter_qty_add': 'Enter a quantity to add.',
             'toast.added_qty_suffix': 'added.', 'toast.incoming_qty_suffix': 'queued as incoming — see Pervežimai.', 'toast.enter_valid_price': 'Enter a valid price.', 'toast.price_updated': 'Price updated.',
-            'toast.supplier_updated': 'Supplier updated.', 'toast.no_existing_sizes': 'No existing sizes in this color to update.',
+            'toast.supplier_updated': 'Supplier updated.', 'toast.no_existing_sizes': 'No sizes in this color yet.',
+            'toast.price_filled_for': 'Price filled in for', 'toast.new_sizes_save_suffix': 'new size(s) — press Save Style to keep.',
             'toast.price_updated_for': 'Price updated for', 'toast.sizes_suffix': 'size(s).',
             'toast.enter_nonzero_qty': 'Enter a non-zero quantity change.', 'toast.stock_updated_now_prefix': 'Stock updated — now',
             'toast.request_updated_prefix': 'Request updated →', 'toast.items_returned_suffix': 'item(s) returned to stock.',
@@ -2418,7 +2419,8 @@
             'toast.session_expired': 'Sesija baigėsi — prisijungiama iš naujo.',
             'toast.image_process_failed': 'Nepavyko apdoroti nuotraukos:', 'toast.enter_qty_add': 'Įveskite pridedamą kiekį.',
             'toast.added_qty_suffix': 'pridėta.', 'toast.incoming_qty_suffix': 'įtraukta į atvykstančias prekes — žr. Pervežimai.', 'toast.enter_valid_price': 'Įveskite galiojančią kainą.', 'toast.price_updated': 'Kaina atnaujinta.',
-            'toast.supplier_updated': 'Tiekėjas atnaujintas.', 'toast.no_existing_sizes': 'Šioje spalvoje nėra esamų dydžių atnaujinimui.',
+            'toast.supplier_updated': 'Tiekėjas atnaujintas.', 'toast.no_existing_sizes': 'Šioje spalvoje dar nėra dydžių.',
+            'toast.price_filled_for': 'Kaina įrašyta', 'toast.new_sizes_save_suffix': 'naujiems dydžiams — spauskite „Išsaugoti“.',
             'toast.price_updated_for': 'Kaina atnaujinta:', 'toast.sizes_suffix': 'dydžiui(-iams).',
             'toast.enter_nonzero_qty': 'Įveskite nenulinį kiekio pokytį.', 'toast.stock_updated_now_prefix': 'Likutis atnaujintas — dabar',
             'toast.request_updated_prefix': 'Užsakymas atnaujintas →', 'toast.items_returned_suffix': 'prekė(-ių) grąžinta į sandėlį.',
@@ -6379,7 +6381,7 @@
     function findVariantContext(variantId) {
         for (const p of products) {
             const v = (p.variants || []).find(x => x.id === variantId);
-            if (v) return { productId: p.id, productName: p.name, sizeRange: p.size_range || null, composition: p.composition || null, colorName: v.colorName, colorHex: v.colorHex, size: v.size, price: v.price, sku: v.sku };
+            if (v) return { productId: p.id, productName: p.name, sizeRange: p.size_range || null, composition: p.composition || null, colorName: v.colorName, colorHex: v.colorHex, size: v.size, price: v.price, costPrice: v.costPrice, sku: v.sku };
         }
         return null;
     }
@@ -6557,17 +6559,32 @@
     // Bulk "align price" — sets one price/cost across every existing size
     // in a color block at once (e.g. a category-wide price change), in a
     // single RPC call rather than editing each row by hand.
+    // New, not-yet-saved size rows (a new color, or sizes just added to an
+    // existing one) are only filled in locally — they're persisted by Save
+    // Style (saveMatrixProduct), same as if typed by hand.
     async function applyBulkPrice(blockId) {
         const block = document.getElementById(blockId);
         if (!block) return;
         const price = parseFloat(block.querySelector('.bulk-price-input').value);
-        const cost = parseFloat(block.querySelector('.bulk-cost-input').value) || 0;
+        const costRaw = block.querySelector('.bulk-cost-input').value.trim();
+        const cost = parseFloat(costRaw) || 0;
         if (!price || price <= 0) { toast(t('toast.enter_valid_price'), 'warn'); return; }
+        const newRows = block.querySelectorAll('.size-row');
         const existingRows = block.querySelectorAll('.size-row-existing');
-        if (existingRows.length === 0) { toast(t('toast.no_existing_sizes'), 'warn'); return; }
+        if (newRows.length === 0 && existingRows.length === 0) { toast(t('toast.no_existing_sizes'), 'warn'); return; }
+        newRows.forEach(row => {
+            row.querySelector('.price-input').value = price;
+            // Blank bulk cost leaves any cost already typed per row alone.
+            if (costRaw !== '') row.querySelector('.cost-input').value = cost;
+        });
+        if (newRows.length) toast(`${t('toast.price_filled_for')} ${newRows.length} ${t('toast.new_sizes_save_suffix')}`, 'success');
+        if (existingRows.length === 0) return;
         const variants = Array.from(existingRows).map(row => {
             const ctx = findVariantContext(parseInt(row.dataset.variantId));
-            return ctx ? { color_name: ctx.colorName, color_hex: ctx.colorHex, size: ctx.size, price, cost_price: cost } : null;
+            // Blank bulk cost keeps each size's saved cost — the RPC would
+            // otherwise coalesce a missing cost_price to 0.
+            const costPrice = costRaw !== '' ? cost : (ctx?.costPrice ?? 0);
+            return ctx ? { color_name: ctx.colorName, color_hex: ctx.colorHex, size: ctx.size, price, cost_price: costPrice } : null;
         }).filter(Boolean);
         const btn = block.querySelector('.bulk-apply-btn');
         btn.disabled = true; btn.innerText = t('inv.applying');
@@ -6576,7 +6593,16 @@
         if (error) { toast(error.message, 'error'); return; }
         toast(`${t('toast.price_updated_for')} ${variants.length} ${t('toast.sizes_suffix')}`, 'success');
         await loadInventory();
-        if (editingProductId) loadProductForEdit(editingProductId);
+        // Re-rendering the form would wipe any unsaved new size rows (this
+        // color's or another's), so in that case just mirror the saved
+        // values into the existing rows' inputs instead.
+        const hasUnsavedRows = Array.from(document.querySelectorAll('#colorBlocksContainer .size-row .size-input')).some(i => i.value.trim());
+        if (hasUnsavedRows) {
+            existingRows.forEach(row => {
+                row.querySelector('.sre-price-input').value = price;
+                if (costRaw !== '') row.querySelector('.sre-cost-input').value = cost || '';
+            });
+        } else if (editingProductId) loadProductForEdit(editingProductId);
     }
 
     async function confirmStockAdjustment() {
