@@ -322,8 +322,8 @@
         .product-img { display: block; width: 100%; aspect-ratio: 3 / 2; height: auto; object-fit: contain; border-radius: 12px; margin-bottom: 10px; background: var(--card-bg-raised); }
         /* Product photos are shot on white, so a real photo's letterbox is white
            (in dark mode too) and the photo blends into its slot. `img.`-qualified
-           so the grey "no photo" placeholder div wearing the same class keeps
-           its grey background and logo. */
+           so the "no photo" placeholder div wearing the same class keeps
+           its existing --card-bg-raised background and logo. */
         img.product-img, img.vm-image { background: #fff; }
         /* "No photo" placeholder — swapped in for any product/style image
            slot with no cover image (or one that fails to load), instead
