@@ -320,6 +320,11 @@
            grid row the same size; the slot background letterboxes the rest. The
            grid runs 4 columns (not 5) so the contained photo is still big enough. */
         .product-img { display: block; width: 100%; aspect-ratio: 3 / 2; height: auto; object-fit: contain; border-radius: 12px; margin-bottom: 10px; background: var(--card-bg-raised); }
+        /* Product photos are shot on white, so a real photo's letterbox is white
+           (in dark mode too) and the photo blends into its slot. `img.`-qualified
+           so the grey "no photo" placeholder div wearing the same class keeps
+           its grey background and logo. */
+        img.product-img, img.vm-image { background: #fff; }
         /* "No photo" placeholder — swapped in for any product/style image
            slot with no cover image (or one that fails to load), instead
            of the browser's broken-image icon. */
@@ -522,7 +527,7 @@
            replaces it on a load failure; display:block is scoped to the <img> so
            it can't override the placeholder's own flex centring. */
         .img-hover-preview .hover-thumb { width: 220px; height: 220px; object-fit: contain; border-radius: 8px; background: var(--card-bg-raised); }
-        .img-hover-preview img.hover-thumb { display: block; }
+        .img-hover-preview img.hover-thumb { display: block; background: #fff; }
         .ds-hoverable { cursor: zoom-in; }
         .bulk-price-bar { display:flex; align-items:center; gap:8px; background: var(--input-bg); border-radius: 9px; padding: 8px 10px; margin-bottom: 10px; flex-wrap:wrap; }
         .bulk-price-bar label { font-size: 0.72rem; color: var(--text-secondary); }
