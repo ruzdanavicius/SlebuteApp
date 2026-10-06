@@ -297,7 +297,7 @@
            edge. flex-shrink: 0 keeps the grid at its full natural height
            instead, so it's the grid's own overflow-y: auto (not row
            compression) that handles anything beyond what's visible. */
-        .product-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 18px; padding-bottom: 40px; overflow-y: auto; flex-shrink: 0; }
+        .product-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; padding-bottom: 40px; overflow-y: auto; flex-shrink: 0; }
         /* contain: layout (not the former `contain: content`, which also
            implies `paint`) still tells Chrome this card's contents can't
            affect layout outside its own box, so patchProductCard()'s
@@ -314,11 +314,12 @@
            gets clipped by this. */
         .product-card { background: var(--card-bg); border: var(--glass-border); border-radius: 16px; padding: 10px; cursor: pointer; transition: 0.15s; position: relative; overflow: hidden; contain: layout style; }
         .product-card:hover { transform: translateY(-4px); box-shadow: 0 10px 30px var(--shadow-color); border-color: rgba(107,37,69,0.3); }
-        /* Square slot + contain: product photos are uploaded uncropped and can be
+        /* 3:2 slot + contain: product photos are uploaded uncropped and can be
            portrait (trousers, dresses) or landscape, so the whole garment must stay
            visible. A fixed aspect ratio (not a fixed height) keeps every tile in a
-           grid row the same size; the slot background letterboxes the rest. */
-        .product-img { display: block; width: 100%; aspect-ratio: 1 / 1; height: auto; object-fit: contain; border-radius: 12px; margin-bottom: 10px; background: var(--card-bg-raised); }
+           grid row the same size; the slot background letterboxes the rest. The
+           grid runs 4 columns (not 5) so the contained photo is still big enough. */
+        .product-img { display: block; width: 100%; aspect-ratio: 3 / 2; height: auto; object-fit: contain; border-radius: 12px; margin-bottom: 10px; background: var(--card-bg-raised); }
         /* "No photo" placeholder — swapped in for any product/style image
            slot with no cover image (or one that fails to load), instead
            of the browser's broken-image icon. */
@@ -793,7 +794,7 @@
             .barcode-input { padding: 11px 12px 11px 38px; font-size: 0.88rem; }
             .category-filter-bar { margin: 10px 0 14px; gap: 6px; }
             .category-chip { padding: 6px 12px; font-size: 0.76rem; }
-            .product-grid { grid-template-columns: repeat(auto-fill, minmax(165px, 1fr)); gap: 12px; padding-bottom: 24px; }
+            .product-grid { grid-template-columns: repeat(auto-fill, minmax(205px, 1fr)); gap: 12px; padding-bottom: 24px; }
             .product-card { padding: 9px; border-radius: 14px; }
             .product-img { border-radius: 10px; margin-bottom: 8px; }
             .product-info h3 { font-size: 0.88rem; }
@@ -830,7 +831,7 @@
             .nav-btn { width: 40px; height: 40px; font-size: 1rem; margin-bottom: 10px; }
             .main-content { padding: 12px 14px; }
             .search-wrapper { width: 100%; max-width: 100%; }
-            .product-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+            .product-grid { grid-template-columns: repeat(auto-fill, minmax(175px, 1fr)); gap: 10px; }
             .cart-panel { width: 260px; padding: 12px; }
             .cart-item .cart-thumb { width: 32px; height: 32px; }
         }
@@ -840,7 +841,7 @@
            but keeps things usable rather than broken if it ever is. */
         @media screen and (max-width: 680px) and (pointer: coarse) {
             .cart-panel { width: 230px; padding: 10px; }
-            .product-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
+            .product-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
             .header-row h1 { font-size: 1.2rem; }
         }
     </style>
