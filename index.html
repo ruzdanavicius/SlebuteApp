@@ -297,7 +297,7 @@
            edge. flex-shrink: 0 keeps the grid at its full natural height
            instead, so it's the grid's own overflow-y: auto (not row
            compression) that handles anything beyond what's visible. */
-        .product-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 18px; padding-bottom: 40px; overflow-y: auto; flex-shrink: 0; }
+        .product-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; padding-bottom: 40px; overflow-y: auto; flex-shrink: 0; }
         /* contain: layout (not the former `contain: content`, which also
            implies `paint`) still tells Chrome this card's contents can't
            affect layout outside its own box, so patchProductCard()'s
@@ -314,7 +314,17 @@
            gets clipped by this. */
         .product-card { background: var(--card-bg); border: var(--glass-border); border-radius: 16px; padding: 10px; cursor: pointer; transition: 0.15s; position: relative; overflow: hidden; contain: layout style; }
         .product-card:hover { transform: translateY(-4px); box-shadow: 0 10px 30px var(--shadow-color); border-color: rgba(107,37,69,0.3); }
-        .product-img { width: 100%; height: 140px; object-fit: cover; border-radius: 12px; margin-bottom: 10px; background: var(--card-bg-raised); }
+        /* 3:2 slot + contain: product photos are uploaded uncropped and can be
+           portrait (trousers, dresses) or landscape, so the whole garment must stay
+           visible. A fixed aspect ratio (not a fixed height) keeps every tile in a
+           grid row the same size; the slot background letterboxes the rest. The
+           grid runs 4 columns (not 5) so the contained photo is still big enough. */
+        .product-img { display: block; width: 100%; aspect-ratio: 3 / 2; height: auto; object-fit: contain; border-radius: 12px; margin-bottom: 10px; background: var(--card-bg-raised); }
+        /* Product photos are shot on white, so a real photo's letterbox is white
+           (in dark mode too) and the photo blends into its slot. `img.`-qualified
+           so the "no photo" placeholder div wearing the same class keeps
+           its existing --card-bg-raised background and logo. */
+        img.product-img, img.vm-image { background: #fff; }
         /* "No photo" placeholder — swapped in for any product/style image
            slot with no cover image (or one that fails to load), instead
            of the browser's broken-image icon. */
@@ -516,8 +526,8 @@
         /* Sizing applies to the real photo AND to the "no photo" placeholder that
            replaces it on a load failure; display:block is scoped to the <img> so
            it can't override the placeholder's own flex centring. */
-        .img-hover-preview .hover-thumb { width: 150px; height: 150px; object-fit: cover; border-radius: 8px; background: var(--card-bg-raised); }
-        .img-hover-preview img.hover-thumb { display: block; }
+        .img-hover-preview .hover-thumb { width: 220px; height: 220px; object-fit: contain; border-radius: 8px; background: var(--card-bg-raised); }
+        .img-hover-preview img.hover-thumb { display: block; background: #fff; }
         .ds-hoverable { cursor: zoom-in; }
         .bulk-price-bar { display:flex; align-items:center; gap:8px; background: var(--input-bg); border-radius: 9px; padding: 8px 10px; margin-bottom: 10px; flex-wrap:wrap; }
         .bulk-price-bar label { font-size: 0.72rem; color: var(--text-secondary); }
@@ -679,7 +689,7 @@
         .close-modal { position: absolute; top: 18px; right: 18px; width: 34px; height: 34px; background:rgba(0,0,0,0.4); border-radius: 50%; display: flex; align-items:center; justify-content:center; cursor: pointer; color:white; z-index: 5; }
         .close-modal:hover { background: rgba(0,0,0,0.65); }
 
-        .vm-image { width: 100%; height: 260px; object-fit: cover; background: var(--card-bg-raised); }
+        .vm-image { width: 100%; height: 260px; object-fit: contain; background: var(--card-bg-raised); }
         .vm-content { padding: 26px; }
         .vm-content h2 { margin-bottom: 4px; }
         .variant-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 10px; margin: 18px 0; }
@@ -789,9 +799,9 @@
             .barcode-input { padding: 11px 12px 11px 38px; font-size: 0.88rem; }
             .category-filter-bar { margin: 10px 0 14px; gap: 6px; }
             .category-chip { padding: 6px 12px; font-size: 0.76rem; }
-            .product-grid { grid-template-columns: repeat(auto-fill, minmax(165px, 1fr)); gap: 12px; padding-bottom: 24px; }
+            .product-grid { grid-template-columns: repeat(auto-fill, minmax(205px, 1fr)); gap: 12px; padding-bottom: 24px; }
             .product-card { padding: 9px; border-radius: 14px; }
-            .product-img { height: 140px; border-radius: 10px; margin-bottom: 8px; }
+            .product-img { border-radius: 10px; margin-bottom: 8px; }
             .product-info h3 { font-size: 0.88rem; }
             .product-info p { font-size: 0.74rem; }
 
@@ -826,8 +836,7 @@
             .nav-btn { width: 40px; height: 40px; font-size: 1rem; margin-bottom: 10px; }
             .main-content { padding: 12px 14px; }
             .search-wrapper { width: 100%; max-width: 100%; }
-            .product-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
-            .product-img { height: 118px; }
+            .product-grid { grid-template-columns: repeat(auto-fill, minmax(175px, 1fr)); gap: 10px; }
             .cart-panel { width: 260px; padding: 12px; }
             .cart-item .cart-thumb { width: 32px; height: 32px; }
         }
@@ -837,8 +846,7 @@
            but keeps things usable rather than broken if it ever is. */
         @media screen and (max-width: 680px) and (pointer: coarse) {
             .cart-panel { width: 230px; padding: 10px; }
-            .product-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
-            .product-img { height: 100px; }
+            .product-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
             .header-row h1 { font-size: 1.2rem; }
         }
     </style>
