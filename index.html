@@ -242,6 +242,7 @@
         .btn-ghost { background: transparent; border: 1px solid rgba(36,22,30,0.16); color: var(--text-primary); }
         .btn-ghost.active { background: var(--accent-color); border-color: var(--accent-color); color: white; }
         .sale-badge { display:inline-block; font-size:0.6rem; font-weight:700; letter-spacing:0.03em; background: var(--danger-color); color:#fff; border-radius:4px; padding:1px 5px; margin-bottom:3px; }
+        .nosize-badge { display:inline-block; font-size:0.6rem; font-weight:700; letter-spacing:0.03em; background: var(--warning-bg); color: var(--warning-text); border-radius:4px; padding:1px 5px; margin-bottom:3px; }
         .storage-badge { display:inline-block; font-size:0.6rem; font-weight:700; letter-spacing:0.03em; background: #b5760f; color:#fff; border-radius:4px; padding:1px 5px; margin-bottom:3px; }
         .storage-hint-icon { color: #b5760f; font-size: 0.86rem; cursor: pointer; flex-shrink: 0; vertical-align: middle; }
         .storage-hint-icon:hover { opacity: 0.7; }
@@ -1034,6 +1035,7 @@
                     <div class="products-side">
                         <button class="btn btn-primary btn-block" onclick="startNewProduct()"><i class="fas fa-plus"></i> <span data-i18n="inv.new_style">New Style</span></button>
                         <input type="text" class="form-input mt-14 kb-toggle-input" inputmode="none" id="productSearchBox" placeholder="Search styles... (try multiple words, e.g. sale supplier)" data-i18n-placeholder="inv.search_styles" oninput="renderProductsList()" style="margin-top:14px;">
+                        <button type="button" class="category-chip hidden" id="noSizesFilterChip" onclick="toggleNoSizesFilter()" style="margin-top:8px; align-self:flex-start;"></button>
                         <div class="products-list" id="productsListPanel"></div>
                     </div>
                     <div class="form-scroll">
@@ -2105,6 +2107,8 @@
             'toast.client_name_required': 'Client name is required for a reservation.', 'toast.request_sent_prefix': 'Request',
             'toast.request_sent_suffix': 'sent!', 'toast.product_name_required': 'Product name is required.',
             'toast.add_size_required': 'Add at least one size with a price.', 'toast.style_saved': 'Style saved!',
+            'toast.style_saved_no_sizes': 'Saved without sizes — add colours/sizes at the stock count.',
+            'inv.no_sizes_badge': 'No sizes', 'inv.no_sizes_filter': 'No sizes',
             'toast.session_expired': 'Session expired — signing you in again.',
             'toast.image_process_failed': 'Could not process that image:', 'toast.enter_qty_add': 'Enter a quantity to add.',
             'toast.added_qty_suffix': 'added.', 'toast.incoming_qty_suffix': 'queued as incoming — see Pervežimai.', 'toast.enter_valid_price': 'Enter a valid price.', 'toast.price_updated': 'Price updated.',
@@ -2424,6 +2428,8 @@
             'toast.client_name_required': 'Rezervacijai būtinas kliento vardas.', 'toast.request_sent_prefix': 'Užsakymas',
             'toast.request_sent_suffix': 'išsiųstas!', 'toast.product_name_required': 'Būtina įvesti prekės pavadinimą.',
             'toast.add_size_required': 'Pridėkite bent vieną dydį su kaina.', 'toast.style_saved': 'Modelis išsaugotas!',
+            'toast.style_saved_no_sizes': 'Išsaugota be dydžių — spalvas/dydžius pridėkite inventorizacijos metu.',
+            'inv.no_sizes_badge': 'Be dydžių', 'inv.no_sizes_filter': 'Be dydžių',
             'toast.session_expired': 'Sesija baigėsi — prisijungiama iš naujo.',
             'toast.image_process_failed': 'Nepavyko apdoroti nuotraukos:', 'toast.enter_qty_add': 'Įveskite pridedamą kiekį.',
             'toast.added_qty_suffix': 'pridėta.', 'toast.incoming_qty_suffix': 'įtraukta į atvykstančias prekes — žr. Pervežimai.', 'toast.enter_valid_price': 'Įveskite galiojančią kainą.', 'toast.price_updated': 'Kaina atnaujinta.',
@@ -2657,6 +2663,7 @@
     let categoryFilterList = [];      // index-addressable list backing the category chips, so onclick handlers never have to embed/escape category text
     const UNCATEGORIZED_KEY = '__uncategorized__';
     let saleOnly = false;             // "Sale" toggle in the POS header — narrows to products with at least one marked-down (is_clearance) variant in stock here
+    let noSizesOnly = false;          // "Be dydžių" chip in Prekių valdymas — narrows the style list to styles saved without any size yet
 
     // A cashier/manager check used in a couple of places below (marking an
     // item down is a price change, same permission line product_variants
@@ -3352,7 +3359,7 @@
             focusGridOnProduct(hit.product);
             return;
         }
-        const productMatch = products.find(p => p.base_barcode && p.base_barcode.toLowerCase() === code.toLowerCase());
+        const productMatch = products.find(p => hasSizes(p) && p.base_barcode && p.base_barcode.toLowerCase() === code.toLowerCase());
         if (productMatch) { openProduct(productMatch.id); clearBarcodeSearch(); return; }
 
         // QA-AUDIT FIX: a hardware-scanner miss (unrecognized/damaged tag,
@@ -3633,8 +3640,14 @@
         return items.filter(p => p.variants.some(v => v.isClearance && availableStock(v) > 0));
     }
 
+    // A style saved without any size yet (catalogue entered ahead of the stock
+    // count) has nothing to sell — keep it off the POS grid entirely rather
+    // than showing a dead "out of stock" tile. It stays visible in Prekių
+    // valdymas, flagged "Be dydžių".
+    function hasSizes(p) { return p.variants.length > 0; }
+
     function applyPosFilters(items) {
-        return filterBySale(filterByCategory(items));
+        return filterBySale(filterByCategory(items.filter(hasSizes)));
     }
 
     function toggleSaleOnly() {
@@ -3648,7 +3661,8 @@
         if (!bar) return;
         const counts = {};
         let uncategorizedCount = 0;
-        for (const p of products) {
+        const sellable = products.filter(hasSizes);
+        for (const p of sellable) {
             if (p.category) counts[p.category] = (counts[p.category] || 0) + 1;
             else uncategorizedCount++;
         }
@@ -3671,7 +3685,7 @@
         bar.classList.remove('hidden');
         bar.innerHTML = categoryFilterList.map((cat, i) => {
             const label = cat === null ? t('pos.all_categories') : (cat === UNCATEGORIZED_KEY ? t('pos.uncategorized') : escapeHtml(cat));
-            const count = cat === null ? products.length : (cat === UNCATEGORIZED_KEY ? uncategorizedCount : counts[cat]);
+            const count = cat === null ? sellable.length : (cat === UNCATEGORIZED_KEY ? uncategorizedCount : counts[cat]);
             const active = activeCategory === cat ? ' active' : '';
             return `<div class="category-chip${active}" onclick="setActiveCategoryByIndex(${i})">${label} <span class="category-chip-count">${count}</span></div>`;
         }).join('');
@@ -5148,17 +5162,33 @@
 
     function renderProductsList() {
         const q = document.getElementById('productSearchBox').value || '';
-        const list = searchProducts(q);
+        // "Be dydžių" chip: only shown while at least one style still has no
+        // size, so it doubles as the "anything left to finish?" check.
+        const noSizesCount = products.filter(p => !hasSizes(p)).length;
+        if (noSizesCount === 0) noSizesOnly = false;
+        const chip = document.getElementById('noSizesFilterChip');
+        if (chip) {
+            chip.classList.toggle('hidden', noSizesCount === 0);
+            chip.classList.toggle('active', noSizesOnly);
+            chip.innerHTML = `${t('inv.no_sizes_filter')} <span class="category-chip-count">${noSizesCount}</span>`;
+        }
+        let list = searchProducts(q);
+        if (noSizesOnly) list = list.filter(p => !hasSizes(p));
         const panel = document.getElementById('productsListPanel');
         panel.innerHTML = list.map(p => `
             <div class="products-list-item ${editingProductId === p.id ? 'active' : ''}" onclick="loadProductForEdit(${p.id})">
                 ${photoTagHTML(p.image_url, 'products-list-thumb', false)}
                 <div class="pli-text">
                     <span>${escapeHtml(p.name)}${productHasClearanceVariant(p) ? ` <span class="sale-badge" title="${t('clearance.final_sale_title')}">${t('pos.sale_badge')}</span>` : ''}</span>
-                    ${p.base_barcode ? `<div class="pli-code">${escapeHtml(p.base_barcode)}</div>` : ''}
+                    ${p.base_barcode || !hasSizes(p) ? `<div class="pli-code">${escapeHtml(p.base_barcode || '')}${hasSizes(p) ? '' : ` <span class="nosize-badge">${t('inv.no_sizes_badge')}</span>`}</div>` : ''}
                 </div>
                 ${productColorBubblesHTML(p)}
             </div>`).join('') || `<p class="muted" style="font-size:0.8rem; padding:8px;">${t('inv.no_styles')}</p>`;
+    }
+
+    function toggleNoSizesFilter() {
+        noSizesOnly = !noSizesOnly;
+        renderProductsList();
     }
 
     /* ============================================================
@@ -6113,13 +6143,13 @@
                 initialStockByRow.push({ [STORES[0]?.id]: s1, [STORES[1]?.id]: s2 });
             });
         });
-        // A brand-new product genuinely needs at least one size to be sellable.
-        // But an existing product being edited just to change something like
-        // category/supplier — with no new size typed in — already has its
-        // sizes (shown above as the read-only "existing" rows); it shouldn't
-        // be forced to add another one just to save those detail changes.
+        // A style may be saved with no size at all (request 2026-10-07): the
+        // catalogue details are entered from home ahead of the stock count,
+        // and the real colours/sizes are only known once the items are in
+        // hand. Such a style stays off the POS grid (hasSizes()) and is
+        // flagged "Be dydžių" in the style list until sizes are added.
         const hasExistingVariants = document.querySelectorAll('#colorBlocksContainer .size-row-existing').length > 0;
-        if (variants.length === 0 && !hasExistingVariants) { toast(t('toast.add_size_required'), 'warn'); return; }
+        const savedWithoutSizes = variants.length === 0 && !hasExistingVariants;
 
         btn.disabled = true; btn.innerText = t('inv.saving');
         const payload_product = {
@@ -6172,7 +6202,7 @@
             const { error: galleryErr } = await sb.from('product_images').insert(extraRows);
             if (galleryErr) toast(galleryErr.message, 'error');
         }
-        toast(t('toast.style_saved'), 'success');
+        toast(t(savedWithoutSizes ? 'toast.style_saved_no_sizes' : 'toast.style_saved'), 'success');
         // v_variants_out on the RPC side is built only from what THIS call
         // submitted (p_variants) — never the style's pre-existing untouched
         // sizes — so this is already correctly scoped to "just what was
