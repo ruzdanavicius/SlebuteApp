@@ -1639,7 +1639,7 @@
                 </div>
                 <div class="form-group">
                     <label data-i18n="markdown.price_label">New price (€)</label>
-                    <input type="number" class="form-input" id="markdownPrice" min="0" step="0.01">
+                    <input type="text" inputmode="decimal" class="form-input" id="markdownPrice">
                 </div>
                 <div class="form-group">
                     <label data-i18n="markdown.reason_label">Reason</label>
@@ -1707,7 +1707,7 @@
                 <p class="muted" style="font-size:0.85rem; margin: 8px 0 4px;" id="quickOpenHint" data-i18n="quickopen.hint">No shift is open at this store yet — enter the starting cash float to open one, then this sale will go straight through.</p>
                 <div class="form-group mt-14">
                     <label data-i18n="quickopen.float_label">Opening cash float (€)</label>
-                    <input type="number" class="form-input" id="quickOpenFloatInput" placeholder="150.00" onkeydown="if(event.key==='Enter'){event.preventDefault(); quickOpenRegisterAndContinue();}">
+                    <input type="text" inputmode="decimal" class="form-input" id="quickOpenFloatInput" placeholder="150.00" onkeydown="if(event.key==='Enter'){event.preventDefault(); quickOpenRegisterAndContinue();}">
                 </div>
                 <button class="btn btn-primary btn-block mt-14" onclick="quickOpenRegisterAndContinue()"><i class="fas fa-play"></i> <span data-i18n="quickopen.open_continue">Open &amp; Continue Sale</span></button>
             </div>
@@ -1773,7 +1773,7 @@
                 <h2 id="movementTitle" data-i18n="movement.cash_in">Cash In</h2>
                 <div class="form-group mt-14">
                     <label data-i18n="movement.amount">Amount (€)</label>
-                    <input type="number" class="form-input" id="movementAmount" placeholder="0.00">
+                    <input type="text" inputmode="decimal" class="form-input" id="movementAmount" placeholder="0.00">
                 </div>
                 <div class="form-group">
                     <label data-i18n="movement.reason">Reason</label>
@@ -1793,7 +1793,7 @@
                 <p class="muted" style="font-size:0.85rem; margin-bottom: 6px;" data-i18n="closeshift.hint">Count the drawer and enter the total — no need to break it down by note or coin.</p>
                 <div class="form-group mt-14">
                     <label data-i18n="closeshift.counted_label">Cash counted (€)</label>
-                    <input type="number" inputmode="decimal" step="0.01" min="0" class="form-input" id="closingCashInput" placeholder="0.00" oninput="updateCloseShiftDiff()" autofocus>
+                    <input type="text" inputmode="decimal" class="form-input" id="closingCashInput" placeholder="0.00" oninput="updateCloseShiftDiff()" autofocus>
                 </div>
                 <div class="stat-grid" style="grid-template-columns: 1fr 1fr;">
                     <div class="stat-box"><div class="label" data-i18n="closeshift.expected">Expected (system)</div><div class="value" id="expectedTotalPreview">—</div></div>
@@ -2792,6 +2792,22 @@
     }
 
     function money(n) { return `€${Number(n||0).toFixed(2)}`; }
+    // Reads an amount typed by hand: "4.5" and "4,5" both mean 4.5 (the money
+    // inputs are type="text", so the browser's locale never rewrites them).
+    // Where both separators appear the last one is the decimal ("1.234,50").
+    // Returns NaN for anything that isn't a number, like parseFloat('').
+    function parseMoney(v) {
+        let s = String(v == null ? '' : v).replace(/[\s €]/g, '');
+        if (!s) return NaN;
+        const c = s.lastIndexOf(','), d = s.lastIndexOf('.');
+        if (c > -1 && d > -1) {
+            const dec = c > d ? ',' : '.';
+            s = s.split(dec === ',' ? '.' : ',').join('').replace(dec, '.');
+        } else {
+            s = s.replace(',', '.');
+        }
+        return /^-?(\d+\.?\d*|\.\d+)$/.test(s) ? parseFloat(s) : NaN;
+    }
 
     /* ============================================================
        AUTH & INIT
@@ -6012,8 +6028,8 @@
             </div>
             <div class="bulk-price-bar">
                 <label>${t('inv.align_price_label')}</label>
-                <input type="number" class="bulk-price-input" step="0.01" placeholder="${t('inv.col_price')}">
-                <input type="number" class="bulk-cost-input" step="0.01" placeholder="${t('inv.col_cost')}">
+                <input type="text" inputmode="decimal" class="bulk-price-input" placeholder="${t('inv.col_price')}">
+                <input type="text" inputmode="decimal" class="bulk-cost-input" placeholder="${t('inv.col_cost')}">
                 <button class="btn btn-ghost btn-sm bulk-apply-btn" onclick="applyBulkPrice('${blockId}')">${t('inv.apply_to_all_sizes')}</button>
             </div>
             ${colorName ? `
@@ -6084,10 +6100,10 @@
                 </div>
                 <div class="sre-price-group">
                     <div class="sre-field">
-                        <input type="number" class="sre-price-input" step="0.01" value="${prefill.price||''}" title="${t('inv.col_price')}">
+                        <input type="text" inputmode="decimal" class="sre-price-input" value="${prefill.price||''}" title="${t('inv.col_price')}">
                     </div>
                     <div class="sre-field">
-                        <input type="number" class="sre-cost-input" step="0.01" value="${prefill.costPrice||''}" title="${t('inv.col_cost')}">
+                        <input type="text" inputmode="decimal" class="sre-cost-input" value="${prefill.costPrice||''}" title="${t('inv.col_cost')}">
                     </div>
                     <button class="icon-btn-sm sre-price-save" onclick="updateVariantPriceCost(${prefill.variantId}, this)" title="${t('inv.save_price_cost')}"><i class="fas fa-check"></i></button>
                 </div>
@@ -6105,8 +6121,8 @@
         row.innerHTML = `
             <input type="text" class="size-input" placeholder="M" title="${t('ds.col_size')}" value="${escapeHtml(prefill.size||'')}">
             <input type="text" class="sku-input" placeholder="auto" title="${t('inv.col_sku')}" value="${escapeHtml(prefill.sku||'')}">
-            <input type="number" class="price-input" placeholder="0.00" title="${t('inv.col_price')}" value="${prefill.price||''}" step="0.01">
-            <input type="number" class="cost-input" placeholder="0.00" title="${t('inv.col_cost')}" step="0.01">
+            <input type="text" inputmode="decimal" class="price-input" placeholder="0.00" title="${t('inv.col_price')}" value="${prefill.price||''}">
+            <input type="text" inputmode="decimal" class="cost-input" placeholder="0.00" title="${t('inv.col_cost')}">
             <input type="number" class="stock1-input" placeholder="0" title="${STORES[0]?.name||'Store 1'}" value="${prefill.stock1||''}">
             <input type="number" class="stock2-input" placeholder="0" title="${STORES[1]?.name||'Store 2'}" value="${prefill.stock2||''}">
             <button class="icon-btn" onclick="this.closest('.size-row').remove()" title="${t('common.remove')}"><i class="fas fa-times"></i></button>
@@ -6134,8 +6150,8 @@
             block.querySelectorAll('.size-row').forEach(row => {
                 const size = row.querySelector('.size-input').value.trim();
                 if (!size) return;
-                const price = parseFloat(row.querySelector('.price-input').value) || 0;
-                const cost = parseFloat(row.querySelector('.cost-input').value) || 0;
+                const price = parseMoney(row.querySelector('.price-input').value) || 0;
+                const cost = parseMoney(row.querySelector('.cost-input').value) || 0;
                 const sku = row.querySelector('.sku-input').value.trim();
                 const s1 = parseInt(row.querySelector('.stock1-input').value) || 0;
                 const s2 = parseInt(row.querySelector('.stock2-input').value) || 0;
@@ -6151,6 +6167,24 @@
         const hasExistingVariants = document.querySelectorAll('#colorBlocksContainer .size-row-existing').length > 0;
         const savedWithoutSizes = variants.length === 0 && !hasExistingVariants;
 
+        // Price/cost typed into an already-saved size row used to be dropped
+        // by Save Style — only that row's own ✓ button persisted it, so the
+        // edit silently reverted on reload. Send any changed row along too,
+        // appended AFTER the new sizes so `variants` indices still line up
+        // with initialStockByRow. Sale (clearance) rows are skipped: their
+        // color+size upsert would land on the source variant instead.
+        const priceEdits = [];
+        document.querySelectorAll('#colorBlocksContainer .size-row-existing').forEach(row => {
+            if (row.querySelector('.sale-badge')) return;
+            const ctx = findVariantContext(parseInt(row.dataset.variantId));
+            if (!ctx) return;
+            const price = parseMoney(row.querySelector('.sre-price-input').value);
+            const cost = parseMoney(row.querySelector('.sre-cost-input').value) || 0;
+            if (!(price > 0)) return;
+            if (Math.abs(price - Number(ctx.price || 0)) < 0.005 && Math.abs(cost - Number(ctx.costPrice || 0)) < 0.005) return;
+            priceEdits.push({ color_name: ctx.colorName, color_hex: ctx.colorHex, size: ctx.size, price, cost_price: cost });
+        });
+
         btn.disabled = true; btn.innerText = t('inv.saving');
         const payload_product = {
             id: editingProductId, name,
@@ -6162,7 +6196,7 @@
             image_url: currentPhotoUrls[0] || null,
             supplier_id: document.getElementById('new_supplier_id').value || null
         };
-        const { data, error } = await sb.rpc('rpc_upsert_fashion_product', { p_product: payload_product, p_variants: variants });
+        const { data, error } = await sb.rpc('rpc_upsert_fashion_product', { p_product: payload_product, p_variants: variants.concat(priceEdits) });
         btn.disabled = false; btn.innerText = t('inv.save_style');
 
         if (error && error.code === '23505' && error.message.includes('base_barcode')) {
@@ -6176,7 +6210,8 @@
         // variant IDs exist. Best-effort per line — a failure here doesn't
         // undo the style save that already succeeded, just gets surfaced.
         const incomingCalls = [];
-        (data.variants || []).forEach((v, i) => {
+        const newVariantsOut = (data.variants || []).slice(0, variants.length); // excludes the price-only edits above
+        newVariantsOut.forEach((v, i) => {
             const byStore = initialStockByRow[i] || {};
             for (const [storeId, qty] of Object.entries(byStore)) {
                 if (storeId === 'undefined' || !qty || qty <= 0) continue;
@@ -6213,7 +6248,7 @@
         // item objects, so adjusting a quantity here would silently mutate
         // whatever's sitting in the header queue too, and printing from
         // here would leave duplicates behind to accidentally reprint later.
-        const newLabelItems = (data.variants || []).map((v, i) => ({
+        const newLabelItems = newVariantsOut.map((v, i) => ({
             productName: data.product_name, sizeRange: data.size_range, composition: data.composition,
             colorName: v.color_name, size: v.size, price: v.price, sku: v.sku,
             copies: Math.max(1, Object.values(initialStockByRow[i] || {}).reduce((a,b) => a + (parseInt(b)||0), 0))
@@ -6461,8 +6496,8 @@
         const ctx = findVariantContext(variantId);
         if (!ctx) return;
         const row = btn.closest('.size-row-existing');
-        const price = parseFloat(row.querySelector('.sre-price-input').value);
-        const cost = parseFloat(row.querySelector('.sre-cost-input').value) || 0;
+        const price = parseMoney(row.querySelector('.sre-price-input').value);
+        const cost = parseMoney(row.querySelector('.sre-cost-input').value) || 0;
         if (!price || price <= 0) { toast(t('toast.enter_valid_price'), 'warn'); return; }
         btn.disabled = true;
         const { error } = await sb.rpc('rpc_upsert_fashion_product', {
@@ -6603,9 +6638,9 @@
     async function applyBulkPrice(blockId) {
         const block = document.getElementById(blockId);
         if (!block) return;
-        const price = parseFloat(block.querySelector('.bulk-price-input').value);
+        const price = parseMoney(block.querySelector('.bulk-price-input').value);
         const costRaw = block.querySelector('.bulk-cost-input').value.trim();
-        const cost = parseFloat(costRaw) || 0;
+        const cost = parseMoney(costRaw) || 0;
         if (!price || price <= 0) { toast(t('toast.enter_valid_price'), 'warn'); return; }
         const newRows = block.querySelectorAll('.size-row');
         const existingRows = block.querySelectorAll('.size-row-existing');
@@ -6694,7 +6729,7 @@
         if (!currentMarkdownTarget) return;
         const qty = parseInt(document.getElementById('markdownQty').value);
         if (!qty || qty <= 0) { toast(t('toast.enter_qty_add'), 'warn'); return; }
-        const price = parseFloat(document.getElementById('markdownPrice').value);
+        const price = parseMoney(document.getElementById('markdownPrice').value);
         if (isNaN(price) || price < 0) { toast(t('toast.enter_valid_price'), 'warn'); return; }
         const reason = document.getElementById('markdownReason').value;
         const notes = document.getElementById('markdownNotes').value.trim() || null;
@@ -8116,7 +8151,7 @@
     // Register tab (opening a shift on its own). quickOpenReturnTo decides
     // what happens next — see openOpenShiftModal() / checkout().
     async function quickOpenRegisterAndContinue() {
-        const val = parseFloat(document.getElementById('quickOpenFloatInput').value) || 0;
+        const val = parseMoney(document.getElementById('quickOpenFloatInput').value) || 0;
         const btn = document.querySelector('#quickOpenRegisterModal .btn-primary');
         btn.disabled = true;
         const { error } = await sb.rpc('rpc_open_cash_register', { p_location_id: DEVICE_LOCATION_ID, p_opening_float: val });
@@ -8140,7 +8175,7 @@
         document.getElementById('movementModal').classList.add('active');
     }
     async function confirmCashMovement() {
-        const amount = parseFloat(document.getElementById('movementAmount').value);
+        const amount = parseMoney(document.getElementById('movementAmount').value);
         const reason = document.getElementById('movementReason').value.trim();
         if (!amount || amount <= 0) { toast(t('toast.enter_valid_amount'), 'warn'); return; }
         if (!reason) { toast(t('toast.enter_reason'), 'warn'); return; }
@@ -8182,7 +8217,7 @@
     }
 
     function updateCloseShiftDiff() {
-        const counted = parseFloat(document.getElementById('closingCashInput').value) || 0;
+        const counted = parseMoney(document.getElementById('closingCashInput').value) || 0;
         const diffEl = document.getElementById('closeShiftDiff');
         if (closeShiftExpected === null) { diffEl.innerText = '—'; return; }
         const diff = round2(counted - closeShiftExpected);
@@ -8192,7 +8227,7 @@
     }
 
     async function confirmCloseShift() {
-        const counted = parseFloat(document.getElementById('closingCashInput').value);
+        const counted = parseMoney(document.getElementById('closingCashInput').value);
         if (isNaN(counted) || counted < 0) { toast(t('toast.enter_valid_amount'), 'warn'); return; }
         const { data, error } = await sb.rpc('rpc_close_cash_register', { p_register_id: currentRegister.id, p_closing_cash_counted: counted });
         if (error) { toast(error.message, 'error'); return; }
