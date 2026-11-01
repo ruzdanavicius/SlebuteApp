@@ -463,7 +463,10 @@
         .sre-qty { font-weight: 700; font-size: 0.9rem; min-width: 16px; text-align:center; }
         .sre-qty.low { color: var(--warning-text); }
         .sre-qty.zero { color: var(--danger-color); }
-        .sre-pending { font-size: 0.72rem; font-weight: 700; color: var(--success-color); white-space: nowrap; }
+        /* The "(+N)" slot is always there (empty when nothing is staged) at a fixed
+           width, so staging a unit never moves the − / + buttons — on this line or
+           any other — and they can be clicked in quick succession. */
+        .sre-pending { display: inline-block; min-width: 40px; font-size: 0.72rem; font-weight: 700; color: var(--success-color); white-space: nowrap; }
         .sre-incoming-badge { font-size: 0.65rem; font-weight: 600; color: var(--accent-color); background: var(--accent-tint); border-radius: 6px; padding: 2px 5px; white-space: nowrap; }
 
         /* STORAGE TAB — one row per SKU already holding storage stock,
@@ -5151,12 +5154,12 @@
         pendingStockProductId = forProductId;
     }
 
-    // Shows/hides the "(+N)" next to a store's count.
+    // Fills the "(+N)" slot next to a store's count (empty when nothing is staged;
+    // the slot keeps its width either way — see .sre-pending).
     function paintPendingBadge(cell, n) {
         const el = cell.querySelector('.sre-pending');
         if (!el) return;
-        el.textContent = `(+${n})`;
-        el.classList.toggle('hidden', n <= 0);
+        el.textContent = n > 0 ? `(+${n})` : '';
     }
 
     // + stages one unit. − first takes back a staged unit; with nothing staged it
@@ -6162,7 +6165,7 @@
                 return `<div class="sre-stock" data-store-id="${s.id}">
                     <span class="sre-loc">${escapeHtml(s.name)}</span>
                     <span class="sre-qty ${cls}">${qty}</span>
-                    <span class="sre-pending ${staged > 0 ? '' : 'hidden'}">(+${staged})</span>
+                    <span class="sre-pending">${staged > 0 ? `(+${staged})` : ''}</span>
                     ${incomingBadge}
                     <button class="icon-btn-sm" onclick="stepStock(${prefill.variantId}, ${s.id}, -1, this)" title="${t('inv.stock_minus_title')} — ${escapeHtml(s.name)}"><i class="fas fa-minus"></i></button>
                     <button class="icon-btn-sm" onclick="stepStock(${prefill.variantId}, ${s.id}, 1, this)" title="${t('inv.stock_plus_title')} — ${escapeHtml(s.name)}"><i class="fas fa-plus"></i></button>
