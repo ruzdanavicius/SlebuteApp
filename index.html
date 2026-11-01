@@ -2111,7 +2111,7 @@
             'inv.no_sizes_badge': 'No sizes', 'inv.no_sizes_filter': 'No sizes',
             'toast.session_expired': 'Session expired — signing you in again.',
             'toast.image_process_failed': 'Could not process that image:', 'toast.enter_qty_add': 'Enter a quantity to add.',
-            'toast.added_qty_suffix': 'added.', 'toast.incoming_qty_suffix': 'queued as incoming — see Pervežimai.', 'toast.enter_valid_price': 'Enter a valid price.', 'toast.price_updated': 'Price updated.',
+            'toast.added_qty_suffix': 'added.', 'toast.incoming_qty_suffix': 'queued as incoming — see Pervežimai.', 'toast.save_stock_failed': 'Style saved, but some quantities were NOT added — they are back in the + boxes; press + to retry.', 'toast.enter_valid_price': 'Enter a valid price.', 'toast.price_updated': 'Price updated.',
             'toast.supplier_updated': 'Supplier updated.', 'toast.no_existing_sizes': 'No sizes in this color yet.',
             'toast.price_filled_for': 'Price filled in for', 'toast.new_sizes_save_suffix': 'new size(s) — press Save Style to keep.',
             'toast.price_updated_for': 'Price updated for', 'toast.sizes_suffix': 'size(s).',
@@ -2432,7 +2432,7 @@
             'inv.no_sizes_badge': 'Be dydžių', 'inv.no_sizes_filter': 'Be dydžių',
             'toast.session_expired': 'Sesija baigėsi — prisijungiama iš naujo.',
             'toast.image_process_failed': 'Nepavyko apdoroti nuotraukos:', 'toast.enter_qty_add': 'Įveskite pridedamą kiekį.',
-            'toast.added_qty_suffix': 'pridėta.', 'toast.incoming_qty_suffix': 'įtraukta į atvykstančias prekes — žr. Pervežimai.', 'toast.enter_valid_price': 'Įveskite galiojančią kainą.', 'toast.price_updated': 'Kaina atnaujinta.',
+            'toast.added_qty_suffix': 'pridėta.', 'toast.incoming_qty_suffix': 'įtraukta į atvykstančias prekes — žr. Pervežimai.', 'toast.save_stock_failed': 'Modelis išsaugotas, bet dalis kiekių NEBUVO pridėta — jie grąžinti į „+“ laukelius; spauskite +, kad bandytumėte dar kartą.', 'toast.enter_valid_price': 'Įveskite galiojančią kainą.', 'toast.price_updated': 'Kaina atnaujinta.',
             'toast.supplier_updated': 'Tiekėjas atnaujintas.', 'toast.no_existing_sizes': 'Šioje spalvoje dar nėra dydžių.',
             'toast.price_filled_for': 'Kaina įrašyta', 'toast.new_sizes_save_suffix': 'naujiems dydžiams — spauskite „Išsaugoti“.',
             'toast.price_updated_for': 'Kaina atnaujinta:', 'toast.sizes_suffix': 'dydžiui(-iams).',
@@ -6086,7 +6086,7 @@
                     <span class="sre-loc">${escapeHtml(s.name)}</span>
                     <span class="sre-qty ${cls}">${qty}</span>
                     ${incomingBadge}
-                    <input type="number" min="1" placeholder="+" class="sre-quickadd-input" title="${t('inv.qty_received_title')} — ${escapeHtml(s.name)}"
+                    <input type="number" min="1" placeholder="+" class="sre-quickadd-input" data-variant-id="${prefill.variantId}" data-store-id="${s.id}" title="${t('inv.qty_received_title')} — ${escapeHtml(s.name)}"
                         onkeydown="if(event.key==='Enter'){event.preventDefault(); this.nextElementSibling.click();}">
                     <button class="icon-btn-sm" onclick="quickAddStock(${prefill.variantId}, ${s.id}, this)" title="${t('inv.add_received_title')} — ${escapeHtml(s.name)}"><i class="fas fa-plus"></i></button>
                     <button class="icon-btn-sm" onclick="openAdjustModal(${prefill.variantId}, '${escapeHtml(prefill.contextLabel||'')}', ${s.id})" title="${t('inv.full_adjustment_title')} — ${escapeHtml(s.name)}"><i class="fas fa-sliders"></i></button>
@@ -6134,6 +6134,27 @@
         const btn = document.getElementById('saveBtn');
         const name = document.getElementById('new_name').value.trim();
         if (!name) { toast(t('toast.product_name_required'), 'warn'); return; }
+
+        // Quantities typed into the "+" boxes of already-saved sizes. Only that
+        // row's + button used to send them, so Save Style dropped them without a
+        // word ("saved!", then stock back at 0 on reload). Collected here and sent
+        // after the save, the same way the + button does (rpc_add_incoming_stock).
+        // A box holding something that isn't a whole number > 0 stops the save
+        // instead of being ignored.
+        const typedStock = [];
+        let badTypedBox = null;
+        document.querySelectorAll('#colorBlocksContainer .sre-quickadd-input').forEach(inp => {
+            const raw = inp.value.trim();
+            if (!raw) return;
+            const qty = Number(raw);
+            if (!Number.isInteger(qty) || qty <= 0) { badTypedBox = badTypedBox || inp; return; }
+            const row = inp.closest('.size-row-existing');
+            typedStock.push({
+                variantId: parseInt(inp.dataset.variantId), storeId: parseInt(inp.dataset.storeId), qty,
+                label: (row && row.querySelector('.sre-sub')?.textContent.trim()) || `#${inp.dataset.variantId}`
+            });
+        });
+        if (badTypedBox) { toast(t('toast.enter_qty_add'), 'warn'); badTypedBox.focus(); return; }
 
         // Initial stock for a brand-new size no longer seeds real inventory
         // directly — it queues the same way a quick-add does (see
@@ -6225,6 +6246,24 @@
         });
         if (incomingCalls.length) await Promise.all(incomingCalls);
 
+        // Same for the quantities typed on already-saved sizes. One at a time:
+        // rpc_add_incoming_stock appends to the open pending transfer per shop,
+        // and two parallel calls could each open their own. Labels are queued for
+        // the header Print Labels button exactly like the + button does.
+        let sentUnits = 0;
+        const failedTyped = [];
+        for (const tp of typedStock) {
+            const { error: e } = await sb.rpc('rpc_add_incoming_stock', {
+                p_variant_id: tp.variantId, p_target_location_id: tp.storeId,
+                p_quantity: tp.qty, p_notes: 'Save Style (Manage Catalog)'
+            });
+            if (e) { failedTyped.push(tp); toast(`${tp.label}: ${e.message}`, 'error'); continue; }
+            sentUnits += tp.qty;
+            const ctx = findVariantContext(tp.variantId);
+            if (ctx) addToPendingLabels([{ ...ctx, copies: tp.qty }]);
+        }
+        if (sentUnits) toast(`+${sentUnits} ${t('toast.incoming_qty_suffix')}`, 'success');
+
         // A brand-new style has no product_id until this save returns, so any
         // photos beyond the cover (uploaded to Storage already, just queued
         // in currentPhotoUrls) only get their product_images rows now. For an
@@ -6259,6 +6298,15 @@
         // list after every save. "Naujas modelis" is the explicit way to start
         // a fresh blank style now that Save no longer doubles as a clear button.
         loadProductForEdit(data.product_id);
+        // The re-render above clears every "+" box. Put back whatever failed to
+        // send so it can be retried instead of retyped from memory.
+        if (failedTyped.length) {
+            failedTyped.forEach(tp => {
+                const el = document.querySelector(`.sre-quickadd-input[data-variant-id="${tp.variantId}"][data-store-id="${tp.storeId}"]`);
+                if (el) el.value = tp.qty;
+            });
+            toast(t('toast.save_stock_failed'), 'warn');
+        }
         if (newLabelItems.length) {
             openLabelPrintModal(t('labelmodal.title'), t('labelmodal.just_saved_subtitle'), newLabelItems);
         }
