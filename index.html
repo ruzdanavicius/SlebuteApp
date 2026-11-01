@@ -5136,12 +5136,13 @@
     let pendingStock = {};              // `${variantId}:${storeId}` -> units staged
     let pendingStockProductId = null;
     // Where Save Style sends staged units:
+    //   'incoming' queued through Atvykstančios prekės (rpc_add_incoming_stock);
+    //              lands in a shop only once it is accepted, scanned out and
+    //              scanned in on arrival — the same route new sizes use.
     //   'shop'     straight into that shop's stock — audited ARRIVAL adjustment
     //              (rpc_record_stock_adjustment); the number changes on Save.
-    //   'incoming' queued through Atvykstančios prekės (rpc_add_incoming_stock);
-    //              lands only once a shop scans the transfer in.
     // Flip this one word to change the behaviour for every size row.
-    const STAGED_PLUS_GOES_TO = 'shop';
+    const STAGED_PLUS_GOES_TO = 'incoming';
 
     function resetPendingStock(forProductId) {
         if (pendingStockProductId === forProductId) return;
