@@ -463,7 +463,7 @@
         .sre-qty { font-weight: 700; font-size: 0.9rem; min-width: 16px; text-align:center; }
         .sre-qty.low { color: var(--warning-text); }
         .sre-qty.zero { color: var(--danger-color); }
-        .sre-quickadd-input { width: 34px; background: var(--card-bg); border: 1px solid rgba(36,22,30,0.16); border-radius: 6px; padding: 4px 3px; font-size: 0.75rem; color: var(--text-primary); outline:none; text-align:center; }
+        .sre-pending { font-size: 0.72rem; font-weight: 700; color: var(--success-color); white-space: nowrap; }
         .sre-incoming-badge { font-size: 0.65rem; font-weight: 600; color: var(--accent-color); background: var(--accent-tint); border-radius: 6px; padding: 2px 5px; white-space: nowrap; }
 
         /* STORAGE TAB — one row per SKU already holding storage stock,
@@ -2111,7 +2111,7 @@
             'inv.no_sizes_badge': 'No sizes', 'inv.no_sizes_filter': 'No sizes',
             'toast.session_expired': 'Session expired — signing you in again.',
             'toast.image_process_failed': 'Could not process that image:', 'toast.enter_qty_add': 'Enter a quantity to add.',
-            'toast.added_qty_suffix': 'added.', 'toast.incoming_qty_suffix': 'queued as incoming — see Pervežimai.', 'toast.save_stock_failed': 'Style saved, but some quantities were NOT added — they are back in the + boxes; press + to retry.', 'toast.enter_valid_price': 'Enter a valid price.', 'toast.price_updated': 'Price updated.',
+            'toast.added_qty_suffix': 'added.', 'toast.incoming_qty_suffix': 'queued as incoming — see Pervežimai.', 'toast.save_stock_failed': 'Style saved, but some stock was NOT added — it is still shown as (+N); press Save again to retry.', 'toast.enter_valid_price': 'Enter a valid price.', 'toast.price_updated': 'Price updated.',
             'toast.supplier_updated': 'Supplier updated.', 'toast.no_existing_sizes': 'No sizes in this color yet.',
             'toast.price_filled_for': 'Price filled in for', 'toast.new_sizes_save_suffix': 'new size(s) — press Save Style to keep.',
             'toast.price_updated_for': 'Price updated for', 'toast.sizes_suffix': 'size(s).',
@@ -2164,6 +2164,8 @@
             'inv.incoming_badge_title': 'Queued as incoming, not yet received at this store', 'inv.incoming_badge_suffix': 'incoming',
             'inv.qty_received_title': 'Quantity received', 'inv.add_received_title': 'Add received stock',
             'inv.full_adjustment_title': 'Full adjustment (correction/damage/etc.)',
+            'inv.stock_plus_title': 'Add 1 (saved with Save Style)', 'inv.stock_minus_title': 'Remove 1 (takes back a staged unit, or opens a correction)',
+            'toast.nothing_to_remove': 'There is no stock to remove here.', 'toast.pending_stock_discarded': 'Unsaved (+N) stock changes were discarded.',
             'inv.uploading_prefix': 'Uploading', 'inv.uploaded_prefix': 'Uploaded',
             'register.title': 'Cash Register',
             'ds.title': 'Daily Sales',
@@ -2432,7 +2434,7 @@
             'inv.no_sizes_badge': 'Be dydžių', 'inv.no_sizes_filter': 'Be dydžių',
             'toast.session_expired': 'Sesija baigėsi — prisijungiama iš naujo.',
             'toast.image_process_failed': 'Nepavyko apdoroti nuotraukos:', 'toast.enter_qty_add': 'Įveskite pridedamą kiekį.',
-            'toast.added_qty_suffix': 'pridėta.', 'toast.incoming_qty_suffix': 'įtraukta į atvykstančias prekes — žr. Pervežimai.', 'toast.save_stock_failed': 'Modelis išsaugotas, bet dalis kiekių NEBUVO pridėta — jie grąžinti į „+“ laukelius; spauskite +, kad bandytumėte dar kartą.', 'toast.enter_valid_price': 'Įveskite galiojančią kainą.', 'toast.price_updated': 'Kaina atnaujinta.',
+            'toast.added_qty_suffix': 'pridėta.', 'toast.incoming_qty_suffix': 'įtraukta į atvykstančias prekes — žr. Pervežimai.', 'toast.save_stock_failed': 'Modelis išsaugotas, bet dalis kiekių NEBUVO pridėta — jie vis dar rodomi kaip (+N); spauskite „Išsaugoti“ dar kartą.', 'toast.enter_valid_price': 'Įveskite galiojančią kainą.', 'toast.price_updated': 'Kaina atnaujinta.',
             'toast.supplier_updated': 'Tiekėjas atnaujintas.', 'toast.no_existing_sizes': 'Šioje spalvoje dar nėra dydžių.',
             'toast.price_filled_for': 'Kaina įrašyta', 'toast.new_sizes_save_suffix': 'naujiems dydžiams — spauskite „Išsaugoti“.',
             'toast.price_updated_for': 'Kaina atnaujinta:', 'toast.sizes_suffix': 'dydžiui(-iams).',
@@ -2485,6 +2487,8 @@
             'inv.incoming_badge_title': 'Įtraukta kaip atvykstanti prekė, dar negauta šioje parduotuvėje', 'inv.incoming_badge_suffix': 'atvyksta',
             'inv.qty_received_title': 'Gautas kiekis', 'inv.add_received_title': 'Pridėti gautą kiekį',
             'inv.full_adjustment_title': 'Pilnas koregavimas (pataisymas/žala ir kt.)',
+            'inv.stock_plus_title': 'Pridėti 1 (išsaugoma su „Išsaugoti modelį“)', 'inv.stock_minus_title': 'Pašalinti 1 (atšaukia paruoštą vienetą arba atidaro koregavimą)',
+            'toast.nothing_to_remove': 'Čia nėra ką šalinti.', 'toast.pending_stock_discarded': 'Neišsaugoti (+N) kiekių pakeitimai buvo atmesti.',
             'inv.uploading_prefix': 'Įkeliama', 'inv.uploaded_prefix': 'Įkelta',
             'register.title': 'Kasos aparatas',
             'ds.title': 'Dienos pardavimai',
@@ -5124,6 +5128,74 @@
        INVENTORY MATRIX CREATOR
        ============================================================ */
     let editingProductId = null;
+
+    // Stock staged with a size row's + button but not saved yet. The row shows it
+    // as "(+N)" beside the real count; Save Style commits all of it and clears the
+    // indicators. Scoped to ONE style (pendingStockProductId): opening another
+    // style or a blank one throws the rest away, with a warning toast.
+    let pendingStock = {};              // `${variantId}:${storeId}` -> units staged
+    let pendingStockProductId = null;
+    // Where Save Style sends staged units:
+    //   'shop'     straight into that shop's stock — audited ARRIVAL adjustment
+    //              (rpc_record_stock_adjustment); the number changes on Save.
+    //   'incoming' queued through Atvykstančios prekės (rpc_add_incoming_stock);
+    //              lands only once a shop scans the transfer in.
+    // Flip this one word to change the behaviour for every size row.
+    const STAGED_PLUS_GOES_TO = 'shop';
+
+    function resetPendingStock(forProductId) {
+        if (pendingStockProductId === forProductId) return;
+        if (Object.keys(pendingStock).length) toast(t('toast.pending_stock_discarded'), 'warn');
+        pendingStock = {};
+        pendingStockProductId = forProductId;
+    }
+
+    // Shows/hides the "(+N)" next to a store's count.
+    function paintPendingBadge(cell, n) {
+        const el = cell.querySelector('.sre-pending');
+        if (!el) return;
+        el.textContent = `(+${n})`;
+        el.classList.toggle('hidden', n <= 0);
+    }
+
+    // + stages one unit. − first takes back a staged unit; with nothing staged it
+    // opens the full correction popup (reason picker), prefilled with −1 — a
+    // removal is a real, audited correction and applies there, not on Save.
+    function stepStock(variantId, storeId, delta, btn) {
+        const key = `${variantId}:${storeId}`;
+        const cell = btn.closest('.sre-stock');
+        const staged = pendingStock[key] || 0;
+        pendingStockProductId = editingProductId;
+        if (delta > 0) {
+            pendingStock[key] = staged + 1;
+        } else if (staged > 0) {
+            if (staged === 1) delete pendingStock[key]; else pendingStock[key] = staged - 1;
+        } else {
+            const shown = parseInt(cell.querySelector('.sre-qty').textContent) || 0;
+            if (shown <= 0) { toast(t('toast.nothing_to_remove'), 'warn'); return; }
+            const row = btn.closest('.size-row-existing');
+            openAdjustModal(variantId, (row && row.dataset.label) || '', storeId, -1, 'CORRECTION');
+            return;
+        }
+        paintPendingBadge(cell, pendingStock[key] || 0);
+    }
+
+    // Re-reads one size's counts from the freshly loaded catalog and repaints them
+    // in the open style form — used after an immediate correction, so the form
+    // is not rebuilt (which would drop anything typed but not saved yet).
+    function repaintStockCells(variantId) {
+        const row = document.querySelector(`#colorBlocksContainer .size-row-existing[data-variant-id="${variantId}"]`);
+        if (!row) return;
+        const found = products.flatMap(p => p.variants || []).find(v => v.id === variantId);
+        if (!found) return;
+        row.querySelectorAll('.sre-stock').forEach(cell => {
+            const qty = ((found.stockByLocation || {})[cell.dataset.storeId] || { quantity: 0 }).quantity;
+            const el = cell.querySelector('.sre-qty');
+            el.textContent = qty;
+            el.className = 'sre-qty ' + (qty <= 0 ? 'zero' : (qty <= 2 ? 'low' : ''));
+        });
+    }
+
     let colorBlockSeq = 0;
     // Ordered list of this style's photo URLs (index 0 = cover photo,
     // mirrored to products.image_url; index 1-3 = the extra gallery angles,
@@ -5886,6 +5958,7 @@
     function startNewProduct() {
         showInventoryForm();
         editingProductId = null;
+        resetPendingStock(null);
         ['new_base_barcode','new_name','new_category','new_size_range','new_composition','new_description'].forEach(id => document.getElementById(id).value = '');
         document.getElementById('new_supplier').value = '';
         document.getElementById('new_supplier_id').value = '';
@@ -5908,6 +5981,7 @@
         if (!p) return;
         showInventoryForm();
         editingProductId = id;
+        resetPendingStock(id);
         document.getElementById('printAllStyleBtn').classList.remove('hidden');
         document.getElementById('styleEditDeleteBtn').classList.remove('hidden');
         const featuredLabel = document.getElementById('featuredOnlineLabel');
@@ -6066,6 +6140,7 @@
             // this just removes the modal round-trip for the common case.
             row.className = 'size-row-existing';
             row.dataset.variantId = prefill.variantId;
+            row.dataset.label = prefill.contextLabel || '';
             // Mark-down / undo-markdown lives here — per store, same as
             // quick-add and Adjust on this row — because a markdown always
             // needs a new label printed (the print-label icon right next to
@@ -6082,14 +6157,14 @@
                 const markdownBtn = prefill.isClearance
                     ? `<button class="icon-btn-sm" onclick="openUndoMarkdownModal(${prefill.variantId}, '${escapeHtml(prefill.contextLabel||'')}', ${s.id})" title="${t('markdown.undo_title')} — ${escapeHtml(s.name)}"><i class="fas fa-rotate-left"></i></button>`
                     : `<button class="icon-btn-sm" onclick="openMarkdownModal(${prefill.variantId}, '${escapeHtml(prefill.contextLabel||'')}', ${Number(prefill.price)||0}, ${s.id})" title="${t('markdown.mark_down_title')} — ${escapeHtml(s.name)}"><i class="fas fa-tag"></i></button>`;
-                return `<div class="sre-stock">
+                const staged = pendingStockProductId === editingProductId ? (pendingStock[`${prefill.variantId}:${s.id}`] || 0) : 0;
+                return `<div class="sre-stock" data-store-id="${s.id}">
                     <span class="sre-loc">${escapeHtml(s.name)}</span>
                     <span class="sre-qty ${cls}">${qty}</span>
+                    <span class="sre-pending ${staged > 0 ? '' : 'hidden'}">(+${staged})</span>
                     ${incomingBadge}
-                    <input type="number" min="1" placeholder="+" class="sre-quickadd-input" data-variant-id="${prefill.variantId}" data-store-id="${s.id}" title="${t('inv.qty_received_title')} — ${escapeHtml(s.name)}"
-                        onkeydown="if(event.key==='Enter'){event.preventDefault(); this.nextElementSibling.click();}">
-                    <button class="icon-btn-sm" onclick="quickAddStock(${prefill.variantId}, ${s.id}, this)" title="${t('inv.add_received_title')} — ${escapeHtml(s.name)}"><i class="fas fa-plus"></i></button>
-                    <button class="icon-btn-sm" onclick="openAdjustModal(${prefill.variantId}, '${escapeHtml(prefill.contextLabel||'')}', ${s.id})" title="${t('inv.full_adjustment_title')} — ${escapeHtml(s.name)}"><i class="fas fa-sliders"></i></button>
+                    <button class="icon-btn-sm" onclick="stepStock(${prefill.variantId}, ${s.id}, -1, this)" title="${t('inv.stock_minus_title')} — ${escapeHtml(s.name)}"><i class="fas fa-minus"></i></button>
+                    <button class="icon-btn-sm" onclick="stepStock(${prefill.variantId}, ${s.id}, 1, this)" title="${t('inv.stock_plus_title')} — ${escapeHtml(s.name)}"><i class="fas fa-plus"></i></button>
                     ${markdownBtn}
                 </div>`;
             }).join('');
@@ -6135,26 +6210,17 @@
         const name = document.getElementById('new_name').value.trim();
         if (!name) { toast(t('toast.product_name_required'), 'warn'); return; }
 
-        // Quantities typed into the "+" boxes of already-saved sizes. Only that
-        // row's + button used to send them, so Save Style dropped them without a
-        // word ("saved!", then stock back at 0 on reload). Collected here and sent
-        // after the save, the same way the + button does (rpc_add_incoming_stock).
-        // A box holding something that isn't a whole number > 0 stops the save
-        // instead of being ignored.
-        const typedStock = [];
-        let badTypedBox = null;
-        document.querySelectorAll('#colorBlocksContainer .sre-quickadd-input').forEach(inp => {
-            const raw = inp.value.trim();
-            if (!raw) return;
-            const qty = Number(raw);
-            if (!Number.isInteger(qty) || qty <= 0) { badTypedBox = badTypedBox || inp; return; }
-            const row = inp.closest('.size-row-existing');
-            typedStock.push({
-                variantId: parseInt(inp.dataset.variantId), storeId: parseInt(inp.dataset.storeId), qty,
-                label: (row && row.querySelector('.sre-sub')?.textContent.trim()) || `#${inp.dataset.variantId}`
-            });
-        });
-        if (badTypedBox) { toast(t('toast.enter_qty_add'), 'warn'); badTypedBox.focus(); return; }
+        // Units staged with the size rows' + buttons (the "(+N)" indicators).
+        // They are only ever committed here, after the style itself is saved.
+        const stagedStock = [];
+        if (editingProductId && pendingStockProductId === editingProductId) {
+            for (const [key, qty] of Object.entries(pendingStock)) {
+                if (!(qty > 0)) continue;
+                const [variantId, storeId] = key.split(':').map(Number);
+                const ctx = findVariantContext(variantId);
+                stagedStock.push({ key, variantId, storeId, qty, label: ctx ? ctx.sku : `#${variantId}` });
+            }
+        }
 
         // Initial stock for a brand-new size no longer seeds real inventory
         // directly — it queues the same way a quick-add does (see
@@ -6246,23 +6312,32 @@
         });
         if (incomingCalls.length) await Promise.all(incomingCalls);
 
-        // Same for the quantities typed on already-saved sizes. One at a time:
-        // rpc_add_incoming_stock appends to the open pending transfer per shop,
-        // and two parallel calls could each open their own. Labels are queued for
-        // the header Print Labels button exactly like the + button does.
+        // Commit the staged units (destination: STAGED_PLUS_GOES_TO). One at a
+        // time — 'incoming' appends to the open pending transfer per shop, and two
+        // parallel calls could each open their own. A line that fails stays staged
+        // (still shown as "(+N)") so Save can simply be pressed again; the ones that
+        // went through are cleared. Labels are queued for the header Print Labels
+        // button, like every other stock increase.
         let sentUnits = 0;
-        const failedTyped = [];
-        for (const tp of typedStock) {
-            const { error: e } = await sb.rpc('rpc_add_incoming_stock', {
-                p_variant_id: tp.variantId, p_target_location_id: tp.storeId,
-                p_quantity: tp.qty, p_notes: 'Save Style (Manage Catalog)'
-            });
-            if (e) { failedTyped.push(tp); toast(`${tp.label}: ${e.message}`, 'error'); continue; }
-            sentUnits += tp.qty;
-            const ctx = findVariantContext(tp.variantId);
-            if (ctx) addToPendingLabels([{ ...ctx, copies: tp.qty }]);
+        let failedStaged = 0;
+        for (const st of stagedStock) {
+            const { error: e } = STAGED_PLUS_GOES_TO === 'incoming'
+                ? await sb.rpc('rpc_add_incoming_stock', {
+                    p_variant_id: st.variantId, p_target_location_id: st.storeId,
+                    p_quantity: st.qty, p_notes: 'Save Style (Manage Catalog)'
+                })
+                : await sb.rpc('rpc_record_stock_adjustment', {
+                    p_variant_id: st.variantId, p_location_id: st.storeId,
+                    p_quantity_change: st.qty, p_reason: 'ARRIVAL', p_notes: 'Save Style (Manage Catalog)'
+                });
+            if (e) { failedStaged++; toast(`${st.label}: ${e.message}`, 'error'); continue; }
+            delete pendingStock[st.key];
+            sentUnits += st.qty;
+            const ctx = findVariantContext(st.variantId);
+            if (ctx) addToPendingLabels([{ ...ctx, copies: st.qty }]);
+            if (STAGED_PLUS_GOES_TO !== 'incoming') checkReorderConflict(st.variantId, st.storeId, st.qty);
         }
-        if (sentUnits) toast(`+${sentUnits} ${t('toast.incoming_qty_suffix')}`, 'success');
+        if (sentUnits) toast(`+${sentUnits} ${t(STAGED_PLUS_GOES_TO === 'incoming' ? 'toast.incoming_qty_suffix' : 'toast.added_qty_suffix')}`, 'success');
 
         // A brand-new style has no product_id until this save returns, so any
         // photos beyond the cover (uploaded to Storage already, just queued
@@ -6298,15 +6373,9 @@
         // list after every save. "Naujas modelis" is the explicit way to start
         // a fresh blank style now that Save no longer doubles as a clear button.
         loadProductForEdit(data.product_id);
-        // The re-render above clears every "+" box. Put back whatever failed to
-        // send so it can be retried instead of retyped from memory.
-        if (failedTyped.length) {
-            failedTyped.forEach(tp => {
-                const el = document.querySelector(`.sre-quickadd-input[data-variant-id="${tp.variantId}"][data-store-id="${tp.storeId}"]`);
-                if (el) el.value = tp.qty;
-            });
-            toast(t('toast.save_stock_failed'), 'warn');
-        }
+        // Sent units' "(+N)" are gone after the re-render above; anything that
+        // failed is still staged and still shown.
+        if (failedStaged) toast(t('toast.save_stock_failed'), 'warn');
         if (newLabelItems.length) {
             openLabelPrintModal(t('labelmodal.title'), t('labelmodal.just_saved_subtitle'), newLabelItems);
         }
@@ -6488,12 +6557,13 @@
     /* ============================================================
        QUICK STOCK ADJUSTMENT
        ============================================================ */
-    function openAdjustModal(variantId, label, locationId = null) {
+    function openAdjustModal(variantId, label, locationId = null, prefillQty = '', prefillReason = null) {
         const loc = locationId || VIEW_LOCATION_ID;
         currentAdjustTarget = { variantId, locationId: loc };
         document.getElementById('adjustVariantLabel').innerText = `${label} — ${t('adjust.at_label')} ${STORES.find(s=>s.id===loc)?.name||''}`;
-        document.getElementById('adjustQty').value = '';
+        document.getElementById('adjustQty').value = prefillQty;
         document.getElementById('adjustNotes').value = '';
+        if (prefillReason) document.getElementById('adjustReason').value = prefillReason;
         document.getElementById('adjustModal').classList.add('active');
     }
 
@@ -6505,36 +6575,6 @@
             if (v) return { productId: p.id, productName: p.name, sizeRange: p.size_range || null, composition: p.composition || null, colorName: v.colorName, colorHex: v.colorHex, size: v.size, price: v.price, costPrice: v.costPrice, sku: v.sku };
         }
         return null;
-    }
-
-    // Inline "+N received" for one store, right in the catalog row — no
-    // modal, for the common case (a shipment just arrived and needs
-    // distributing across sizes/stores). Full Adjust Stock (with a reason
-    // picker) is still there via the sliders icon for corrections/damage.
-    //
-    // Doesn't credit the store directly any more — logs the arrival at the
-    // "Atvykstančios prekės" virtual store and queues/extends a pending
-    // transfer to this store, same as a store-to-store transfer, visible in
-    // Pervežimai. Real inventory (and the reorder-conflict check) only
-    // updates once someone actually scans it in on receipt — see
-    // rpc_add_incoming_stock and the receiving-scan rework.
-    async function quickAddStock(variantId, locationId, btn) {
-        const input = btn.parentElement.querySelector('.sre-quickadd-input');
-        const qty = parseInt(input.value);
-        if (!qty || qty <= 0) { toast(t('toast.enter_qty_add'), 'warn'); return; }
-        btn.disabled = true;
-        const { data, error } = await sb.rpc('rpc_add_incoming_stock', {
-            p_variant_id: variantId, p_target_location_id: locationId,
-            p_quantity: qty, p_notes: 'Quick add (Manage Catalog)'
-        });
-        btn.disabled = false;
-        if (error) { toast(error.message, 'error'); return; }
-        input.value = '';
-        toast(`+${qty} ${t('toast.incoming_qty_suffix')}`, 'success');
-        const ctx = findVariantContext(variantId);
-        if (ctx) addToPendingLabels([{ ...ctx, copies: qty }]);
-        await Promise.all([loadInventory(), loadIncomingSummary()]);
-        if (editingProductId) loadProductForEdit(editingProductId);
     }
 
     // Inline price/cost edit for one existing variant. Reuses the same
@@ -6733,6 +6773,7 @@
         const reason = document.getElementById('adjustReason').value;
         const notes = document.getElementById('adjustNotes').value.trim() || null;
 
+        const adjustedVariantId = currentAdjustTarget.variantId;
         const { data, error } = await sb.rpc('rpc_record_stock_adjustment', {
             p_variant_id: currentAdjustTarget.variantId,
             p_location_id: currentAdjustTarget.locationId,
@@ -6752,6 +6793,7 @@
         closeModal('adjustModal');
         closeModal('variantModal');
         await loadInventory();
+        repaintStockCells(adjustedVariantId); // no-op unless that size is open in the style form
     }
 
     /* ============================================================
