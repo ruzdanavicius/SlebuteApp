@@ -1067,6 +1067,11 @@
                                     <button class="icon-btn hidden" id="styleDeleteCloseBtn" onclick="exitStyleDeleteMode()" title="Close" data-i18n-title="common.close"><i class="fas fa-times"></i></button>
                                 </div>
                             </div>
+                            <div class="form-group hidden" id="featuredTitleGroup">
+                                <label data-i18n="inv.web_title">Website title</label>
+                                <input type="text" class="form-input" id="featuredWebTitle" maxlength="80" onchange="onFeaturedWebTitleSave()" onkeydown="if(event.key === 'Enter'){event.preventDefault(); this.blur();}">
+                                <div class="helper-text" style="display:block;" data-i18n="inv.web_title_hint">Shown to customers on slebute.lt instead of the POS name. Leave blank to use the POS name.</div>
+                            </div>
                             <div class="form-group">
                                 <label data-i18n="inv.base_barcode">Base Barcode (scan tag)</label>
                                 <input type="text" class="form-input kb-toggle-input" inputmode="none" id="new_base_barcode" placeholder="e.g. H-2026-01" onblur="autoFillProduct()" onkeydown="if(event.key === 'Enter'){event.preventDefault(); this.blur();}">
@@ -2159,7 +2164,7 @@
             'inv.add_color': 'Add color',
             'inv.delist_title': 'Delete this size', 'inv.delist_confirm_zero_prefix': 'Delete',
             'toast.variant_delisted': 'Size deleted.',
-            'inv.featured_online': 'Feature on website', 'toast.featured_on': 'Added to the website showcase.', 'toast.featured_off': 'Removed from the website showcase.',
+            'inv.featured_online': 'Feature on website', 'inv.web_title': 'Website title', 'inv.web_title_hint': 'Shown to customers on slebute.lt instead of the POS name. Leave blank to use the POS name.', 'toast.web_title_saved': 'Website title saved.', 'toast.featured_on': 'Added to the website showcase.', 'toast.featured_off': 'Removed from the website showcase.',
             'inv.edit_delete_toggle': 'Edit / Delete', 'inv.delete_style': 'Delete Style',
             'inv.delete_style_confirm_zero_prefix': 'Delete style',
             'inv.delete_style_confirm_zero_suffix': '? This removes every color and size — the whole style will disappear from the catalog.',
@@ -2483,7 +2488,7 @@
             'inv.add_color': 'Pridėti spalvą',
             'inv.delist_title': 'Ištrinti šį dydį', 'inv.delist_confirm_zero_prefix': 'Ištrinti',
             'toast.variant_delisted': 'Dydis ištrintas.',
-            'inv.featured_online': 'Rodyti svetainėje', 'toast.featured_on': 'Pridėta į svetainės vitriną.', 'toast.featured_off': 'Pašalinta iš svetainės vitrinos.',
+            'inv.featured_online': 'Rodyti svetainėje', 'inv.web_title': 'Pavadinimas svetainėje', 'inv.web_title_hint': 'Rodomas klientams slebute.lt vietoje kasos pavadinimo. Palikite tuščią, jei norite naudoti kasos pavadinimą.', 'toast.web_title_saved': 'Svetainės pavadinimas išsaugotas.', 'toast.featured_on': 'Pridėta į svetainės vitriną.', 'toast.featured_off': 'Pašalinta iš svetainės vitrinos.',
             'inv.edit_delete_toggle': 'Redaguoti / Ištrinti', 'inv.delete_style': 'Ištrinti modelį',
             'inv.delete_style_confirm_zero_prefix': 'Ištrinti modelį',
             'inv.delete_style_confirm_zero_suffix': '? Bus pašalintos visos spalvos ir dydžiai — visas modelis dings iš sąrašo.',
@@ -3551,7 +3556,7 @@
                             inventory ( quantity, reserved_quantity, storage_quantity, location_id, safety_stock_threshold )
                         )
                     ),
-                    featured_products ( is_active ),
+                    featured_products ( is_active, web_title ),
                     product_images ( id, image_url, sort_order )`)
                 .eq('is_active', true)
                 .order('name'));
@@ -3613,6 +3618,7 @@
                 composition: prod.composition,
                 supplierId: prod.supplier_id, // style-level, not per-SKU — a shop sources a whole style from one supplier
                 isFeaturedOnline: !!(featuredRow && featuredRow.is_active),
+                featuredWebTitle: (featuredRow && featuredRow.web_title) || '',
                 images,
                 variants
             };
@@ -6077,6 +6083,7 @@
         document.getElementById('printAllStyleBtn').classList.add('hidden');
         document.getElementById('styleEditDeleteBtn').classList.add('hidden');
         document.getElementById('featuredOnlineLabel').classList.add('hidden'); // a style must be saved (have an id) before it can be featured
+        document.getElementById('featuredTitleGroup').classList.add('hidden');
         exitStyleDeleteMode();
         document.getElementById('colorBlocksContainer').innerHTML = '';
         addColorBlock();
@@ -6095,6 +6102,7 @@
         const featuredLabel = document.getElementById('featuredOnlineLabel');
         featuredLabel.classList.toggle('hidden', !isManagerOrAdmin());
         document.getElementById('featuredOnlineCheckbox').checked = !!p.isFeaturedOnline;
+        syncFeaturedTitleField(p);
         exitStyleDeleteMode();
         document.getElementById('new_base_barcode').value = p.base_barcode || '';
         document.getElementById('new_name').value = p.name || '';
@@ -6798,7 +6806,38 @@
         }
         toast(wantFeatured ? t('toast.featured_on') : t('toast.featured_off'), 'success');
         const p = products.find(x => x.id === editingProductId);
-        if (p) p.isFeaturedOnline = wantFeatured;
+        if (p) { p.isFeaturedOnline = wantFeatured; syncFeaturedTitleField(p); }
+    }
+
+    // Optional customer-facing title for slebute.lt (featured_products.web_title).
+    // Only offered for a featured style; blank = the website shows the POS name.
+    // Saves on leaving the field, like the checkbox above (not part of Save Style).
+    function syncFeaturedTitleField(p) {
+        const group = document.getElementById('featuredTitleGroup');
+        const show = !!p && isManagerOrAdmin() && !!p.isFeaturedOnline;
+        group.classList.toggle('hidden', !show);
+        if (!show) return;
+        const input = document.getElementById('featuredWebTitle');
+        input.value = p.featuredWebTitle || '';
+        input.placeholder = p.name || '';
+    }
+
+    async function onFeaturedWebTitleSave() {
+        if (!editingProductId) return;
+        const p = products.find(x => x.id === editingProductId);
+        const input = document.getElementById('featuredWebTitle');
+        const value = input.value.trim();
+        if (!p || value === (p.featuredWebTitle || '')) return;
+        input.disabled = true;
+        const { error } = await sb.from('featured_products').update({ web_title: value || null }).eq('product_id', editingProductId);
+        input.disabled = false;
+        if (error) {
+            input.value = p.featuredWebTitle || ''; // revert on failure
+            toast(error.message, 'error');
+            return;
+        }
+        p.featuredWebTitle = value;
+        toast(t('toast.web_title_saved'), 'success');
     }
 
     // Bulk "align price" — sets one price/cost across every existing size
