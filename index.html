@@ -765,6 +765,9 @@
         .toast { display:flex; flex-direction:column; gap:8px; align-items:flex-start; }
         .toast-action-btn { background:none; border:1px solid var(--accent-color); color:var(--accent-color); border-radius:6px; padding:5px 10px; font-size:0.78rem; font-weight:600; cursor:pointer; }
         .toast-action-btn:hover { background:var(--accent-tint); }
+        .toast.error { position:relative; padding-right:48px; cursor:pointer; }
+        .toast-close-btn { position:absolute; top:4px; right:4px; width:40px; height:40px; background:none; border:none; color:var(--text-secondary); font-size:1rem; cursor:pointer; border-radius:8px; }
+        .toast-close-btn:hover { background:var(--accent-tint); }
         @keyframes toastIn { from { opacity:0; transform: translateX(20px); } to { opacity:1; transform: translateX(0); } }
 
         .role-badge { font-size: 0.65rem; text-transform:uppercase; font-weight:700; padding: 2px 8px; border-radius: 20px; background: var(--accent-tint); color: var(--accent-color); letter-spacing: 0.04em; display: none; /* hidden by request — kept in DOM/still populated, just not shown; store-pill takes its visual slot */ }
@@ -962,6 +965,7 @@
                         </div>
                     </div>
                     <div style="display:flex; align-items:center; gap:12px;">
+                        <button class="btn btn-ghost" id="showAllStockBtn" onclick="toggleShowAllStock()" title="Also show styles with no stock at this store" data-i18n-title="pos.show_all_stock_title"><i class="fas fa-layer-group"></i> <span data-i18n="pos.show_all_stock">All</span></button>
                         <button class="btn btn-ghost" id="saleToggleBtn" onclick="toggleSaleOnly()" title="Show only marked-down items" data-i18n-title="pos.sale_toggle_title"><i class="fas fa-tag"></i> <span data-i18n="pos.sale_toggle">Sale</span></button>
                         <button class="btn btn-ghost" onclick="openReturnsModal()" title="Scan a receipt to void/refund a sale, or scan an item to restock a return" data-i18n-title="pos.returns_title"><i class="fas fa-rotate-left"></i> <span data-i18n="pos.returns">Returns</span></button>
                     </div>
@@ -1979,6 +1983,8 @@
             'adjust.reason_damaged': 'Damaged', 'adjust.reason_transfer': 'Transfer',
             'adjust.notes_label': 'Notes (optional)', 'adjust.apply': 'Apply Adjustment',
             'pos.sale_toggle': 'Sale', 'pos.sale_toggle_title': 'Show only marked-down items', 'pos.sale_badge': 'SALE',
+            'pos.show_all_stock': 'All', 'pos.show_all_stock_title': 'Also show styles with no stock at this store', 'pos.hidden_out_of_stock': 'more with no stock here.',
+            'toast.dismiss': 'Close',
             'clearance.final_sale_tag': 'FINAL SALE', 'clearance.final_sale_title': 'Clearance item — final sale, no returns or exchanges',
             'returns.final_sale_blocked': 'Clearance items are final sale and cannot be returned or exchanged.',
             'storage.badge': 'IN STORAGE', 'storage.in_storage_title': 'In storage at this store',
@@ -2303,6 +2309,8 @@
             'adjust.reason_damaged': 'Sugadinta', 'adjust.reason_transfer': 'Perkėlimas',
             'adjust.notes_label': 'Pastabos (neprivaloma)', 'adjust.apply': 'Pritaikyti pakeitimą',
             'pos.sale_toggle': 'Išpardavimas', 'pos.sale_toggle_title': 'Rodyti tik nukainotas prekes', 'pos.sale_badge': 'NUOLAIDA',
+            'pos.show_all_stock': 'Visos', 'pos.show_all_stock_title': 'Rodyti ir modelius, kurių šioje parduotuvėje nėra', 'pos.hidden_out_of_stock': 'dar yra, bet šioje parduotuvėje jų nėra.',
+            'toast.dismiss': 'Uždaryti',
             'clearance.final_sale_tag': 'GALUTINIS PARDAVIMAS', 'clearance.final_sale_title': 'Nukainota prekė — galutinis pardavimas, negrąžinama ir nekeičiama',
             'returns.final_sale_blocked': 'Nukainotos prekės yra galutinis pardavimas – jų grąžinti ar keisti negalima.',
             'storage.badge': 'SANDĖLYJE', 'storage.in_storage_title': 'Sandėlyje šioje parduotuvėje',
@@ -2686,6 +2694,8 @@
     let categoryFilterList = [];      // index-addressable list backing the category chips, so onclick handlers never have to embed/escape category text
     const UNCATEGORIZED_KEY = '__uncategorized__';
     let saleOnly = false;             // "Sale" toggle in the POS header — narrows to products with at least one marked-down (is_clearance) variant in stock here
+    let showAllStock = false;         // "Visos" toggle in the POS header — off = the grid only lists styles with stock (display or storage) at this store
+    let lastHiddenOutOfStock = 0;     // how many styles the in-stock filter hid from the last render — feeds the empty-state "show all" hint
     let noSizesOnly = false;          // "Be dydžių" chip in Prekių valdymas — narrows the style list to styles saved without any size yet
 
     // A cashier/manager check used in a couple of places below (marking an
@@ -2780,13 +2790,35 @@
     // the "inform without stopping" pattern (CLAUDE.md §6), never a blocking
     // confirm(). Built via DOM methods rather than innerHTML so msg/label
     // (always plain text here, no HTML) never need escaping.
+    //
+    // Errors are the exception: an error stays until the cashier closes it
+    // (✕ or a tap anywhere on it), so one that appears mid-rush can't vanish
+    // unread. The same error text already on screen is not stacked again,
+    // and at most 3 errors stay up (the oldest goes first).
     function toast(msg, type='info', action=null) {
+        const container = document.getElementById('toastContainer');
+        const sticky = type === 'error';
+        if (sticky) {
+            const open = [...container.querySelectorAll('.toast.error')];
+            if (open.some(x => x.dataset.msg === msg)) return;
+            if (open.length >= 3) open[0].remove();
+        }
         const el = document.createElement('div');
         el.className = `toast ${type}`;
+        el.dataset.msg = msg;
         const msgEl = document.createElement('span');
         msgEl.textContent = msg;
         el.appendChild(msgEl);
         const dismiss = () => { el.style.opacity = '0'; el.style.transition='0.3s'; setTimeout(()=>el.remove(), 300); };
+        if (sticky) {
+            const close = document.createElement('button');
+            close.type = 'button';
+            close.className = 'toast-close-btn';
+            close.setAttribute('aria-label', t('toast.dismiss'));
+            close.textContent = '✕';
+            el.appendChild(close);
+            el.onclick = dismiss;
+        }
         let timeoutMs = 3500;
         if (action) {
             timeoutMs = 8000;
@@ -2794,11 +2826,11 @@
             btn.type = 'button';
             btn.className = 'toast-action-btn';
             btn.textContent = action.label;
-            btn.onclick = () => { action.onClick(); dismiss(); };
+            btn.onclick = (e) => { e.stopPropagation(); action.onClick(); dismiss(); };
             el.appendChild(btn);
         }
-        document.getElementById('toastContainer').appendChild(el);
-        setTimeout(dismiss, timeoutMs);
+        container.appendChild(el);
+        if (!sticky) setTimeout(dismiss, timeoutMs);
     }
 
     function playPing() {
@@ -3331,7 +3363,7 @@
     function focusGridOnProduct(product) {
         if (!product) return;
         lastSearchResults = [product];
-        renderProducts(applyPosFilters([product]));
+        renderProducts(applyPosFilters([product], true));
         barcodeInput.value = product.base_barcode || '';
     }
 
@@ -3686,8 +3718,31 @@
     // valdymas, flagged "Be dydžių".
     function hasSizes(p) { return p.variants.length > 0; }
 
-    function applyPosFilters(items) {
-        return filterBySale(filterByCategory(items.filter(hasSizes)));
+    // Most of the catalogue is styles with nothing at this store, so by
+    // default the grid lists only styles with at least one unit here —
+    // display OR storage (storage still sells via "Sell It Anyway"). Counts
+    // raw stock, not availableStock(): a style must not vanish from the grid
+    // just because its last unit is sitting in the cart. Scanning is
+    // unaffected (resolveScan() looks up every SKU), and "Visos" shows the
+    // rest, e.g. to reserve from the other shop.
+    function hasStockHere(p) {
+        return p.variants.some(v => (v.stock || 0) > 0 || (v.storageStock || 0) > 0);
+    }
+
+    function filterInStockHere(items) {
+        if (showAllStock) { lastHiddenOutOfStock = 0; return items; }
+        const kept = items.filter(hasStockHere);
+        lastHiddenOutOfStock = items.length - kept.length;
+        return kept;
+    }
+
+    // keepOutOfStock: a style the cashier just scanned stays on screen even
+    // with nothing here (focusGridOnProduct) — hiding what they're holding
+    // would read as "the scan failed".
+    function applyPosFilters(items, keepOutOfStock) {
+        const sellable = filterBySale(filterByCategory(items.filter(hasSizes)));
+        if (keepOutOfStock) { lastHiddenOutOfStock = 0; return sellable; }
+        return filterInStockHere(sellable);
     }
 
     function toggleSaleOnly() {
@@ -3696,12 +3751,19 @@
         renderProducts(applyPosFilters(lastSearchResults !== null ? lastSearchResults : products));
     }
 
+    function toggleShowAllStock() {
+        showAllStock = !showAllStock;
+        document.getElementById('showAllStockBtn').classList.toggle('active', showAllStock);
+        renderCategoryFilterBar();
+        renderProducts(applyPosFilters(lastSearchResults !== null ? lastSearchResults : products));
+    }
+
     function renderCategoryFilterBar() {
         const bar = document.getElementById('categoryFilterBar');
         if (!bar) return;
         const counts = {};
         let uncategorizedCount = 0;
-        const sellable = products.filter(hasSizes);
+        const sellable = products.filter(p => hasSizes(p) && (showAllStock || hasStockHere(p)));
         for (const p of sellable) {
             if (p.category) counts[p.category] = (counts[p.category] || 0) + 1;
             else uncategorizedCount++;
@@ -3756,7 +3818,10 @@
 
     function renderProducts(items) {
         if (!items || items.length === 0) {
-            grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1;"><i class="fas fa-shirt"></i>${t('pos.no_products')}</div>`;
+            const hiddenHint = lastHiddenOutOfStock > 0
+                ? `<div style="margin-top:10px;">${lastHiddenOutOfStock} ${t('pos.hidden_out_of_stock')} <button type="button" class="btn btn-ghost" onclick="toggleShowAllStock()">${t('pos.show_all_stock')}</button></div>`
+                : '';
+            grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1;"><i class="fas fa-shirt"></i>${t('pos.no_products')}${hiddenHint}</div>`;
             return;
         }
         grid.innerHTML = items.map(p => {
