@@ -470,6 +470,9 @@
         /* Save Style while units are staged: a pulsing outline and a "+7 unsaved" tag. */
         #saveBtn.has-unsaved { box-shadow: 0 0 0 3px rgba(107,37,69,0.28); animation: unsavedPulse 1.6s ease-in-out infinite; }
         #saveBtn .save-unsaved { font-weight: 700; }
+        .autosave-status { align-self: center; font-size: 0.75rem; color: var(--text-secondary); white-space: nowrap; min-width: 9rem; text-align: right; }
+        .autosave-status.saved { color: var(--success-color); }
+        .autosave-status.failed { color: var(--danger-color); font-weight: 600; }
         @keyframes unsavedPulse { 0%, 100% { box-shadow: 0 0 0 2px rgba(107,37,69,0.22); } 50% { box-shadow: 0 0 0 6px rgba(107,37,69,0.12); } }
         @media (prefers-reduced-motion: reduce) { #saveBtn.has-unsaved { animation: none; } }
         .sre-incoming-badge { font-size: 0.65rem; font-weight: 600; color: var(--accent-color); background: var(--accent-tint); border-radius: 6px; padding: 2px 5px; white-space: nowrap; }
@@ -1136,6 +1139,7 @@
 
                         <div style="display:flex; gap:12px;">
                             <button class="btn btn-primary" id="saveBtn" style="flex:1;" onclick="saveMatrixProduct()"><i class="fas fa-save"></i> <span data-i18n="inv.save_style">Save Style</span></button>
+                            <span id="autosaveStatus" class="autosave-status" role="status" aria-live="polite"></span>
                         </div>
                         </div>
                     </div>
@@ -2149,7 +2153,7 @@
             'login.offline_no_cache': 'No connection, and no saved login on this device yet. Connect to the internet once to enable offline sign-in.',
             'common.email_placeholder': 'Email', 'common.password_placeholder': 'Password',
             'common.processing': 'Processing...', 'common.error': 'Error', 'common.error_prefix': 'Error:',
-            'adjust.at_label': 'at', 'inv.saving': 'Saving...', 'inv.compressing': 'Compressing...',
+            'adjust.at_label': 'at', 'inv.saving': 'Saving...', 'inv.autosaving': 'Saving…', 'inv.autosaved': 'Auto-saved', 'inv.autosave_failed': 'Auto-save failed — press Save Style', 'toast.color_name_required': 'Color name cannot be empty.', 'toast.color_name_taken': 'This style already has a color with that name.', 'toast.color_save_denied': 'Color change was not saved (no permission).', 'inv.compressing': 'Compressing...',
             'scantransfer.not_part_suffix': 'is not part of any open shipment.', 'scantransfer.already_scanned_suffix': 'is already fully scanned',
             'scantransfer.scanned_prefix': 'Scanned', 'returns.not_match_suffix': "doesn't match any known SKU.",
             'scantransfer.headed_elsewhere_prefix': 'is headed to', 'scantransfer.receive_here_anyway': 'Receive here anyway',
@@ -2473,7 +2477,7 @@
             'login.offline_no_cache': 'Nėra ryšio, o šiame įrenginyje dar nėra išsaugoto prisijungimo. Prisijunkite prie interneto bent kartą, kad įjungtumėte prisijungimą neprisijungus.',
             'common.email_placeholder': 'El. paštas', 'common.password_placeholder': 'Slaptažodis',
             'common.processing': 'Apdorojama...', 'common.error': 'Klaida', 'common.error_prefix': 'Klaida:',
-            'adjust.at_label': 'parduotuvė:', 'inv.saving': 'Saugoma...', 'inv.compressing': 'Suspaudžiama...',
+            'adjust.at_label': 'parduotuvė:', 'inv.saving': 'Saugoma...', 'inv.autosaving': 'Saugoma…', 'inv.autosaved': 'Automatiškai išsaugota', 'inv.autosave_failed': 'Automatinis išsaugojimas nepavyko – spauskite „Išsaugoti“', 'toast.color_name_required': 'Spalvos pavadinimas negali būti tuščias.', 'toast.color_name_taken': 'Šis modelis jau turi tokio pavadinimo spalvą.', 'toast.color_save_denied': 'Spalvos pakeitimas neišsaugotas (nėra teisių).', 'inv.compressing': 'Suspaudžiama...',
             'scantransfer.not_part_suffix': 'nepriklauso jokiam laukiamam siuntimui.', 'scantransfer.already_scanned_suffix': 'jau visiškai nuskaityta',
             'scantransfer.scanned_prefix': 'Nuskaityta', 'returns.not_match_suffix': 'neatitinka jokio žinomo SKU.',
             'scantransfer.headed_elsewhere_prefix': 'vyksta į', 'scantransfer.receive_here_anyway': 'Vis tiek priimti čia',
@@ -5257,8 +5261,14 @@
 
     window.addEventListener('beforeunload', (e) => {
         const staged = Object.keys(pendingStock).reduce((a, id) => a + stagedUnits(id), 0);
-        if (staged > 0 || stockCommitsInFlight > 0) { e.preventDefault(); e.returnValue = ''; }
+        if (staged > 0 || stockCommitsInFlight > 0 || styleHasPendingEdits() || hasUnsavedDraftWork()) { e.preventDefault(); e.returnValue = ''; }
     });
+    // Style edits save themselves shortly after a field is finished, and again
+    // whenever the page is hidden or closed (fields still being typed in are left
+    // alone; the leave-page prompt above covers those).
+    document.getElementById('invFormFields').addEventListener('change', scheduleStyleAutosave);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushStyleEdits(); });
+    window.addEventListener('pagehide', () => { flushStyleEdits(); });
 
     // Fills the "(+N)" slot next to a store's count (empty when nothing is staged;
     // the slot keeps its width either way — see .sre-pending).
@@ -6068,7 +6078,14 @@
         document.getElementById('invFormFields').classList.remove('hidden');
     }
 
+    // Pending edits on the open style are saved first, so clearing or re-rendering
+    // the form can never throw them away; if that save fails we stay on the form.
     function startNewProduct() {
+        if (styleHasPendingEdits()) { flushStyleEdits({ includeFocused: true }).then(ok => { if (ok) renderNewProduct(); }); return; }
+        renderNewProduct();
+    }
+
+    function renderNewProduct() {
         showInventoryForm();
         leaveStyleFor(null);
         editingProductId = null;
@@ -6089,9 +6106,15 @@
         addColorBlock();
         renderProductsList();
         refreshSaveButton();
+        setAutosaveStatus('');
     }
 
     function loadProductForEdit(id) {
+        if (styleHasPendingEdits()) { flushStyleEdits({ includeFocused: true }).then(ok => { if (ok) renderProductForEdit(id); }); return; }
+        renderProductForEdit(id);
+    }
+
+    function renderProductForEdit(id) {
         const p = products.find(x => x.id === id);
         if (!p) return;
         showInventoryForm();
@@ -6125,7 +6148,7 @@
         }
         document.getElementById('colorBlocksContainer').innerHTML = '';
         Object.entries(byColor).forEach(([colorName, info]) => {
-            const blockId = addColorBlock(colorName, info.colorHex);
+            const blockId = addColorBlock(colorName, info.colorHex, info.sizes[0] && info.sizes[0].colorId);
             info.sizes.sort((a, b) => compareSizes(a.size, b.size));
             info.sizes.forEach(v => addSizeRow(blockId, {
                 size: v.size, sku: v.sku, price: v.price, costPrice: v.costPrice, existing: true,
@@ -6136,6 +6159,7 @@
         });
         renderProductsList();
         refreshSaveButton();
+        setAutosaveStatus('');
     }
 
     async function autoFillProduct() {
@@ -6198,7 +6222,7 @@
         return sa.localeCompare(sb, undefined, { numeric: true, sensitivity: 'base' });
     }
 
-    function addColorBlock(colorName = '', colorHex = '#333333') {
+    function addColorBlock(colorName = '', colorHex = '#333333', colorId = null) {
         const blockId = 'color_' + (++colorBlockSeq);
         const container = document.getElementById('colorBlocksContainer');
         const div = document.createElement('div');
@@ -6237,6 +6261,13 @@
             <button class="btn btn-ghost btn-sm mt-8" onclick="addSizeRow('${blockId}')"><i class="fas fa-plus"></i> ${t('inv.add_size')}</button>
         `;
         container.appendChild(div);
+        if (colorId) {
+            // Loaded from the database: remember id and values so Save / autosave
+            // can tell what was renamed or recoloured and update that color by id.
+            div.dataset.colorId = colorId;
+            div.dataset.origName = colorName;
+            div.dataset.origHex = div.querySelector('.color-hex-input').value;
+        }
         if (!colorName) addSizeRow(blockId);
         return blockId;
     }
@@ -6322,10 +6353,219 @@
         rowsContainer.appendChild(row);
     }
 
+    /* ---- Style edits: one definition of "what changed" for Save Style and autosave ----
+       Save Style used to send only NEW size rows (plus changed prices) and the
+       product fields. A renamed or recoloured EXISTING color was never sent, so
+       it looked saved ("Style saved") and came back as the old name on reload.
+       Colors are now written by id (product_colors RLS already lets managers and
+       admins UPDATE), and the same diff drives the autosave below. */
+
+    // Existing colors (blocks carrying data-color-id) whose name or swatch differs
+    // from what was loaded. Fields the user is still typing in are skipped unless
+    // includeFocused — a half-typed name must never reach the live catalogue.
+    function collectColourEdits(opts = {}) {
+        const edits = [];
+        document.querySelectorAll('#colorBlocksContainer .color-block[data-color-id]').forEach(block => {
+            const nameEl = block.querySelector('.color-name-input');
+            const hexEl = block.querySelector('.color-hex-input');
+            const edit = { block, id: parseInt(block.dataset.colorId) };
+            const name = nameEl.value.trim();
+            if (name !== (block.dataset.origName || '') && (opts.includeFocused || nameEl !== document.activeElement)) edit.name = name;
+            const hex = hexEl.value;
+            if (hex.toLowerCase() !== (block.dataset.origHex || '').toLowerCase() && (opts.includeFocused || hexEl !== document.activeElement)) edit.hex = hex;
+            if (edit.name !== undefined || edit.hex !== undefined) edits.push(edit);
+        });
+        return edits;
+    }
+
+    // Name the color has (or is about to have) in the database.
+    function effectiveColourName(block, edits) {
+        const e = edits.find(x => x.block === block);
+        if (e && e.name !== undefined) return e.name;
+        if (block.dataset.colorId) return block.dataset.origName || '';
+        return block.querySelector('.color-name-input').value.trim() || 'Standard';
+    }
+
+    // Returns a message when a rename can't be applied, otherwise null.
+    function validateColourEdits(edits) {
+        for (const e of edits) {
+            if (e.name === undefined) continue;
+            if (!e.name) return t('toast.color_name_required');
+            const clash = Array.from(document.querySelectorAll('#colorBlocksContainer .color-block'))
+                .some(b => b !== e.block && effectiveColourName(b, edits).toLowerCase() === e.name.toLowerCase());
+            if (clash) return t('toast.color_name_taken');
+        }
+        return null;
+    }
+
+    // Writes the color changes; returns an error message or null.
+    async function applyColourEdits(edits) {
+        for (const e of edits) {
+            const patch = {};
+            if (e.name !== undefined) patch.color_name = e.name;
+            if (e.hex !== undefined) patch.color_hex = e.hex;
+            const { data, error } = await sb.from('product_colors').update(patch).eq('id', e.id).select('id');
+            if (error) return error.code === '23505' ? t('toast.color_name_taken') : error.message;
+            // RLS turns a refused UPDATE into "0 rows", not an error.
+            if (!data || data.length !== 1) return t('toast.color_save_denied');
+        }
+        return null;
+    }
+
+    // Price/cost typed into already-saved size rows. Keyed by the color's name as
+    // it is (or is about to be) in the database, never by a half-edited input.
+    function collectPriceEdits(colourEdits, opts = {}) {
+        const edits = [];
+        document.querySelectorAll('#colorBlocksContainer .size-row-existing').forEach(row => {
+            if (row.querySelector('.sale-badge')) return;
+            const ctx = findVariantContext(parseInt(row.dataset.variantId));
+            if (!ctx) return;
+            const priceEl = row.querySelector('.sre-price-input');
+            const costEl = row.querySelector('.sre-cost-input');
+            if (!opts.includeFocused && (priceEl === document.activeElement || costEl === document.activeElement)) return;
+            const price = parseMoney(priceEl.value);
+            const cost = parseMoney(costEl.value) || 0;
+            if (!(price > 0)) return;
+            if (Math.abs(price - Number(ctx.price || 0)) < 0.005 && Math.abs(cost - Number(ctx.costPrice || 0)) < 0.005) return;
+            const block = row.closest('.color-block');
+            const ce = block ? colourEdits.find(x => x.block === block) : null;
+            edits.push({
+                color_name: block ? effectiveColourName(block, colourEdits) : ctx.colorName,
+                color_hex: (ce && ce.hex !== undefined) ? ce.hex : ((block && block.dataset.origHex) || ctx.colorHex),
+                size: ctx.size, price, cost_price: cost
+            });
+        });
+        return edits;
+    }
+
+    // Style-level fields that differ from the loaded style (only the changed keys,
+    // which rpc_upsert_fashion_product treats as "leave the rest alone").
+    function collectProductFieldEdits(p, opts = {}) {
+        const out = {};
+        const skip = el => !opts.includeFocused && el === document.activeElement;
+        const nameEl = document.getElementById('new_name');
+        const name = nameEl.value.trim();
+        if (name && name !== (p.name || '') && !skip(nameEl)) out.name = name;
+        [['base_barcode', 'new_base_barcode'], ['category', 'new_category'], ['size_range', 'new_size_range'],
+         ['composition', 'new_composition'], ['description', 'new_description']].forEach(([key, elId]) => {
+            const el = document.getElementById(elId);
+            const v = el.value.trim() || null;
+            if (v !== (p[key] || null) && !skip(el)) out[key] = v;
+        });
+        const sup = document.getElementById('new_supplier_id').value || null;
+        if (String(sup || '') !== String(p.supplierId || '')) out.supplier_id = sup;
+        return out;
+    }
+
+    // Reads the open style's pending edits NOW (synchronously), so the caller can
+    // go on to clear or re-render the form straight away. null = nothing to save.
+    function snapshotStyleEdits(opts = {}) {
+        const id = editingProductId;
+        if (!id || !isManagerOrAdmin()) return null;
+        const p = products.find(x => x.id === id);
+        if (!p) return null;
+        const colours = collectColourEdits(opts);
+        const prices = collectPriceEdits(colours, opts);
+        const product = collectProductFieldEdits(p, opts);
+        if (!colours.length && !prices.length && !Object.keys(product).length) return null;
+        return { id, label: p.base_barcode || p.name, colours, prices, product };
+    }
+
+    function styleHasPendingEdits() { return !!snapshotStyleEdits({ includeFocused: true }); }
+
+    // New size rows with a size typed (not part of autosave: they create SKUs and
+    // queue stock, so they wait for the Save button) or a brand-new style that
+    // has not been saved yet.
+    function hasUnsavedDraftWork() {
+        if (document.getElementById('invFormFields').classList.contains('hidden')) return false;
+        const typedRows = Array.from(document.querySelectorAll('#colorBlocksContainer .size-row .size-input')).some(i => i.value.trim());
+        if (editingProductId) return typedRows;
+        return typedRows || !!document.getElementById('new_name').value.trim() || !!document.getElementById('new_base_barcode').value.trim();
+    }
+
+    let autosaveChain = Promise.resolve(true);
+    let autosaveTimer = null;
+
+    function setAutosaveStatus(state) {
+        const el = document.getElementById('autosaveStatus');
+        if (!el) return;
+        el.className = 'autosave-status' + (state ? ' ' + state : '');
+        if (state === 'saving') el.textContent = t('inv.autosaving');
+        else if (state === 'saved') el.textContent = `${t('inv.autosaved')} ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+        else if (state === 'failed') el.textContent = t('inv.autosave_failed');
+        else el.textContent = '';
+    }
+
+    // The form now matches the database: what it shows is the new baseline.
+    function markColourEditsApplied(edits) {
+        edits.forEach(c => {
+            if (!c.block.isConnected) return;
+            if (c.name !== undefined) c.block.dataset.origName = c.name;
+            if (c.hex !== undefined) c.block.dataset.origHex = c.hex;
+        });
+    }
+
+    async function persistStyleEdits(job) {
+        setAutosaveStatus('saving');
+        const fail = (msg) => {
+            setAutosaveStatus('failed');
+            toast(`${job.label}: ${msg}`, 'error');
+            return false;
+        };
+        const colourErr = await applyColourEdits(job.colours);
+        if (colourErr) return fail(colourErr);
+        if (job.prices.length || Object.keys(job.product).length) {
+            const { error } = await sb.rpc('rpc_upsert_fashion_product', {
+                p_product: Object.assign({ id: job.id }, job.product), p_variants: job.prices
+            });
+            if (error) return fail(error.message);
+        }
+        await loadInventory();
+        markColourEditsApplied(job.colours);
+        if (editingProductId === job.id) setAutosaveStatus('saved');
+        return true;
+    }
+
+    // Saves whatever is pending on the open style, one write at a time. Resolves
+    // true when there was nothing to save or it all saved, false when it did not
+    // (the user has been told which style and why).
+    function flushStyleEdits(opts = {}) {
+        clearTimeout(autosaveTimer);
+        const saveBtn = document.getElementById('saveBtn');
+        if (saveBtn && saveBtn.disabled) return autosaveChain.then(() => true); // the Save button is writing everything itself
+        const job = snapshotStyleEdits(opts);
+        if (!job) return autosaveChain.then(() => true);
+        const problem = validateColourEdits(job.colours);
+        if (problem) {
+            setAutosaveStatus('failed');
+            toast(`${job.label}: ${problem}`, 'warn');
+            return Promise.resolve(false);
+        }
+        autosaveChain = autosaveChain.then(() => persistStyleEdits(job)).catch(err => {
+            setAutosaveStatus('failed');
+            toast(`${job.label}: ${err && err.message ? err.message : err}`, 'error');
+            return false;
+        });
+        return autosaveChain;
+    }
+
+    // A finished edit (field left, swatch picked) is saved a moment later.
+    function scheduleStyleAutosave() {
+        if (!editingProductId || !isManagerOrAdmin()) return;
+        clearTimeout(autosaveTimer);
+        autosaveTimer = setTimeout(() => { flushStyleEdits(); }, 1200);
+    }
+
     async function saveMatrixProduct() {
         const btn = document.getElementById('saveBtn');
         const name = document.getElementById('new_name').value.trim();
         if (!name) { toast(t('toast.product_name_required'), 'warn'); return; }
+        clearTimeout(autosaveTimer);
+        await autosaveChain; // let an autosave that is already writing finish first
+        // Existing colors renamed or recoloured on the form (written by id below).
+        const colourEdits = collectColourEdits({ includeFocused: true });
+        const colourProblem = validateColourEdits(colourEdits);
+        if (colourProblem) { toast(colourProblem, 'warn'); return; }
 
         // Units staged with the size rows' + buttons (the "(+N)" indicators) are
         // committed below, after the style itself has been saved — or earlier,
@@ -6369,19 +6609,15 @@
         // appended AFTER the new sizes so `variants` indices still line up
         // with initialStockByRow. Sale (clearance) rows are skipped: their
         // color+size upsert would land on the source variant instead.
-        const priceEdits = [];
-        document.querySelectorAll('#colorBlocksContainer .size-row-existing').forEach(row => {
-            if (row.querySelector('.sale-badge')) return;
-            const ctx = findVariantContext(parseInt(row.dataset.variantId));
-            if (!ctx) return;
-            const price = parseMoney(row.querySelector('.sre-price-input').value);
-            const cost = parseMoney(row.querySelector('.sre-cost-input').value) || 0;
-            if (!(price > 0)) return;
-            if (Math.abs(price - Number(ctx.price || 0)) < 0.005 && Math.abs(cost - Number(ctx.costPrice || 0)) < 0.005) return;
-            priceEdits.push({ color_name: ctx.colorName, color_hex: ctx.colorHex, size: ctx.size, price, cost_price: cost });
-        });
+        // The rows are keyed by the color's current name (after the rename below),
+        // not the name it was loaded with — otherwise a renamed color would be
+        // re-created next to the old one.
+        const priceEdits = collectPriceEdits(colourEdits, { includeFocused: true });
 
         btn.disabled = true; btn.innerText = t('inv.saving');
+        const colourErr = await applyColourEdits(colourEdits);
+        if (colourErr) { btn.disabled = false; refreshSaveButton(); toast(colourErr, 'error'); return; }
+        markColourEditsApplied(colourEdits);
         const payload_product = {
             id: editingProductId, name,
             base_barcode: document.getElementById('new_base_barcode').value.trim() || null,
@@ -10660,6 +10896,10 @@ ${qrBlock}${field(skuG, qrColX, skuY)}${field(colourG, qrColX, colourY)}${field(
        VIEW SWITCHING
        ============================================================ */
     function switchView(view) {
+        // Leaving Manage Catalog: edits on the open style save themselves first.
+        if (view !== 'inventory' && document.getElementById('view-inventory').classList.contains('active')) {
+            flushStyleEdits({ includeFocused: true });
+        }
         // Leaving Manage Catalog with units staged on the open style (the "(+N)"
         // indicators) saves them now rather than losing them.
         if (view !== 'inventory' && document.getElementById('view-inventory').classList.contains('active')
