@@ -11147,6 +11147,177 @@ ${qrBlock}${field(skuG, qrColX, skuY)}${field(colourG, qrColX, colourY)}${field(
         }
     }
 
+    /* ============================================================
+       USAGE TRACKING (app_events) — collection only; analysis comes later.
+       Never on the sale path: track() only pushes to an in-memory buffer
+       (mirrored to localStorage so a reload or a day offline loses
+       nothing) and flush() sends batches of up to 100 through
+       rpc_log_events every 10 s, at 20 queued events, and when the tab is
+       hidden. Every step is wrapped in try/catch — tracking can fail, a
+       sale can't fail because of it. The server stamps who and which
+       store; the client sends what happened.
+       Hooks wrap existing global functions after they're defined (inline
+       onclick handlers and internal calls both resolve through the same
+       global binding), so no sale/return code changes for this.
+       No customer data: no names, phones or notes. Search text is kept
+       only when a search finds nothing (product vocabulary gaps).
+       ============================================================ */
+    const TRACK = (() => {
+        const APP = 'pos';
+        const BUF_KEY = 'slebute_track_buffer';
+        const MAX_BUF = 500;
+        const version = document.lastModified;   // GitHub Pages serves the deploy time as Last-Modified
+        const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random());
+        let deviceId = null;
+        try { deviceId = localStorage.getItem('slebute_device_id'); if (!deviceId) { deviceId = uuid(); localStorage.setItem('slebute_device_id', deviceId); } } catch (e) { deviceId = uuid(); }
+        const sessionId = uuid();
+        let buf = [];
+        try { buf = JSON.parse(localStorage.getItem(BUF_KEY) || '[]'); if (!Array.isArray(buf)) buf = []; } catch (e) { buf = []; }
+        let sending = false;
+        const persist = () => { try { localStorage.setItem(BUF_KEY, JSON.stringify(buf)); } catch (e) {} };
+
+        function track(event, props, extra) {
+            try {
+                buf.push(Object.assign({ at: new Date().toISOString(), event, session: sessionId, online: navigator.onLine, props: props || {} }, extra || {}));
+                if (buf.length > MAX_BUF) buf = buf.slice(-MAX_BUF);
+                persist();
+                if (buf.length >= 20) flush();
+            } catch (e) {}
+        }
+
+        async function flush() {
+            if (sending || !buf.length || !PROFILE || !navigator.onLine) return;
+            sending = true;
+            const batch = buf.slice(0, 100);
+            try {
+                const { error } = await rpcRaw('rpc_log_events', { p_app: APP, p_version: version, p_device: deviceId, p_events: batch });
+                // A network failure keeps the batch for the next try; any other
+                // error drops it, so one bad batch can never block the queue.
+                if (!error || !isNetworkError(error)) { buf = buf.slice(batch.length); persist(); }
+            } catch (e) {
+                if (!isNetworkError(e)) { buf = buf.slice(batch.length); persist(); }
+            } finally { sending = false; }
+        }
+
+        setInterval(flush, 10000);
+        document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flush(); });
+        window.addEventListener('online', () => { track('online'); flush(); });
+        window.addEventListener('offline', () => track('offline'));
+        window.addEventListener('error', (e) => track('js_error', { msg: String(e.message || '').slice(0, 200), line: e.lineno || null }));
+        window.addEventListener('unhandledrejection', (e) => track('js_error', { msg: String((e.reason && e.reason.message) || e.reason || '').slice(0, 200), promise: true }));
+
+        // Rage taps: 3+ taps on the same control within 1 s.
+        let lastTapKey = null, tapTimes = [];
+        document.addEventListener('click', (e) => {
+            try {
+                const el = e.target.closest('button, a, [onclick], .product-card, .category-chip, .nav-item, input, select');
+                if (!el) return;
+                const key = el.id || el.getAttribute('data-i18n') || (el.querySelector && el.querySelector('[data-i18n]')?.getAttribute('data-i18n'))
+                    || (el.getAttribute('onclick') || '').split('(')[0] || el.className.split(' ')[0] || el.tagName;
+                const now = performance.now();
+                if (key !== lastTapKey) { lastTapKey = key; tapTimes = []; }
+                tapTimes = tapTimes.filter(t0 => now - t0 < 1000); tapTimes.push(now);
+                if (tapTimes.length === 3) track('rage_tap', {}, { target: String(key).slice(0, 120) });
+            } catch (err) {}
+        }, true);
+
+        // Wraps a global function; `before` runs first and may return state
+        // that `after` receives once the call (sync or async) has finished.
+        function hook(name, before, after) {
+            const orig = window[name];
+            if (typeof orig !== 'function') return;
+            window[name] = function (...args) {
+                let state;
+                try { state = before ? before(args) : undefined; } catch (e) {}
+                const out = orig.apply(this, args);
+                if (after) {
+                    const done = () => { try { after(args, state); } catch (e) {} };
+                    if (out && typeof out.then === 'function') out.then(done, done); else done();
+                }
+                return out;
+            };
+        }
+
+        return { track, flush, hook, uuid };
+    })();
+
+    // Every RPC: name, duration, ok/error. Patches `then` on the builder the
+    // client returns (not the builder itself), so chained calls keep working.
+    const rpcRaw = sb.rpc.bind(sb);
+    sb.rpc = function (name, args, opts) {
+        const builder = rpcRaw(name, args, opts);
+        try {
+            const t0 = performance.now();
+            const origThen = builder.then.bind(builder);
+            builder.then = (onOk, onErr) => origThen((res) => {
+                try { TRACK.track('rpc', { name, ok: !(res && res.error), code: (res && res.error && (res.error.code || res.error.message || '').toString().slice(0, 80)) || null }, { ms: Math.round(performance.now() - t0) }); } catch (e) {}
+                return res;
+            }).then(onOk, onErr);
+        } catch (e) {}
+        return builder;
+    };
+
+    (() => {
+        const { track, hook, uuid } = TRACK;
+        // One checkout flow = first item into an empty cart → sale completed.
+        let flowId = null, flowStart = 0;
+        const flowExtra = (ms) => ({ flow: 'checkout', flow_id: flowId, ms });
+
+        hook('showApp', null, () => track('app_open', { role: PROFILE && PROFILE.role, lang: typeof currentLang !== 'undefined' ? currentLang : null, width: window.innerWidth, touch: matchMedia('(pointer: coarse)').matches }));
+        hook('logout', () => { track('logout'); TRACK.flush(); });
+        hook('switchView', (a) => track('view', { to: a[0] }));
+
+        hook('addToCart', () => cart.length, (a, before) => {
+            if (cart.length <= before) return;            // nothing was added (blocked, out of stock, …)
+            if (before === 0 || !flowId) { flowId = uuid(); flowStart = performance.now(); }
+            track('cart_add', { lines: cart.length }, flowExtra(Math.round(performance.now() - flowStart)));
+        });
+        hook('removeFromCart', null, () => {
+            track('cart_remove', { lines: cart.length }, flowExtra(Math.round(performance.now() - flowStart)));
+            if (cart.length === 0) { track('cart_emptied', {}, flowExtra(Math.round(performance.now() - flowStart))); flowId = null; }
+        });
+        hook('setPaymentMethod', (a) => track('pay_method', { method: a[0] }, flowExtra(Math.round(performance.now() - flowStart))));
+        hook('checkout', () => ({ lines: cart.length, queued: offlineQueue.length, t0: performance.now() }), (a, s) => {
+            if (!s || !s.lines) return;
+            const completed = cart.length === 0;
+            track('checkout_end', {
+                outcome: completed ? (offlineQueue.length > s.queued ? 'queued_offline' : 'completed') : 'not_completed',
+                lines: s.lines,
+                checkout_ms: Math.round(performance.now() - s.t0),
+            }, flowExtra(Math.round(performance.now() - flowStart)));
+            if (completed) flowId = null;
+        });
+
+        hook('resolveScan', (a) => ({ lines: cart.length, hw: !!a[1], len: String(a[0] || '').trim().length }),
+            (a, s) => track('scan', { hw: s.hw, len: s.len, added: cart.length > s.lines }, flowId ? flowExtra(Math.round(performance.now() - flowStart)) : {}));
+
+        // Typed search: logged once typing pauses for 1.5 s, not per keystroke.
+        let searchTimer = null;
+        hook('liveFilterProducts', null, () => {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(() => {
+                const q = barcodeInput.value.trim();
+                if (!q) return;
+                const shown = grid.querySelectorAll('.product-card').length;
+                track('search', { len: q.length, shown, hidden_out_of_stock: lastHiddenOutOfStock, ...(shown === 0 ? { q: q.slice(0, 40) } : {}) });
+            }, 1500);
+        });
+        hook('openProduct', (a) => {
+            const cards = [...grid.querySelectorAll('.product-card')];
+            const rank = cards.findIndex(c => c.dataset.productId == a[0]);
+            track('product_open', { from_search: lastSearchResults !== null, rank: rank >= 0 ? rank + 1 : null, shown: cards.length });
+        });
+        hook('toggleShowAllStock', null, () => track('filter', { show_all_stock: showAllStock }));
+        hook('toggleSaleOnly', null, () => track('filter', { sale_only: saleOnly }));
+        hook('setActiveCategoryByIndex', null, () => track('filter', { category: activeCategory === null ? 'all' : 'set' }));
+
+        let returnStart = 0;
+        hook('openReturnsModal', () => { returnStart = performance.now(); track('return_start'); });
+        hook('confirmOrderRefund', null, () => track('return_confirm', {}, { flow: 'return', ms: returnStart ? Math.round(performance.now() - returnStart) : null }));
+
+        hook('toast', (a) => track('toast', { type: a[1] || 'info', msg: String(a[0] || '').slice(0, 120) }));
+    })();
+
     document.getElementById('loginMark').src = BRAND_LOGO_URL;
     document.getElementById('sidebarMark').src = BRAND_LOGO_URL;
     applyStaticTranslations(); // translate the login screen and initial UI on first paint, not just after a manual toggle
