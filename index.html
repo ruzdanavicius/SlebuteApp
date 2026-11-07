@@ -339,6 +339,30 @@
         /* On a caption-less slot the mark can afford to be a bit bigger. */
         .img-placeholder:not(.img-placeholder-label) img.ph-mark { width:52%; }
         .photo-gallery-thumb { width:52px; height:52px; border-radius:8px; object-fit:cover; border:1px solid rgba(255,255,255,0.2); background: var(--card-bg-raised); }
+        /* Product photo manager (Prekių valdymas): full gallery modal + full-size viewer */
+        .pm-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:14px; margin-top:14px; }
+        .pm-grid.pm-busy { opacity:0.55; pointer-events:none; }
+        .pm-card { background: var(--card-bg-raised); border-radius:12px; padding:8px; display:flex; flex-direction:column; gap:8px; border:1px solid rgba(36,22,30,0.08); }
+        .pm-card.pm-first { border-color: var(--accent-color); }
+        .pm-imgwrap { position:relative; aspect-ratio:1/1; border-radius:8px; overflow:hidden; background:#fff; cursor:zoom-in; display:flex; align-items:center; justify-content:center; }
+        .pm-img { width:100%; height:100%; object-fit:contain; }
+        .pm-badge { position:absolute; top:6px; left:6px; background:var(--accent-color); color:#fff; font-size:0.68rem; font-weight:600; padding:3px 8px; border-radius:20px; }
+        .pm-num { position:absolute; bottom:6px; left:6px; background:rgba(36,22,30,0.65); color:#fff; font-size:0.68rem; font-weight:600; min-width:20px; text-align:center; padding:2px 6px; border-radius:20px; }
+        .pm-actions { display:flex; gap:6px; flex-wrap:wrap; justify-content:center; }
+        .pm-btn { width:38px; height:38px; border:none; border-radius:8px; cursor:pointer; background:rgba(36,22,30,0.07); color:var(--text-primary); display:inline-flex; align-items:center; justify-content:center; font-size:0.82rem; }
+        .pm-btn:hover { background: var(--accent-color); color:#fff; }
+        .pm-btn.pm-danger { background: var(--danger-tint); color: var(--danger-color); }
+        .pm-btn.pm-danger:hover { background: var(--danger-color); color:#fff; }
+        .pm-add { aspect-ratio:1/1; border:2px dashed rgba(36,22,30,0.25); border-radius:12px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; cursor:pointer; color:var(--text-secondary); font-size:0.85rem; font-weight:600; }
+        .pm-add:hover { border-color: var(--accent-color); color: var(--accent-color); }
+        .pm-add i { font-size:1.5rem; }
+        .pv-stage { max-width:calc(100vw - 150px); max-height:calc(100vh - 100px); max-height:calc(100dvh - 100px); overflow:auto; border-radius:8px; }
+        .pv-stage img { display:block; max-width:calc(100vw - 150px); max-height:calc(100vh - 100px); max-height:calc(100dvh - 100px); object-fit:contain; cursor:zoom-in; background:#fff; }
+        .pv-stage img.zoomed { max-width:none; max-height:none; cursor:zoom-out; }
+        .pv-nav { position:absolute; top:50%; transform:translateY(-50%); width:48px; height:48px; border-radius:50%; border:none; background:rgba(255,255,255,0.18); color:#fff; font-size:1.1rem; cursor:pointer; display:flex; align-items:center; justify-content:center; z-index:6; }
+        .pv-nav:hover { background:rgba(255,255,255,0.35); }
+        .pv-prev { left:16px; } .pv-next { right:16px; }
+        .pv-caption { position:absolute; bottom:16px; left:0; right:0; text-align:center; color:#fff; font-size:0.85rem; text-shadow:0 1px 3px rgba(0,0,0,0.6); }
         .product-info h3 { font-size: 0.98rem; font-weight: 600; margin-bottom: 3px; display: flex; align-items: center; gap: 5px; }
         .product-info h3 .p-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .product-info p { color: var(--text-secondary); font-size: 0.82rem; display:flex; justify-content:space-between; align-items:center; gap: 6px; }
@@ -1121,6 +1145,7 @@
                                 <div style="display:flex; gap:12px; align-items:center;">
                                     <label for="img_uploader" class="btn btn-ghost btn-sm" id="photoUploadBtn" style="cursor:pointer;"><i class="fas fa-upload"></i> <span data-i18n="inv.upload">Upload</span></label>
                                     <input type="file" id="img_uploader" accept="image/*" style="display:none;" onchange="uploadImage()">
+                                    <button type="button" class="btn btn-ghost btn-sm hidden" id="photoManageBtn" onclick="openPhotoManager()"><i class="fas fa-images"></i> <span data-i18n="pm.manage">Manage photos</span></button>
                                     <span id="upload_status" style="font-size:0.78rem; color:var(--text-secondary);" data-i18n="inv.no_file">No file chosen</span>
                                 </div>
                             </div>
@@ -1719,6 +1744,33 @@
         </div>
     </div>
 
+    <!-- PRODUCT PHOTO MANAGER (opened from the Photos field in Prekių valdymas) -->
+    <div class="modal-overlay" id="productPhotoModal">
+        <div class="modal-box wide">
+            <div class="close-modal" onclick="closePhotoManager()"><i class="fas fa-times"></i></div>
+            <div class="vm-content">
+                <h2 data-i18n="pm.title">Photos</h2>
+                <p class="muted" id="pmSubtitle" style="font-size:0.85rem; margin-bottom:4px;">—</p>
+                <p class="muted" style="font-size:0.78rem;" data-i18n="pm.hint">Tap a photo to enlarge it. The first photo is the cover shown in the POS and on the website.</p>
+                <div id="pmStatus" style="font-size:0.8rem; min-height:1.1em; margin-top:6px;"></div>
+                <div class="pm-grid" id="pmGrid"></div>
+                <input type="file" id="pm_add_input" accept="image/*" multiple style="display:none;" onchange="pmAddFiles(this)">
+                <input type="file" id="pm_replace_input" accept="image/*" style="display:none;" onchange="pmReplaceFile(this)">
+                <div style="display:flex; gap:10px; margin-top:18px;">
+                    <button class="btn btn-primary" style="flex:1;" onclick="closePhotoManager()" data-i18n="common.close">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Full-size photo viewer on top of the manager (fit to screen, click for actual pixels) -->
+    <div class="modal-overlay" id="photoViewer" style="z-index:120; background:rgba(15,8,12,0.94);">
+        <div class="close-modal" onclick="closePhotoViewer()"><i class="fas fa-times"></i></div>
+        <button class="pv-nav pv-prev" onclick="pvStep(-1)" aria-label="Previous"><i class="fas fa-chevron-left"></i></button>
+        <div class="pv-stage"><img id="pvImg" alt="" onclick="pvToggleZoom()"></div>
+        <button class="pv-nav pv-next" onclick="pvStep(1)" aria-label="Next"><i class="fas fa-chevron-right"></i></button>
+        <div class="pv-caption" id="pvCaption"></div>
+    </div>
+
     <!-- QUICK OPEN REGISTER MODAL (pops up on checkout if no register is open) -->
     <div class="modal-overlay" id="quickOpenRegisterModal">
         <div class="modal-box narrow">
@@ -2043,6 +2095,12 @@
             'inv.product_photos': 'Photos (up to 4)', 'inv.upload': 'Upload', 'inv.no_file': 'No file chosen',
             'inv.remove_photo': 'Remove photo', 'inv.confirm_delete_photo': 'Delete this photo? The others will stay.',
             'toast.photo_deleted': 'Photo deleted.', 'toast.photo_limit_reached': 'Maximum 4 photos per style.',
+            'pm.title': 'Photos', 'pm.manage': 'Manage photos', 'pm.cover': 'Cover', 'pm.make_cover': 'Make cover',
+            'pm.move_left': 'Move left', 'pm.move_right': 'Move right', 'pm.replace': 'Replace with another picture',
+            'pm.rotate': 'Rotate 90°', 'pm.download': 'Download original', 'pm.add': 'Add photo', 'pm.enlarge': 'Enlarge',
+            'pm.empty': 'No photos yet.', 'pm.working': 'Working…', 'pm.click_actual': 'click for actual size',
+            'pm.hint': 'Tap a photo to enlarge it. The first photo is the cover shown in the POS and on the website.',
+            'toast.photo_replaced': 'Photo replaced.',
             'inv.description': 'Description', 'inv.colors_sizes': 'Colors & Sizes',
             'inv.print_all_style': 'Print all labels for this style', 'inv.save_style': 'Save Style',
             'req.title': 'Dispatch Board', 'req.refresh': 'Refresh',
@@ -2369,6 +2427,12 @@
             'inv.product_photos': 'Nuotraukos (iki 4)', 'inv.upload': 'Įkelti', 'inv.no_file': 'Failas nepasirinktas',
             'inv.remove_photo': 'Šalinti nuotrauką', 'inv.confirm_delete_photo': 'Ištrinti šią nuotrauką? Kitos liks.',
             'toast.photo_deleted': 'Nuotrauka ištrinta.', 'toast.photo_limit_reached': 'Daugiausiai 4 nuotraukos vienam modeliui.',
+            'pm.title': 'Nuotraukos', 'pm.manage': 'Tvarkyti nuotraukas', 'pm.cover': 'Viršelis', 'pm.make_cover': 'Padaryti viršeliu',
+            'pm.move_left': 'Perkelti į kairę', 'pm.move_right': 'Perkelti į dešinę', 'pm.replace': 'Pakeisti kita nuotrauka',
+            'pm.rotate': 'Pasukti 90°', 'pm.download': 'Atsisiųsti originalą', 'pm.add': 'Pridėti nuotrauką', 'pm.enlarge': 'Padidinti',
+            'pm.empty': 'Nuotraukų dar nėra.', 'pm.working': 'Dirbama…', 'pm.click_actual': 'spustelėkite tikram dydžiui',
+            'pm.hint': 'Spustelėkite nuotrauką, kad padidintumėte. Pirma nuotrauka yra viršelis, rodomas kasoje ir svetainėje.',
+            'toast.photo_replaced': 'Nuotrauka pakeista.',
             'inv.description': 'Aprašymas', 'inv.colors_sizes': 'Spalvos ir dydžiai',
             'inv.print_all_style': 'Spausdinti visas šio modelio etiketes', 'inv.save_style': 'Išsaugoti',
             'req.title': 'Pervežimai', 'req.refresh': 'Atnaujinti',
@@ -6877,9 +6941,9 @@
     function renderPhotoGallery() {
         const box = document.getElementById('photoGallery');
         box.innerHTML = currentPhotoUrls.map((url, i) => `
-            <div style="position:relative; width:52px; height:52px;">
+            <div style="position:relative; width:52px; height:52px; cursor:zoom-in;" onclick="openPhotoManager()" title="${t('pm.manage')}">
                 ${photoTagHTML(url, 'photo-gallery-thumb', false)}
-                <button class="icon-btn-sm icon-btn-danger" onclick="deletePhoto(${i})" title="${t('inv.remove_photo')}"
+                <button class="icon-btn-sm icon-btn-danger" onclick="event.stopPropagation(); deletePhoto(${i})" title="${t('inv.remove_photo')}"
                     style="position:absolute; top:-6px; right:-6px; width:18px; height:18px; min-width:18px; padding:0; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:0.65rem;">
                     <i class="fas fa-times"></i>
                 </button>
@@ -6887,6 +6951,9 @@
         `).join('');
         const uploadBtn = document.getElementById('photoUploadBtn');
         if (uploadBtn) uploadBtn.classList.toggle('hidden', currentPhotoUrls.length >= PHOTO_MAX);
+        const manageBtn = document.getElementById('photoManageBtn');
+        if (manageBtn) manageBtn.classList.toggle('hidden', currentPhotoUrls.length === 0);
+        renderPhotoManager(); // keeps the manager in step with every change (add / delete / reorder)
     }
 
     async function deletePhoto(index) {
@@ -6906,6 +6973,230 @@
         if (path) await sb.storage.from('pos-images').remove([path]);
         toast(t('toast.photo_deleted'), 'success');
     }
+
+    /* ============================================================
+       PRODUCT PHOTO MANAGER — full-screen gallery for the style being
+       edited in Prekių valdymas: see every photo together, reorder (the
+       first is the cover), enlarge to full size, replace in place, rotate,
+       download the stored original, delete, add. Works on the same
+       currentPhotoUrls list as the small thumbnail strip, and saves through
+       the same persistPhotosForExistingProduct() (existing style) or waits
+       for Save Style (new style) — so nothing here can drift out of step
+       with the form. No DB change: product_images.sort_order + the cover in
+       products.image_url already model the order.
+       ============================================================ */
+    let pmBusy = false;
+    let pmReplaceIdx = -1;
+    let pvIndex = 0;
+
+    function openPhotoManager() {
+        document.getElementById('productPhotoModal').classList.add('active');
+        renderPhotoManager();
+    }
+    function closePhotoManager() { closePhotoViewer(); closeModal('productPhotoModal'); }
+
+    function pmSetBusy(on, msg) {
+        pmBusy = on;
+        const grid = document.getElementById('pmGrid'), st = document.getElementById('pmStatus');
+        if (grid) grid.classList.toggle('pm-busy', on);
+        if (st) st.innerText = on ? (msg || t('pm.working')) : '';
+    }
+
+    function renderPhotoManager() {
+        const modal = document.getElementById('productPhotoModal');
+        if (!modal || !modal.classList.contains('active')) return;
+        const n = currentPhotoUrls.length;
+        const name = (document.getElementById('new_name')?.value || '').trim();
+        document.getElementById('pmSubtitle').innerText = `${name ? name + ' · ' : ''}${n} / ${PHOTO_MAX}`;
+        const hide = 'visibility:hidden;';
+        const cards = currentPhotoUrls.map((url, i) => `
+            <div class="pm-card${i === 0 ? ' pm-first' : ''}">
+                <div class="pm-imgwrap" onclick="openPhotoViewer(${i})" title="${t('pm.enlarge')}">
+                    ${photoTagHTML(url, 'pm-img', false, null, true)}
+                    ${i === 0 ? `<span class="pm-badge"><i class="fas fa-star"></i> ${t('pm.cover')}</span>` : ''}
+                    <span class="pm-num">${i + 1}</span>
+                </div>
+                <div class="pm-actions">
+                    <button type="button" class="pm-btn" style="${i === 0 ? hide : ''}" onclick="pmMove(${i}, -1)" title="${t('pm.move_left')}"><i class="fas fa-arrow-left"></i></button>
+                    <button type="button" class="pm-btn" style="${i === n - 1 ? hide : ''}" onclick="pmMove(${i}, 1)" title="${t('pm.move_right')}"><i class="fas fa-arrow-right"></i></button>
+                    <button type="button" class="pm-btn" style="${i === 0 ? hide : ''}" onclick="pmMove(${i}, ${-i})" title="${t('pm.make_cover')}"><i class="fas fa-star"></i></button>
+                    <button type="button" class="pm-btn" onclick="pmPickReplace(${i})" title="${t('pm.replace')}"><i class="fas fa-upload"></i></button>
+                    <button type="button" class="pm-btn" onclick="pmRotate(${i})" title="${t('pm.rotate')}"><i class="fas fa-rotate-right"></i></button>
+                    <button type="button" class="pm-btn" onclick="pmDownload(${i})" title="${t('pm.download')}"><i class="fas fa-download"></i></button>
+                    <button type="button" class="pm-btn pm-danger" onclick="deletePhoto(${i})" title="${t('inv.remove_photo')}"><i class="fas fa-trash"></i></button>
+                </div>
+            </div>`).join('');
+        const addTile = n < PHOTO_MAX
+            ? `<div class="pm-add" onclick="document.getElementById('pm_add_input').click()"><i class="fas fa-plus"></i><span>${t('pm.add')}</span></div>`
+            : '';
+        document.getElementById('pmGrid').innerHTML = (n || addTile) ? cards + addTile : `<p class="muted">${t('pm.empty')}</p>`;
+    }
+
+    // Applies a whole new photo list, saving it for an existing style and
+    // rolling back (with a toast, from persist…) if the save fails.
+    async function pmApply(next) {
+        const prev = currentPhotoUrls.slice();
+        currentPhotoUrls = next;
+        if (editingProductId) {
+            const ok = await persistPhotosForExistingProduct();
+            if (!ok) { currentPhotoUrls = prev; renderPhotoGallery(); return false; }
+        }
+        renderPhotoGallery();
+        return true;
+    }
+
+    // delta moves one step (-1/+1); make-cover passes -index to jump to 0.
+    async function pmMove(i, delta) {
+        if (pmBusy) return;
+        const j = Math.max(0, Math.min(currentPhotoUrls.length - 1, i + delta));
+        if (j === i) return;
+        const next = currentPhotoUrls.slice();
+        const [item] = next.splice(i, 1);
+        next.splice(j, 0, item);
+        pmSetBusy(true);
+        try { await pmApply(next); } finally { pmSetBusy(false); }
+    }
+
+    async function uploadPhotoBlob(blob) {
+        const filePath = `${Date.now()}_${Math.floor(Math.random()*1000)}.jpg`;
+        const { error } = await sb.storage.from('pos-images').upload(filePath, blob, { contentType: 'image/jpeg' });
+        if (error) { toast(error.message, 'error'); return null; }
+        return { path: filePath, url: sb.storage.from('pos-images').getPublicUrl(filePath).data.publicUrl };
+    }
+
+    async function pmAddFiles(input) {
+        const files = Array.from(input.files || []);
+        input.value = '';
+        if (!files.length || pmBusy) return;
+        const room = PHOTO_MAX - currentPhotoUrls.length;
+        if (room <= 0) { toast(t('toast.photo_limit_reached'), 'warn'); return; }
+        if (files.length > room) toast(t('toast.photo_limit_reached'), 'warn');
+        pmSetBusy(true, t('inv.compressing'));
+        try {
+            for (const file of files.slice(0, room)) {
+                let blob;
+                try { blob = await compressImageFile(file); }
+                catch (e) { toast(t('toast.image_process_failed') + ' ' + e.message, 'error'); continue; }
+                pmSetBusy(true, `${t('inv.uploading_prefix')} (${(blob.size/1024).toFixed(0)}KB)...`);
+                const up = await uploadPhotoBlob(blob);
+                if (!up) continue;
+                const ok = await pmApply([...currentPhotoUrls, up.url]);
+                if (!ok) await sb.storage.from('pos-images').remove([up.path]);
+            }
+        } finally { pmSetBusy(false); }
+    }
+
+    function pmPickReplace(i) {
+        if (pmBusy) return;
+        pmReplaceIdx = i;
+        document.getElementById('pm_replace_input').click();
+    }
+    async function pmReplaceFile(input) {
+        const file = input.files && input.files[0];
+        input.value = '';
+        const i = pmReplaceIdx;
+        if (!file || pmBusy || !currentPhotoUrls[i]) return;
+        pmSetBusy(true, t('inv.compressing'));
+        try {
+            let blob;
+            try { blob = await compressImageFile(file); }
+            catch (e) { toast(t('toast.image_process_failed') + ' ' + e.message, 'error'); return; }
+            await pmReplaceWithBlob(i, blob);
+        } finally { pmSetBusy(false); }
+    }
+
+    // Uploads blob as a NEW file and swaps it into slot i (same position,
+    // same cover status). A new filename each time also means no stale
+    // browser/edge-cached copy of the old picture. The old Storage object
+    // is removed afterwards, exactly as deletePhoto() does.
+    async function pmReplaceWithBlob(i, blob) {
+        const up = await uploadPhotoBlob(blob);
+        if (!up) return false;
+        const old = currentPhotoUrls[i];
+        const next = currentPhotoUrls.slice();
+        next[i] = up.url;
+        const ok = await pmApply(next);
+        if (!ok) { await sb.storage.from('pos-images').remove([up.path]); return false; }
+        const oldPath = storagePathFromUrl(old);
+        if (oldPath) await sb.storage.from('pos-images').remove([oldPath]);
+        toast(t('toast.photo_replaced'), 'success');
+        return true;
+    }
+
+    async function pmRotate(i) {
+        if (pmBusy || !currentPhotoUrls[i]) return;
+        pmSetBusy(true);
+        try {
+            const res = await fetch(currentPhotoUrls[i], { cache: 'no-store' });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const bmp = await createImageBitmap(await res.blob());
+            const c = document.createElement('canvas');
+            c.width = bmp.height; c.height = bmp.width;
+            const g = c.getContext('2d');
+            g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
+            g.translate(c.width / 2, c.height / 2);
+            g.rotate(Math.PI / 2);
+            g.drawImage(bmp, -bmp.width / 2, -bmp.height / 2);
+            const out = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.9));
+            if (!out) throw new Error('Could not encode image.');
+            await pmReplaceWithBlob(i, out);
+        } catch (e) {
+            toast(t('toast.image_process_failed') + ' ' + e.message, 'error');
+        } finally { pmSetBusy(false); }
+    }
+
+    // Saves the stored file itself (not a screenshot) for editing elsewhere.
+    // fetch → blob URL, because the download attribute is ignored on
+    // cross-origin links (Storage lives on another origin).
+    async function pmDownload(i) {
+        const url = currentPhotoUrls[i];
+        if (!url || pmBusy) return;
+        pmSetBusy(true);
+        try {
+            const res = await fetch(url, { cache: 'no-store' });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const objUrl = URL.createObjectURL(await res.blob());
+            const base = (document.getElementById('new_name')?.value || 'photo').trim().replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-+|-+$/g, '') || 'photo';
+            const a = document.createElement('a');
+            a.href = objUrl; a.download = `${base}-${i + 1}.jpg`;
+            document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(() => URL.revokeObjectURL(objUrl), 4000);
+        } catch (e) {
+            toast(e.message, 'error');
+        } finally { pmSetBusy(false); }
+    }
+
+    /* Full-size viewer: fit to screen, click the image for actual pixels. */
+    function openPhotoViewer(i) {
+        pvIndex = i;
+        pvRender();
+        document.getElementById('photoViewer').classList.add('active');
+    }
+    function closePhotoViewer() { document.getElementById('photoViewer').classList.remove('active'); }
+    function pvRender() {
+        const url = currentPhotoUrls[pvIndex];
+        if (!url) { closePhotoViewer(); return; }
+        const img = document.getElementById('pvImg'), cap = document.getElementById('pvCaption');
+        const n = currentPhotoUrls.length;
+        img.classList.remove('zoomed');
+        cap.innerText = `${pvIndex + 1} / ${n}`;
+        img.onload = () => { cap.innerText = `${pvIndex + 1} / ${n} · ${img.naturalWidth} × ${img.naturalHeight} px · ${t('pm.click_actual')}`; };
+        img.src = url;
+    }
+    function pvStep(d) {
+        const n = currentPhotoUrls.length;
+        if (!n) return;
+        pvIndex = (pvIndex + d + n) % n;
+        pvRender();
+    }
+    function pvToggleZoom() { document.getElementById('pvImg').classList.toggle('zoomed'); }
+    document.addEventListener('keydown', (e) => {
+        const v = document.getElementById('photoViewer');
+        if (!v || !v.classList.contains('active')) return;
+        if (e.key === 'Escape') { closePhotoViewer(); e.stopPropagation(); }
+        else if (e.key === 'ArrowLeft') pvStep(-1);
+        else if (e.key === 'ArrowRight') pvStep(1);
+    }, true);
 
     /* ============================================================
        REORDER RESTOCK CONFLICT — slice 4 of the reorder review. Called
