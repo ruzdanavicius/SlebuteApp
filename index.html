@@ -1775,7 +1775,7 @@
                 <input type="file" id="pm_add_input" accept="image/*" multiple style="display:none;" onchange="pmAddFiles(this)">
                 <input type="file" id="pm_replace_input" accept="image/*" style="display:none;" onchange="pmReplaceFile(this)">
                 <div style="display:flex; gap:10px; margin-top:18px;">
-                    <button class="btn btn-primary" style="flex:1;" onclick="closePhotoManager()" data-i18n="common.close">Close</button>
+                    <button class="btn btn-primary" id="pmCloseBtn" style="flex:1;" onclick="pmSaveAndClose()"><i class="fas fa-save"></i> <span data-i18n="pm.save_close">Save style &amp; close</span></button>
                 </div>
             </div>
         </div>
@@ -2164,7 +2164,7 @@
             'inv.product_photos': 'Photos (up to 4)', 'inv.upload': 'Upload', 'inv.no_file': 'No file chosen',
             'inv.remove_photo': 'Remove photo', 'inv.confirm_delete_photo': 'Delete this photo? The others will stay.',
             'toast.photo_deleted': 'Photo deleted.', 'toast.photo_limit_reached': 'Maximum 4 photos per style.',
-            'pm.title': 'Photos', 'pm.manage': 'Manage photos', 'pm.cover': 'Cover', 'pm.make_cover': 'Make cover',
+            'pm.save_close': 'Save style & close', 'pm.title': 'Photos', 'pm.manage': 'Manage photos', 'pm.cover': 'Cover', 'pm.make_cover': 'Make cover',
             'pm.move_left': 'Move left', 'pm.move_right': 'Move right', 'pm.replace': 'Replace with another picture',
             'pm.rotate': 'Rotate 90°', 'pm.download': 'Download original', 'pm.add': 'Add photo', 'pm.enlarge': 'Enlarge',
             'pm.empty': 'No photos yet.', 'pm.working': 'Working…', 'pm.click_actual': 'click for actual size',
@@ -2510,7 +2510,7 @@
             'inv.product_photos': 'Nuotraukos (iki 4)', 'inv.upload': 'Įkelti', 'inv.no_file': 'Failas nepasirinktas',
             'inv.remove_photo': 'Šalinti nuotrauką', 'inv.confirm_delete_photo': 'Ištrinti šią nuotrauką? Kitos liks.',
             'toast.photo_deleted': 'Nuotrauka ištrinta.', 'toast.photo_limit_reached': 'Daugiausiai 4 nuotraukos vienam modeliui.',
-            'pm.title': 'Nuotraukos', 'pm.manage': 'Tvarkyti nuotraukas', 'pm.cover': 'Viršelis', 'pm.make_cover': 'Padaryti viršeliu',
+            'pm.save_close': 'Išsaugoti ir uždaryti', 'pm.title': 'Nuotraukos', 'pm.manage': 'Tvarkyti nuotraukas', 'pm.cover': 'Viršelis', 'pm.make_cover': 'Padaryti viršeliu',
             'pm.move_left': 'Perkelti į kairę', 'pm.move_right': 'Perkelti į dešinę', 'pm.replace': 'Pakeisti kita nuotrauka',
             'pm.rotate': 'Pasukti 90°', 'pm.download': 'Atsisiųsti originalą', 'pm.add': 'Pridėti nuotrauką', 'pm.enlarge': 'Padidinti',
             'pm.empty': 'Nuotraukų dar nėra.', 'pm.working': 'Dirbama…', 'pm.click_actual': 'spustelėkite tikram dydžiui',
@@ -6786,13 +6786,13 @@
     async function saveMatrixProduct() {
         const btn = document.getElementById('saveBtn');
         const name = document.getElementById('new_name').value.trim();
-        if (!name) { toast(t('toast.product_name_required'), 'warn'); return; }
+        if (!name) { toast(t('toast.product_name_required'), 'warn'); return false; }
         clearTimeout(autosaveTimer);
         await autosaveChain; // let an autosave that is already writing finish first
         // Existing colors renamed or recoloured on the form (written by id below).
         const colourEdits = collectColourEdits({ includeFocused: true });
         const colourProblem = validateColourEdits(colourEdits);
-        if (colourProblem) { toast(colourProblem, 'warn'); return; }
+        if (colourProblem) { toast(colourProblem, 'warn'); return false; }
 
         // Units staged with the size rows' + buttons (the "(+N)" indicators) are
         // committed below, after the style itself has been saved — or earlier,
@@ -6843,7 +6843,7 @@
 
         btn.disabled = true; btn.innerText = t('inv.saving');
         const colourErr = await applyColourEdits(colourEdits);
-        if (colourErr) { btn.disabled = false; refreshSaveButton(); toast(colourErr, 'error'); return; }
+        if (colourErr) { btn.disabled = false; refreshSaveButton(); toast(colourErr, 'error'); return false; }
         markColourEditsApplied(colourEdits);
         const payload_product = {
             id: editingProductId, name,
@@ -6861,9 +6861,9 @@
         if (error && error.code === '23505' && error.message.includes('base_barcode')) {
             const delisted = await showDelistedNotice(payload_product.base_barcode);
             toast(delisted ? `${t('inv.delisted_code_prefix')}.` : t('toast.barcode_taken'), 'warn');
-            return;
+            return false;
         }
-        if (error) { toast(error.message, 'error'); return; }
+        if (error) { toast(error.message, 'error'); return false; }
 
         // Queue any typed-in initial stock as incoming shipments now that the
         // variant IDs exist. Best-effort per line — a failure here doesn't
@@ -6937,6 +6937,7 @@
         if (newLabelItems.length) {
             openLabelPrintModal(t('labelmodal.title'), t('labelmodal.just_saved_subtitle'), newLabelItems);
         }
+        return true;
     }
 
     /* Client-side compression: downscale to a max edge and re-encode as JPEG
@@ -7091,6 +7092,23 @@
         renderPhotoManager();
     }
     function closePhotoManager() { closePhotoViewer(); closeModal('productPhotoModal'); }
+
+    // The bottom button: save the WHOLE style (photos, sizes, colours, prices, details,
+    // staged units — exactly what the Save Style button does), then close. If the save
+    // does not go through (e.g. no name yet) its own message is shown and the window
+    // stays open. The corner ✕ still just closes: photo changes on a saved style are
+    // already written as you make them.
+    async function pmSaveAndClose() {
+        if (pmBusy) return;
+        const btn = document.getElementById('pmCloseBtn');
+        if (btn) btn.disabled = true;
+        pmSetBusy(true, t('inv.saving'));
+        let ok = false;
+        try { ok = await saveMatrixProduct(); }
+        catch (e) { toast((e && e.message) || String(e), 'error'); }
+        finally { pmSetBusy(false); if (btn) btn.disabled = false; }
+        if (ok) closePhotoManager();
+    }
 
     function pmSetBusy(on, msg) {
         pmBusy = on;
