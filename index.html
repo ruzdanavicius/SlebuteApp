@@ -2646,6 +2646,7 @@
     // register, set this to 0 to disable it instantly.
     const ZPL_QR_SIZE_BADGE_FRACTION = 0.30;
     const BRAND_SHOP_LINK = 'www.facebook.com/slebute';   // printed bottom-right on labels — update to your real page/site
+    const BRAND_WEBSITE = 'www.slebute.lt';               // printed bottom-centre on labels, after a small globe icon
     // Your logo, embedded directly so the app stays a single self-contained
     // file — no separate hosting/upload step needed. To change it later,
     // replace this data URI (or point it at a hosted image URL instead).
@@ -10370,17 +10371,26 @@ ${logoBlock}^FO${margin},${linkY}^A0N,${linkH},${linkH}^FB${W - margin*2},1,0,L,
         // graphic usually comes out a few dots narrower than requested.
         const qrX = qrColX + Math.round((qrColW - qrActualWidth) / 2);
         const qrBlock = qrGraphic ? `^FO${qrX},${qrY}${qrGraphic.zpl}^FS\n` : '';
-        const skuY = qrY + qrActualWidth + mm(0.7), skuH = mm(2.1);
+        // Text elements below are placed by BASELINE (not box top), so the
+        // colour name can share one baseline with the website and Facebook
+        // text in the bottom row. textToZplGraphic draws its text at
+        // round(boxH*0.5 + fontPx*0.35) from the box top; this mirrors that
+        // so a box can be positioned to put the baseline at a given mm.
+        const rowBaselineMm = 28.4; // shared by colour, website and Facebook text
+        const placeText = (text, fontPx, widthDots, align, bold, mono, italic, baselineMm) => {
+            const boxH = fontPx + mm(1);
+            const g = textToZplGraphic(text, fontPx, widthDots, boxH, align, bold, mono, italic);
+            return { g, y: mm(baselineMm) - Math.round(boxH * 0.5 + fontPx * 0.35) };
+        };
+        const skuH = mm(2.1);
         // The QR above still encodes the full variant SKU (so a scan resolves
         // the exact size/colour); the human-readable text is the style's main
         // base barcode instead. Falls back to the SKU when a style has none.
-        const skuG = textToZplGraphic(ctx.baseBarcode || ctx.sku || '', skuH, qrColW, skuH + mm(0.6), 'center', false, true, false);
-        // Colour line, directly under the SKU — same column, same
-        // centring, one notch smaller since it shares the tight strip left
-        // under the QR by design (see "SKU below" comment above; this is
-        // the only addition to that column).
-        const colourY = skuY + skuH + mm(0.8), colourH = mm(1.5);
-        const colourG = textToZplGraphic(ctx.colorName || '', colourH, qrColW, colourH + mm(0.5), 'center', false, false, false);
+        const skuT = placeText(ctx.baseBarcode || ctx.sku || '', skuH, qrColW, 'center', false, true, false, 26.6);
+        // Colour line, under the barcode text — same column, same centring,
+        // one notch smaller. Sits on the bottom row's shared baseline.
+        const colourH = mm(1.5);
+        const colourT = placeText(ctx.colorName || '', colourH, qrColW, 'center', false, false, false, rowBaselineMm);
 
         // --- CENTRE: price (as large as safely fits) + up to 6 composition
         // lines (italic, smaller), the whole block centred as a unit in the
@@ -10388,20 +10398,21 @@ ${logoBlock}^FO${margin},${linkY}^A0N,${linkH},${linkH}^FB${W - margin*2},1,0,L,
         // left-aligned to each other (a shared left edge), only the block's
         // bounding box is centred, so mixed-length lines don't ragged-edge.
         //
-        // Price size is capped at 7.2mm: measured against real text widths,
-        // "€199.99" (worst realistic case — same width as any 3-digit-euro
-        // price) needs 34.2mm at 7.5mm in this font against a 36mm gap —
-        // too tight. 7.2mm keeps ~1.5mm clear on each side at that same
-        // worst case while still being noticeably larger than before.
         const gapStart = qrColX + qrColW, gapEnd = rightColX, gapWidth = gapEnd - gapStart;
-        const priceFontMm = 7.2, priceFont = mm(priceFontMm);
-        const compFont = mm(2.0), compStep = mm(2.5), compTop = mm(12);
-        const maxLineWidthDots = mm(34); // generous cap, matches the priceFontMm sizing above
+        // Price is drawn at 8.0mm and shrunk only when it would not fit the
+        // 34mm cap (a 3-digit-euro price such as "€199.99" is the case that
+        // used to hold this at 7.2mm). Common 2-digit prices stay large.
+        const compFont = mm(2.0), compStepMm = 2.5, compFirstBaselineMm = 12.6;
+        const maxLineWidthDots = mm(34);
+        const priceBaselineMm = 7.9;
 
         const priceStr = `\u20AC${Number(ctx.price || 0).toFixed(2)}`;
         const compLines = String(ctx.composition || '')
             .split(',').map(s => s.trim()).filter(Boolean).slice(0, 6);
 
+        let priceFont = mm(8.0);
+        const priceRawWidth = measureTextWidthDots(priceStr, priceFont, 0, true, false, true);
+        if (priceRawWidth > maxLineWidthDots) priceFont = Math.floor(priceFont * maxLineWidthDots / priceRawWidth);
         const priceWidth = Math.round(measureTextWidthDots(priceStr, priceFont, maxLineWidthDots, true, false, true));
         const compWidths = compLines.map(line => Math.round(measureTextWidthDots(line, compFont, maxLineWidthDots, false, false, true)));
         const blockWidth = Math.max(priceWidth, ...compWidths, 1);
@@ -10409,12 +10420,12 @@ ${logoBlock}^FO${margin},${linkY}^A0N,${linkH},${linkH}^FB${W - margin*2},1,0,L,
         // can never push the block left of the QR column.
         const blockX = Math.max(gapStart, gapStart + Math.round((gapWidth - blockWidth) / 2));
 
-        const priceG = textToZplGraphic(priceStr, priceFont, maxLineWidthDots, priceFont + mm(2), 'left', true, false, true);
+        const priceT = placeText(priceStr, priceFont, maxLineWidthDots, 'left', true, false, true, priceBaselineMm);
 
         let compBlock = '';
         compLines.forEach((line, i) => {
-            const g = textToZplGraphic(line, compFont, maxLineWidthDots, compFont + mm(0.5), 'left', false, false, true);
-            if (g) compBlock += `^FO${blockX},${compTop + i * compStep}${g}^FS\n`;
+            const t = placeText(line, compFont, maxLineWidthDots, 'left', false, false, true, compFirstBaselineMm + i * compStepMm);
+            if (t.g) compBlock += `^FO${blockX},${t.y}${t.g}^FS\n`;
         });
 
         // --- RIGHT: size range (top) + logo (large, centred) + Facebook
@@ -10449,10 +10460,20 @@ ${logoBlock}^FO${margin},${linkY}^A0N,${linkH},${linkH}^FB${W - margin*2},1,0,L,
 
         const field = (g, x, y) => g ? `^FO${x},${y}${g}^FS\n` : '';
 
+        // --- BOTTOM CENTRE: globe icon + website, the group centred on the
+        // label's own centre line (W/2), on the same baseline as the colour
+        // name and the Facebook text.
+        const globeSize = mm(2.4), globeGap = mm(0.9), webFont = mm(1.8), webMaxW = mm(16);
+        const webTextWidth = Math.round(measureTextWidthDots(BRAND_WEBSITE, webFont, webMaxW, false, false, false));
+        const webStartX = Math.round(W / 2 - (globeSize + globeGap + webTextWidth) / 2);
+        const globeG = globeIconToZplGraphic(globeSize);
+        const webT = placeText(BRAND_WEBSITE, webFont, webMaxW, 'left', false, false, false, rowBaselineMm);
+        const webBlock = field(globeG, webStartX, fbY) + field(webT.g, webStartX + globeSize + globeGap, webT.y);
+
         const zpl = `^XA
 ^PW${W}
 ^LL${H}
-${qrBlock}${field(skuG, qrColX, skuY)}${field(colourG, qrColX, colourY)}${field(priceG, blockX, mm(1.5))}${compBlock}${field(sizeG, rightColX, margin)}${logoBlock}${fbBlock}^PQ${Math.max(1, copies|0)}
+${qrBlock}${field(skuT.g, qrColX, skuT.y)}${field(colourT.g, qrColX, colourT.y)}${field(priceT.g, blockX, priceT.y)}${compBlock}${field(sizeG, rightColX, margin)}${logoBlock}${webBlock}${fbBlock}^PQ${Math.max(1, copies|0)}
 ^XZ`;
         return zpl;
     }
@@ -10567,6 +10588,41 @@ ${qrBlock}${field(skuG, qrColX, skuY)}${field(colourG, qrColX, colourY)}${field(
         ctx.textBaseline = 'alphabetic';
         const fWidth = ctx.measureText('f').width;
         ctx.fillText('f', (sizeDots - fWidth) / 2 - sizeDots * 0.03, sizeDots * 0.775);
+
+        const px = ctx.getImageData(0, 0, sizeDots, sizeDots).data;
+        const bytesPerRow = Math.ceil(sizeDots / 8);
+        let hex = '';
+        for (let yy = 0; yy < sizeDots; yy++) {
+            const rowBytes = new Uint8Array(bytesPerRow);
+            for (let xx = 0; xx < sizeDots; xx++) {
+                const i = (yy * sizeDots + xx) * 4;
+                const lum = 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2];
+                if (lum < 160) rowBytes[xx >> 3] |= (0x80 >> (xx & 7));
+            }
+            for (const b of rowBytes) hex += b.toString(16).padStart(2, '0').toUpperCase();
+        }
+        const totalBytes = bytesPerRow * sizeDots;
+        return `^GFA,${totalBytes},${totalBytes},${bytesPerRow},${hex}`;
+    }
+    /* Small globe glyph (circle, meridian, equator, two latitude arcs) drawn
+       from primitives, shown before the website address. Same 1-bit ^GFA
+       encoding as the Facebook icon; sized to sizeDots square. */
+    function globeIconToZplGraphic(sizeDots) {
+        const canvas = document.createElement('canvas');
+        canvas.width = sizeDots;
+        canvas.height = sizeDots;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, sizeDots, sizeDots);
+        ctx.strokeStyle = '#000';
+        const lw = Math.max(2, Math.round(sizeDots * 0.09));
+        ctx.lineWidth = lw;
+        const r = sizeDots / 2, R = r - lw / 2;
+        ctx.beginPath(); ctx.arc(r, r, R, 0, Math.PI * 2); ctx.stroke();
+        ctx.beginPath(); ctx.ellipse(r, r, R * 0.42, R, 0, 0, Math.PI * 2); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(r - R, r); ctx.lineTo(r + R, r); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(r - R * 0.85, r * 0.52 + r * 0.0); ctx.quadraticCurveTo(r, r * 0.74, r + R * 0.85, r * 0.52); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(r - R * 0.85, sizeDots - r * 0.52); ctx.quadraticCurveTo(r, sizeDots - r * 0.74, r + R * 0.85, sizeDots - r * 0.52); ctx.stroke();
 
         const px = ctx.getImageData(0, 0, sizeDots, sizeDots).data;
         const bytesPerRow = Math.ceil(sizeDots / 8);
