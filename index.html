@@ -1807,9 +1807,9 @@
             <div class="vm-content">
                 <h2><i class="fas fa-wand-magic-sparkles"></i> <span id="peAssistTitle">—</span></h2>
                 <ol class="pe-steps">
-                    <li><button type="button" class="btn btn-ghost btn-sm" onclick="peOpenFlow()"><i class="fas fa-up-right-from-square"></i> <span data-i18n="pe.s_open">Open Google Flow</span></button></li>
-                    <li><span data-i18n="pe.s_both">Click Flow's prompt box and press Ctrl+V — one copy brings the photo and the prompt.</span><br><button type="button" class="btn btn-primary btn-sm" onclick="peCopyBoth()"><i class="fas fa-copy"></i> <span data-i18n="pe.copy_both">Copy photo + prompt</span></button></li>
-                    <li><span data-i18n="pe.s_fallback">If only one of them showed up in Flow, add the other:</span><br><button type="button" class="btn btn-ghost btn-sm" onclick="peCopyPhoto()"><i class="fas fa-image"></i> <span data-i18n="pe.copy_photo">Copy photo</span></button> <button type="button" class="btn btn-ghost btn-sm" onclick="peCopyPrompt()"><i class="fas fa-copy"></i> <span data-i18n="pe.copy_prompt">Copy prompt</span></button></li>
+                    <li><button type="button" class="btn btn-ghost btn-sm" onclick="peOpenFlow()"><i class="fas fa-up-right-from-square"></i> <span data-i18n="pe.s_open">Open Google Flow in a new window</span></button></li>
+                    <li><span data-i18n="pe.s_photo">Press “Copy photo”, then in Flow click the prompt box and press Ctrl+V.</span><br><button type="button" class="btn btn-ghost btn-sm" onclick="peCopyPhoto()"><i class="fas fa-image"></i> <span data-i18n="pe.copy_photo">Copy photo</span></button></li>
+                    <li><span data-i18n="pe.s_prompt">Press “Copy prompt”, click the prompt box in Flow again and press Ctrl+V (the photo stays).</span><br><button type="button" class="btn btn-ghost btn-sm" onclick="peCopyPrompt()"><i class="fas fa-copy"></i> <span data-i18n="pe.copy_prompt">Copy prompt</span></button></li>
                     <li data-i18n="pe.s_wait">Press send in Flow, wait about a minute, then download the new picture.</li>
                     <li><span data-i18n="pe.s_result">Add the new picture here:</span>
                         <label class="pe-drop" id="peDrop" for="pe_result_input"
@@ -2174,9 +2174,8 @@
             'pe.hint': 'Pick the look. Next you copy the photo and a ready-made prompt into Google Flow, then bring the new picture back here to review.',
             'pe.clean': 'Clean background — item only', 'pe.clean_sub': 'The garment alone on a clean light background',
             'pe.model': 'On a model — in a street', 'pe.model_sub': 'A person wearing it in a real setting',
-            'pe.s_open': 'Open Google Flow', 'pe.s_both': 'Click Flow\'s prompt box and press Ctrl+V — one copy brings the photo and the prompt.',
-            'pe.copy_both': 'Copy photo + prompt', 'pe.both_copied': 'Photo and prompt copied — paste into Flow (Ctrl+V).',
-            'pe.s_fallback': 'If only one of them showed up in Flow, add the other:',
+            'pe.s_open': 'Open Google Flow in a new window', 'pe.s_photo': 'Press “Copy photo”, then in Flow click the prompt box and press Ctrl+V.',
+            'pe.s_prompt': 'Press “Copy prompt”, click the prompt box in Flow again and press Ctrl+V (the photo stays).',
             'pe.s_wait': 'Press send in Flow, wait about a minute, then download the new picture.', 'pe.s_result': 'Add the new picture here:',
             'pe.copy_photo': 'Copy photo', 'pe.copy_prompt': 'Copy prompt', 'pe.drop': 'Choose, drop or paste the new picture',
             'pe.photo_copied': 'Photo copied — paste it into Flow (Ctrl+V).', 'pe.prompt_copied': 'Prompt copied — paste it into Flow.',
@@ -2521,9 +2520,8 @@
             'pe.hint': 'Pasirinkite vaizdą. Toliau nukopijuosite nuotrauką ir paruoštą aprašymą į Google Flow, o gautą naują nuotrauką atsinešite čia peržiūrai.',
             'pe.clean': 'Švarus fonas – tik prekė', 'pe.clean_sub': 'Prekė viena ant švaraus šviesaus fono',
             'pe.model': 'Su modeliu – gatvėje', 'pe.model_sub': 'Žmogus su preke tikroje aplinkoje',
-            'pe.s_open': 'Atidaryti Google Flow', 'pe.s_both': 'Spustelėkite Flow aprašymo lauką ir paspauskite Ctrl+V – vienas kopijavimas atneša ir nuotrauką, ir aprašymą.',
-            'pe.copy_both': 'Kopijuoti nuotrauką + aprašymą', 'pe.both_copied': 'Nuotrauka ir aprašymas nukopijuoti – įklijuokite į Flow (Ctrl+V).',
-            'pe.s_fallback': 'Jei Flow atsirado tik vienas iš jų, pridėkite kitą:',
+            'pe.s_open': 'Atidaryti Google Flow naujame lange', 'pe.s_photo': 'Paspauskite „Kopijuoti nuotrauką“, tada Flow spustelėkite aprašymo lauką ir paspauskite Ctrl+V.',
+            'pe.s_prompt': 'Paspauskite „Kopijuoti aprašymą“, dar kartą spustelėkite Flow aprašymo lauką ir paspauskite Ctrl+V (nuotrauka lieka).',
             'pe.s_wait': 'Flow paspauskite siųsti, palaukite apie minutę, tada atsisiųskite naują nuotrauką.', 'pe.s_result': 'Pridėkite naują nuotrauką čia:',
             'pe.copy_photo': 'Kopijuoti nuotrauką', 'pe.copy_prompt': 'Kopijuoti aprašymą', 'pe.drop': 'Pasirinkite, įmeskite arba įklijuokite naują nuotrauką',
             'pe.photo_copied': 'Nuotrauka nukopijuota – įklijuokite į Flow (Ctrl+V).', 'pe.prompt_copied': 'Aprašymas nukopijuotas – įklijuokite į Flow.',
@@ -7344,18 +7342,14 @@
         peGetPrompt(look);   // warm the cache so "Copy prompt" is instant
     }
 
-    function peOpenFlow() { window.open(PE_FLOW_URL, '_blank', 'noopener'); }
-
-    async function peImagePng(url) {
-        const res = await fetch(url, { cache: 'no-store' });
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        const bmp = await createImageBitmap(await res.blob());
-        const c = document.createElement('canvas');
-        c.width = bmp.width; c.height = bmp.height;
-        c.getContext('2d').drawImage(bmp, 0, 0);
-        const png = await new Promise(r => c.toBlob(r, 'image/png'));
-        if (!png) throw new Error('could not encode image');
-        return png;
+    // A separate window (not a tab), on the right half of the screen, so Flow and this page
+    // sit side by side and copy / paste is one click away from the other.
+    function peOpenFlow() {
+        const aw = (window.screen && screen.availWidth) || 1400, ah = (window.screen && screen.availHeight) || 900;
+        const al = (window.screen && screen.availLeft) || 0, at = (window.screen && screen.availTop) || 0;
+        const w = Math.max(900, Math.round(aw / 2));
+        const features = `popup=yes,noopener,width=${w},height=${ah},left=${al + aw - w},top=${at}`;
+        window.open(PE_FLOW_URL, '_blank', features);
     }
 
     // Puts the photo on the clipboard as an image so it can be pasted straight into
@@ -7364,27 +7358,16 @@
         const url = currentPhotoUrls[pePickIdx];
         if (!url) return;
         try {
-            const png = await peImagePng(url);
-            if (!navigator.clipboard || !window.ClipboardItem) throw new Error('clipboard unavailable');
+            const res = await fetch(url, { cache: 'no-store' });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const bmp = await createImageBitmap(await res.blob());
+            const c = document.createElement('canvas');
+            c.width = bmp.width; c.height = bmp.height;
+            c.getContext('2d').drawImage(bmp, 0, 0);
+            const png = await new Promise(r => c.toBlob(r, 'image/png'));
+            if (!png || !navigator.clipboard || !window.ClipboardItem) throw new Error('clipboard unavailable');
             await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })]);
             toast(t('pe.photo_copied'), 'success');
-        } catch (e) {
-            toast(t('pe.copy_failed'), 'warn');
-            pmDownload(pePickIdx);
-        }
-    }
-
-    // Photo AND prompt in one clipboard item, so one Ctrl+V in Flow can bring both.
-    // Whether Flow also inserts the text is up to Flow; the two single buttons stay
-    // as the fallback for when only the photo shows up.
-    async function peCopyBoth() {
-        const url = currentPhotoUrls[pePickIdx];
-        if (!url) return;
-        try {
-            const [png, prompt] = await Promise.all([peImagePng(url), peGetPrompt(peLook)]);
-            if (!navigator.clipboard || !window.ClipboardItem) throw new Error('clipboard unavailable');
-            await navigator.clipboard.write([new ClipboardItem({ 'image/png': png, 'text/plain': new Blob([prompt], { type: 'text/plain' }) })]);
-            toast(t('pe.both_copied'), 'success');
         } catch (e) {
             toast(t('pe.copy_failed'), 'warn');
             pmDownload(pePickIdx);
