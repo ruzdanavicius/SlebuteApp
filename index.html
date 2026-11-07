@@ -356,6 +356,24 @@
         .pm-add { aspect-ratio:1/1; border:2px dashed rgba(36,22,30,0.25); border-radius:12px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; cursor:pointer; color:var(--text-secondary); font-size:0.85rem; font-weight:600; }
         .pm-add:hover { border-color: var(--accent-color); color: var(--accent-color); }
         .pm-add i { font-size:1.5rem; }
+        /* ✨ AI photo improvement (queue + review) */
+        .pm-btn.pm-magic { background: rgba(107,37,69,0.12); color: var(--accent-color); }
+        .pm-btn.pm-magic:hover { background: var(--accent-color); color:#fff; }
+        .pm-btn.pm-magic[disabled] { opacity:0.4; cursor:not-allowed; }
+        .pe-chips { display:flex; gap:4px; flex-wrap:wrap; justify-content:center; min-height:0; }
+        .pe-chip { border:none; border-radius:20px; padding:3px 9px; font-size:0.7rem; font-weight:600; cursor:default; background:rgba(36,22,30,0.08); color:var(--text-secondary); font-family:inherit; }
+        .pe-chip.pe-ready { background:var(--accent-color); color:#fff; cursor:pointer; }
+        .pe-chip.pe-failed { background:var(--danger-tint); color:var(--danger-color); cursor:pointer; }
+        .pe-choice { display:flex; flex-direction:column; align-items:flex-start; gap:2px; width:100%; text-align:left; padding:14px 16px; margin-top:10px; border:1px solid rgba(36,22,30,0.15); border-radius:12px; background:var(--card-bg-raised); cursor:pointer; font-family:inherit; color:var(--text-primary); }
+        .pe-choice:hover { border-color:var(--accent-color); }
+        .pe-choice strong { font-size:0.95rem; }
+        .pe-choice span { font-size:0.78rem; color:var(--text-secondary); }
+        .pe-compare { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:12px; }
+        .pe-compare figure { margin:0; display:flex; flex-direction:column; gap:6px; align-items:center; }
+        .pe-compare img { width:100%; aspect-ratio:3/4; object-fit:contain; background:#fff; border-radius:10px; border:1px solid rgba(36,22,30,0.1); }
+        .pe-compare figcaption { font-size:0.75rem; font-weight:600; color:var(--text-secondary); }
+        .pe-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:16px; }
+        .pe-actions .btn { flex:1; min-width:140px; }
         .pv-stage { max-width:calc(100vw - 150px); max-height:calc(100vh - 100px); max-height:calc(100dvh - 100px); overflow:auto; border-radius:8px; }
         .pv-stage img { display:block; max-width:calc(100vw - 150px); max-height:calc(100vh - 100px); max-height:calc(100dvh - 100px); object-fit:contain; cursor:zoom-in; background:#fff; }
         .pv-stage img.zoomed { max-width:none; max-height:none; cursor:zoom-out; }
@@ -1771,6 +1789,36 @@
         <div class="pv-caption" id="pvCaption"></div>
     </div>
 
+    <!-- AI PHOTO IMPROVEMENT: choose a look, then review Before | After (opened from the photo manager) -->
+    <div class="modal-overlay" id="peChooseModal" style="z-index:110;">
+        <div class="modal-box narrow">
+            <div class="close-modal" onclick="closeModal('peChooseModal')"><i class="fas fa-times"></i></div>
+            <div class="vm-content">
+                <h2><i class="fas fa-wand-magic-sparkles"></i> <span data-i18n="pe.title">Improve photo</span></h2>
+                <p class="muted" style="font-size:0.8rem; margin-top:6px;" data-i18n="pe.hint">A helper makes the new picture in the background. Nothing changes until you review it and press a button.</p>
+                <button type="button" class="pe-choice" onclick="peQueue('clean')"><strong data-i18n="pe.clean">Clean background — item only</strong><span data-i18n="pe.clean_sub">The garment alone on a clean light background</span></button>
+                <button type="button" class="pe-choice" onclick="peQueue('model')"><strong data-i18n="pe.model">On a model — in a street</strong><span data-i18n="pe.model_sub">A person wearing it in a real setting</span></button>
+            </div>
+        </div>
+    </div>
+    <div class="modal-overlay" id="peReviewModal" style="z-index:115;">
+        <div class="modal-box wide">
+            <div class="close-modal" onclick="closeModal('peReviewModal')"><i class="fas fa-times"></i></div>
+            <div class="vm-content">
+                <h2><i class="fas fa-wand-magic-sparkles"></i> <span data-i18n="pe.review_title">Review new photo</span></h2>
+                <div class="pe-compare">
+                    <figure><img id="peBeforeImg" alt=""><figcaption data-i18n="pe.before">Before</figcaption></figure>
+                    <figure><img id="peAfterImg" alt=""><figcaption data-i18n="pe.after">After</figcaption></figure>
+                </div>
+                <div class="pe-actions">
+                    <button type="button" class="btn btn-primary" id="peReplaceBtn" onclick="peAccept('replace')" data-i18n="pe.replace">Replace this photo</button>
+                    <button type="button" class="btn btn-ghost" id="peAddBtn" onclick="peAccept('add')" data-i18n="pe.add">Add as extra photo</button>
+                    <button type="button" class="btn btn-ghost" onclick="peDiscard()" data-i18n="pe.discard">Discard</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- QUICK OPEN REGISTER MODAL (pops up on checkout if no register is open) -->
     <div class="modal-overlay" id="quickOpenRegisterModal">
         <div class="modal-box narrow">
@@ -2101,6 +2149,19 @@
             'pm.empty': 'No photos yet.', 'pm.working': 'Working…', 'pm.click_actual': 'click for actual size',
             'pm.hint': 'Tap a photo to enlarge it. The first photo is the cover shown in the POS and on the website.',
             'toast.photo_replaced': 'Photo replaced.',
+            'pe.btn': 'Improve photo (AI)', 'pe.title': 'Improve photo',
+            'pe.hint': 'A helper makes the new picture in the background. Nothing changes until you review it and press a button.',
+            'pe.clean': 'Clean background — item only', 'pe.clean_sub': 'The garment alone on a clean light background',
+            'pe.model': 'On a model — in a street', 'pe.model_sub': 'A person wearing it in a real setting',
+            'pe.save_first': 'Save the style first, then improve its photos.',
+            'pe.queued': 'Queued — it will show up on the photo when ready.',
+            'pe.already': 'This photo is already queued or ready for that look.',
+            'pe.v_clean': 'Clean', 'pe.v_model': 'Model',
+            'pe.st_pending': 'in queue', 'pe.st_processing': 'making…', 'pe.st_waiting': 'waiting for daily limit', 'pe.st_done': 'ready — review', 'pe.st_failed': 'failed — tap to retry',
+            'pe.review_title': 'Review new photo', 'pe.before': 'Before', 'pe.after': 'After',
+            'pe.replace': 'Replace this photo', 'pe.add': 'Add as extra photo', 'pe.discard': 'Discard',
+            'pe.added': 'New photo added.', 'pe.discarded': 'Discarded.', 'pe.fetch_failed': 'Could not load the new picture.',
+            'pe.original_gone': 'The original photo is no longer in the list — add the new one as an extra photo instead.',
             'inv.description': 'Description', 'inv.colors_sizes': 'Colors & Sizes',
             'inv.print_all_style': 'Print all labels for this style', 'inv.save_style': 'Save Style',
             'req.title': 'Dispatch Board', 'req.refresh': 'Refresh',
@@ -2433,6 +2494,19 @@
             'pm.empty': 'Nuotraukų dar nėra.', 'pm.working': 'Dirbama…', 'pm.click_actual': 'spustelėkite tikram dydžiui',
             'pm.hint': 'Spustelėkite nuotrauką, kad padidintumėte. Pirma nuotrauka yra viršelis, rodomas kasoje ir svetainėje.',
             'toast.photo_replaced': 'Nuotrauka pakeista.',
+            'pe.btn': 'Pagerinti nuotrauką (DI)', 'pe.title': 'Pagerinti nuotrauką',
+            'pe.hint': 'Pagalbininkas naujos nuotraukos darbą atlieka fone. Niekas nesikeičia, kol jos neperžiūrėsite ir nepaspausite mygtuko.',
+            'pe.clean': 'Švarus fonas – tik prekė', 'pe.clean_sub': 'Prekė viena ant švaraus šviesaus fono',
+            'pe.model': 'Su modeliu – gatvėje', 'pe.model_sub': 'Žmogus su preke tikroje aplinkoje',
+            'pe.save_first': 'Pirmiausia išsaugokite modelį, tada tobulinkite jo nuotraukas.',
+            'pe.queued': 'Įtraukta į eilę – kai bus paruošta, atsiras prie nuotraukos.',
+            'pe.already': 'Ši nuotrauka tokiam variantui jau eilėje arba paruošta.',
+            'pe.v_clean': 'Švarus', 'pe.v_model': 'Modelis',
+            'pe.st_pending': 'eilėje', 'pe.st_processing': 'kuriama…', 'pe.st_waiting': 'laukia dienos limito', 'pe.st_done': 'paruošta – peržiūrėti', 'pe.st_failed': 'nepavyko – spauskite kartoti',
+            'pe.review_title': 'Peržiūrėti naują nuotrauką', 'pe.before': 'Prieš', 'pe.after': 'Po',
+            'pe.replace': 'Pakeisti šią nuotrauką', 'pe.add': 'Pridėti kaip papildomą', 'pe.discard': 'Atmesti',
+            'pe.added': 'Nauja nuotrauka pridėta.', 'pe.discarded': 'Atmesta.', 'pe.fetch_failed': 'Nepavyko įkelti naujos nuotraukos.',
+            'pe.original_gone': 'Pradinės nuotraukos sąraše nebėra – pridėkite naująją kaip papildomą.',
             'inv.description': 'Aprašymas', 'inv.colors_sizes': 'Spalvos ir dydžiai',
             'inv.print_all_style': 'Spausdinti visas šio modelio etiketes', 'inv.save_style': 'Išsaugoti',
             'req.title': 'Pervežimai', 'req.refresh': 'Atnaujinti',
@@ -6992,8 +7066,9 @@
     function openPhotoManager() {
         document.getElementById('productPhotoModal').classList.add('active');
         renderPhotoManager();
+        peStart();
     }
-    function closePhotoManager() { closePhotoViewer(); closeModal('productPhotoModal'); }
+    function closePhotoManager() { peStop(); closePhotoViewer(); closeModal('productPhotoModal'); }
 
     function pmSetBusy(on, msg) {
         pmBusy = on;
@@ -7023,8 +7098,10 @@
                     <button type="button" class="pm-btn" onclick="pmPickReplace(${i})" title="${t('pm.replace')}"><i class="fas fa-upload"></i></button>
                     <button type="button" class="pm-btn" onclick="pmRotate(${i})" title="${t('pm.rotate')}"><i class="fas fa-rotate-right"></i></button>
                     <button type="button" class="pm-btn" onclick="pmDownload(${i})" title="${t('pm.download')}"><i class="fas fa-download"></i></button>
+                    <button type="button" class="pm-btn pm-magic" onclick="pePick(${i})" title="${t(editingProductId ? 'pe.btn' : 'pe.save_first')}"${editingProductId ? '' : ' disabled'}><i class="fas fa-wand-magic-sparkles"></i></button>
                     <button type="button" class="pm-btn pm-danger" onclick="deletePhoto(${i})" title="${t('inv.remove_photo')}"><i class="fas fa-trash"></i></button>
                 </div>
+                ${peChipsHTML(url)}
             </div>`).join('');
         const addTile = n < PHOTO_MAX
             ? `<div class="pm-add" onclick="document.getElementById('pm_add_input').click()"><i class="fas fa-plus"></i><span>${t('pm.add')}</span></div>`
@@ -7197,6 +7274,154 @@
         else if (e.key === 'ArrowLeft') pvStep(-1);
         else if (e.key === 'ArrowRight') pvStep(1);
     }, true);
+
+    /* ============================================================
+       AI PHOTO IMPROVEMENT — the ✨ button on each photo in the photo
+       manager. Queues a row in photo_enhance_jobs; a helper running in the
+       owner's Chrome (logged in to Google Flow) makes the new picture and
+       marks the job done; this code polls while the manager is open and
+       offers Before | After: replace the photo, add it as an extra photo,
+       or discard. Nothing is changed without that button press. Reuses the
+       manager's own pmReplaceWithBlob / uploadPhotoBlob / pmApply, so
+       ordering, cover and storage cleanup behave exactly like a manual
+       replace. Only for a saved style (jobs reference products.id); the
+       helper itself is a separate piece (see slebute-ops).
+       ============================================================ */
+    const PE_LIVE = ['pending', 'processing', 'waiting_quota', 'done', 'failed'];
+    const PE_ACTIVE = ['pending', 'processing', 'waiting_quota'];
+    const PE_STATUS_KEY = { pending: 'pe.st_pending', processing: 'pe.st_processing', waiting_quota: 'pe.st_waiting', done: 'pe.st_done', failed: 'pe.st_failed' };
+    let peJobs = [];
+    let peLastSig = '';
+    let peTimer = null;
+    let pePickIdx = -1;
+    let peReviewJob = null;
+
+    // Background refresh: silent on error (it runs every few seconds), and only
+    // repaints the manager when something actually changed.
+    async function peLoadJobs() {
+        const pid = editingProductId;
+        if (!pid) { peJobs = []; return; }
+        const { data, error } = await sb.from('photo_enhance_jobs')
+            .select('id, source_url, variant, status, result_url, error')
+            .eq('product_id', pid).in('status', PE_LIVE).order('created_at', { ascending: false });
+        if (error || pid !== editingProductId) return;
+        const sig = JSON.stringify(data);
+        if (sig === peLastSig) return;
+        peLastSig = sig;
+        peJobs = data || [];
+        renderPhotoManager();
+    }
+    function peStart() {
+        peStop();
+        peLoadJobs();
+        peTimer = setInterval(() => { if (!document.hidden && peJobs.some(j => PE_ACTIVE.includes(j.status))) peLoadJobs(); }, 8000);
+    }
+    function peStop() {
+        if (peTimer) clearInterval(peTimer);
+        peTimer = null; peJobs = []; peLastSig = '';
+    }
+
+    // Small status chips under a photo (one per look: Clean / Model).
+    function peChipsHTML(url) {
+        const mine = peJobs.filter(j => j.source_url === url);
+        if (!mine.length) return '';
+        return `<div class="pe-chips">${mine.map(j => {
+            const cls = j.status === 'done' ? ' pe-ready' : j.status === 'failed' ? ' pe-failed' : '';
+            const click = (j.status === 'done' || j.status === 'failed') ? ` onclick="peChipClick('${j.id}')"` : '';
+            return `<button type="button" class="pe-chip${cls}"${click}>${t('pe.v_' + j.variant)} · ${t(PE_STATUS_KEY[j.status] || 'pe.st_pending')}</button>`;
+        }).join('')}</div>`;
+    }
+
+    function pePick(i) {
+        if (pmBusy || !currentPhotoUrls[i]) return;
+        if (!editingProductId) { toast(t('pe.save_first'), 'warn'); return; }
+        pePickIdx = i;
+        document.getElementById('peChooseModal').classList.add('active');
+    }
+
+    async function peQueue(variant) {
+        const url = currentPhotoUrls[pePickIdx];
+        closeModal('peChooseModal');
+        if (!url || !editingProductId) return;
+        const { error } = await sb.from('photo_enhance_jobs').insert({ product_id: editingProductId, source_url: url, variant });
+        if (error) {
+            if (error.code === '23505') toast(t('pe.already'), 'warn'); else toast(error.message, 'error');
+            return;
+        }
+        toast(t('pe.queued'), 'success');
+        peLastSig = '';
+        await peLoadJobs();
+    }
+
+    async function peChipClick(id) {
+        const job = peJobs.find(j => j.id === id);
+        if (!job) return;
+        if (job.status === 'failed') {
+            // Retry: back into the queue. (A newer live job for the same look makes this a duplicate → told so.)
+            const { error } = await sb.from('photo_enhance_jobs').update({ status: 'pending', error: null }).eq('id', id);
+            if (error) { toast(error.code === '23505' ? t('pe.already') : error.message, error.code === '23505' ? 'warn' : 'error'); return; }
+            peLastSig = '';
+            await peLoadJobs();
+            return;
+        }
+        if (job.status !== 'done' || !job.result_url) return;
+        peReviewJob = job;
+        document.getElementById('peBeforeImg').src = job.source_url;
+        document.getElementById('peAfterImg').src = job.result_url;
+        document.getElementById('peReplaceBtn').disabled = !currentPhotoUrls.includes(job.source_url);
+        document.getElementById('peAddBtn').disabled = currentPhotoUrls.length >= PHOTO_MAX;
+        document.getElementById('peReviewModal').classList.add('active');
+    }
+
+    async function peAccept(mode) {
+        const job = peReviewJob;
+        if (!job || pmBusy) return;
+        const idx = currentPhotoUrls.indexOf(job.source_url);
+        if (mode === 'replace' && idx === -1) { toast(t('pe.original_gone'), 'warn'); return; }
+        if (mode === 'add' && currentPhotoUrls.length >= PHOTO_MAX) { toast(t('toast.photo_limit_reached'), 'warn'); return; }
+        pmSetBusy(true);
+        let ok = false;
+        try {
+            let blob;
+            try {
+                const res = await fetch(job.result_url, { cache: 'no-store' });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                blob = await res.blob();
+            } catch (e) { toast(t('pe.fetch_failed'), 'error'); return; }
+            if (mode === 'replace') {
+                ok = await pmReplaceWithBlob(idx, blob);          // toasts "Photo replaced."
+            } else {
+                const up = await uploadPhotoBlob(blob);
+                if (up) {
+                    ok = await pmApply([...currentPhotoUrls, up.url]);
+                    if (ok) toast(t('pe.added'), 'success');
+                    else await sb.storage.from('pos-images').remove([up.path]);
+                }
+            }
+        } finally { pmSetBusy(false); }
+        if (!ok) return;
+        closeModal('peReviewModal');
+        await peFinish(job, 'accepted');
+    }
+
+    async function peDiscard() {
+        const job = peReviewJob;
+        if (!job) return;
+        closeModal('peReviewModal');
+        await peFinish(job, 'discarded');
+        toast(t('pe.discarded'), 'success');
+    }
+
+    // Closes the job and frees the helper's candidate file in Storage.
+    async function peFinish(job, status) {
+        const { error } = await sb.from('photo_enhance_jobs').update({ status }).eq('id', job.id);
+        if (error) { toast(error.message, 'error'); return; }
+        const path = storagePathFromUrl(job.result_url);
+        if (path) await sb.storage.from('pos-images').remove([path]);
+        peReviewJob = null;
+        peLastSig = '';
+        await peLoadJobs();
+    }
 
     /* ============================================================
        REORDER RESTOCK CONFLICT — slice 4 of the reorder review. Called
