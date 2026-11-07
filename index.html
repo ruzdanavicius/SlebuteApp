@@ -6760,6 +6760,10 @@
             copies: Math.max(1, Object.values(initialStockByRow[i] || {}).reduce((a,b) => a + (parseInt(b)||0), 0))
         }));
         await Promise.all([loadInventory(), loadIncomingSummary()]);
+        // The save RPC doesn't return base_barcode (it may be auto-assigned
+        // server-side), so read it from the freshly reloaded style list.
+        const savedBaseBarcode = products.find(p => p.id === data.product_id)?.base_barcode || '';
+        newLabelItems.forEach(it => { it.baseBarcode = savedBaseBarcode; });
         // Stay on the style just saved (new or existing) instead of resetting to
         // a blank form — a manager mid-edit shouldn't have to re-find it in the
         // list after every save. "Naujas modelis" is the explicit way to start
@@ -6964,7 +6968,7 @@
     function findVariantContext(variantId) {
         for (const p of products) {
             const v = (p.variants || []).find(x => x.id === variantId);
-            if (v) return { productId: p.id, productName: p.name, sizeRange: p.size_range || null, composition: p.composition || null, colorName: v.colorName, colorHex: v.colorHex, size: v.size, price: v.price, costPrice: v.costPrice, sku: v.sku };
+            if (v) return { productId: p.id, productName: p.name, baseBarcode: p.base_barcode || '', sizeRange: p.size_range || null, composition: p.composition || null, colorName: v.colorName, colorHex: v.colorHex, size: v.size, price: v.price, costPrice: v.costPrice, sku: v.sku };
         }
         return null;
     }
@@ -10367,7 +10371,10 @@ ${logoBlock}^FO${margin},${linkY}^A0N,${linkH},${linkH}^FB${W - margin*2},1,0,L,
         const qrX = qrColX + Math.round((qrColW - qrActualWidth) / 2);
         const qrBlock = qrGraphic ? `^FO${qrX},${qrY}${qrGraphic.zpl}^FS\n` : '';
         const skuY = qrY + qrActualWidth + mm(0.7), skuH = mm(2.1);
-        const skuG = textToZplGraphic(ctx.sku || '', skuH, qrColW, skuH + mm(0.6), 'center', false, true, false);
+        // The QR above still encodes the full variant SKU (so a scan resolves
+        // the exact size/colour); the human-readable text is the style's main
+        // base barcode instead. Falls back to the SKU when a style has none.
+        const skuG = textToZplGraphic(ctx.baseBarcode || ctx.sku || '', skuH, qrColW, skuH + mm(0.6), 'center', false, true, false);
         // Colour line, directly under the SKU — same column, same
         // centring, one notch smaller since it shares the tight strip left
         // under the QR by design (see "SKU below" comment above; this is
@@ -10863,7 +10870,7 @@ ${qrBlock}${field(skuG, qrColX, skuY)}${field(colourG, qrColX, colourY)}${field(
         // inputs in the modal cover both raising a 0 and zeroing out a line
         // you don't want, no separate remove control needed.
         const items = p.variants.map(v => ({
-            productName: p.name, sizeRange: p.size_range || null, composition: p.composition || null,
+            productName: p.name, baseBarcode: p.base_barcode || '', sizeRange: p.size_range || null, composition: p.composition || null,
             colorName: v.colorName, size: v.size, price: v.price, sku: v.sku,
             copies: Object.values(v.stockByLocation || {}).reduce((s, loc) => s + (loc.quantity || 0) + (loc.storage || 0), 0)
         }));
