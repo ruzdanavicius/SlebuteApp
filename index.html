@@ -10382,15 +10382,30 @@ ${logoBlock}^FO${margin},${linkY}^A0N,${linkH},${linkH}^FB${W - margin*2},1,0,L,
             const g = textToZplGraphic(text, fontPx, widthDots, boxH, align, bold, mono, italic);
             return { g, y: mm(baselineMm) - Math.round(boxH * 0.5 + fontPx * 0.35) };
         };
-        const skuH = mm(2.1);
+        // Largest font <= startPx that still fits maxWpx wide (never below
+        // minPx — past that the text is ellipsised by textToZplGraphic).
+        const fitFont = (text, startPx, maxWpx, bold, mono, italic, minPx) => {
+            const w = measureTextWidthDots(text, startPx, 0, bold, mono, italic);
+            return w > maxWpx ? Math.max(minPx, Math.floor(startPx * maxWpx / w)) : startPx;
+        };
         // The QR above still encodes the full variant SKU (so a scan resolves
         // the exact size/colour); the human-readable text is the style's main
         // base barcode instead. Falls back to the SKU when a style has none.
-        const skuT = placeText(ctx.baseBarcode || ctx.sku || '', skuH, qrColW, 'center', false, true, false, 26.6);
-        // Colour line, under the barcode text — same column, same centring,
-        // one notch smaller. Sits on the bottom row's shared baseline.
-        const colourH = mm(1.5);
-        const colourT = placeText(ctx.colorName || '', colourH, qrColW, 'center', false, false, false, rowBaselineMm);
+        // Drawn large (3.2mm) on a fixed baseline just above the colour line,
+        // then capped so (a) it fits the column width and (b) its top keeps
+        // >= 1mm clear of the QR's bottom edge (scan quiet zone).
+        const codeText = ctx.baseBarcode || ctx.sku || '';
+        const codeBaselineMm = 25.6;
+        const qrBottomMm = (qrY + qrActualWidth) / dpm;
+        const codeMaxByHeight = mm(Math.max(0, codeBaselineMm - qrBottomMm - 1.0) / 0.6); // digit height ~0.6em
+        const skuH = Math.max(mm(2.1), Math.min(
+            fitFont(codeText, mm(3.2), qrColW, false, true, false, mm(2.1)), codeMaxByHeight));
+        const skuT = placeText(codeText, skuH, qrColW, 'center', false, true, false, codeBaselineMm);
+        // Colour line, under the barcode text — same column, same centring.
+        // Sits on the bottom row's shared baseline (with website/Facebook).
+        const colourText = ctx.colorName || '';
+        const colourH = fitFont(colourText, mm(2.0), qrColW, false, false, false, mm(1.5));
+        const colourT = placeText(colourText, colourH, qrColW, 'center', false, false, false, rowBaselineMm);
 
         // --- CENTRE: price (as large as safely fits) + up to 6 composition
         // lines (italic, smaller), the whole block centred as a unit in the
