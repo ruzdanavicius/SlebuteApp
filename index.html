@@ -962,6 +962,10 @@
                 <span class="nav-badge hidden" id="offlineBadge">0</span>
             </div>
             <div class="nav-btn" id="navOverridePin" onclick="openSetOverridePinModal()" data-i18n-title="setpin.title" title="My PIN"><i class="fas fa-key"></i></div>
+            <div class="nav-btn" id="navDevices" onclick="openDevicesModal()" data-i18n-title="dev.title" title="Devices">
+                <i class="fas fa-tablet-screen-button"></i>
+                <span class="nav-badge hidden" id="deviceNavBadge">!</span>
+            </div>
             <div class="nav-btn" onclick="logout()" data-i18n-title="nav.logout" title="Log out"><i class="fas fa-sign-out-alt"></i></div>
         </nav>
 
@@ -1891,6 +1895,44 @@
         </div>
     </div>
 
+    <!-- DEVICES MODAL — name this device with a manager's code; managers/admins add + review devices -->
+    <div class="modal-overlay" id="devicesModal">
+        <div class="modal-box">
+            <div class="close-modal" onclick="closeModal('devicesModal')"><i class="fas fa-times"></i></div>
+            <div class="vm-content">
+                <h2><i class="fas fa-tablet-screen-button"></i> <span data-i18n="dev.title">Devices</span></h2>
+                <p id="deviceThisStatus" style="font-weight:600; margin: 10px 0 4px;"></p>
+                <div id="devicePairBox">
+                    <p class="muted" style="font-size:0.85rem; margin: 0 0 8px;" data-i18n="dev.pair_hint">Enter the 8-digit code from a manager to name this device.</p>
+                    <input type="text" inputmode="numeric" autocomplete="off" maxlength="9" class="form-input" id="devicePairCodeInput" data-i18n-placeholder="dev.code_ph" placeholder="0000 0000" style="font-size:1.3rem; letter-spacing:2px; text-align:center;" onkeydown="if(event.key==='Enter')pairThisDevice()">
+                    <p class="muted" id="devicePairMsg" style="font-size:0.8rem; color:var(--danger-color); min-height:1.1em; margin:6px 0 0;"></p>
+                    <button class="btn btn-primary btn-block mt-14" onclick="pairThisDevice()"><i class="fas fa-link"></i> <span data-i18n="dev.pair_btn">Name this device</span></button>
+                </div>
+                <div id="devicesAdminSection" style="display:none; margin-top:22px; border-top:1px solid rgba(0,0,0,0.08); padding-top:16px;">
+                    <h3 style="margin:0 0 10px; font-size:1rem;" data-i18n="dev.add_title">Add a device</h3>
+                    <div class="form-group">
+                        <label data-i18n="dev.store">Store</label>
+                        <select class="form-input" id="deviceNewStore"></select>
+                    </div>
+                    <div class="form-group mt-14">
+                        <label data-i18n="dev.name_label">Device name</label>
+                        <input type="text" maxlength="60" autocomplete="off" class="form-input" id="deviceNewName" data-i18n-placeholder="dev.name_ph" placeholder="e.g. Till 1" onkeydown="if(event.key==='Enter')createDeviceCode()">
+                    </div>
+                    <button class="btn btn-primary btn-block mt-14" onclick="createDeviceCode()"><i class="fas fa-qrcode"></i> <span data-i18n="dev.create_code">Create code</span></button>
+                    <div id="deviceCodeBox" style="display:none; text-align:center; margin-top:14px;">
+                        <div id="deviceCodeValue" style="font-size:2rem; font-weight:700; letter-spacing:4px; color:var(--accent-color); font-variant-numeric:tabular-nums;"></div>
+                        <p class="muted" style="font-size:0.8rem; margin:4px 0 0;" data-i18n="dev.code_expires">Works once, for 10 minutes. Enter it on the new device.</p>
+                    </div>
+                    <h3 style="margin:20px 0 8px; font-size:1rem;" data-i18n="dev.list_title">Named devices</h3>
+                    <div id="deviceListNamed" class="muted" style="font-size:0.9rem;"></div>
+                    <h3 style="margin:20px 0 4px; font-size:1rem;" data-i18n="dev.seen_title">Seen but not named</h3>
+                    <p class="muted" style="font-size:0.8rem; margin:0 0 8px;" data-i18n="dev.seen_hint">These browsers signed in but have no name yet. Name them with a code.</p>
+                    <div id="deviceListSeen" class="muted" style="font-size:0.9rem;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- OFFLINE SALE QUEUE MODAL -->
     <div class="modal-overlay" id="pendingSalesModal">
         <div class="modal-box wide">
@@ -1985,7 +2027,41 @@
        ============================================================ */
     const SUPABASE_URL = 'https://bpxakmnifkrsbjhiytqf.supabase.co';
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJweGFrbW5pZmtyc2JqaGl5dHFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ2MTMzNDgsImV4cCI6MjA4MDE4OTM0OH0.kgfljhRJeLtBIy7U8QU7DEGgRdBwcquH9QVLuhalMEY';
-    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    // Per-browser device key (observe-only device registry, see DEVICES section).
+    // A random 256-bit secret kept in localStorage; the database stores only its
+    // sha256. It is sent as an x-device-key header on Data API (REST) calls only —
+    // never on auth/storage/realtime — and today nothing rejects a call for lacking
+    // it. If storage is unavailable the key lives for this page load only.
+    const DEVICE_KEY = (function () {
+        const make = () => Array.from(crypto.getRandomValues(new Uint8Array(32)), b => b.toString(16).padStart(2, '0')).join('');
+        try {
+            let k = localStorage.getItem('slebute_device_key');
+            if (!/^[0-9a-f]{64}$/.test(k || '')) { k = make(); localStorage.setItem('slebute_device_key', k); }
+            return k;
+        } catch (e) { return make(); }
+    })();
+    let _deviceBlockedAt = 0;
+    function deviceAwareFetch(input, init) {
+        try {
+            const url = typeof input === 'string' ? input : '';
+            if (url.indexOf('/rest/v1/') === -1) return fetch(input, init);
+            const headers = new Headers((init && init.headers) || undefined);
+            headers.set('x-device-key', DEVICE_KEY);
+            return fetch(input, Object.assign({}, init, { headers })).then(res => {
+                // Only ever fires if blocking is switched on server-side (not today).
+                if (res.status === 401) {
+                    res.clone().json().then(b => {
+                        if (b && b.message === 'device_not_paired' && Date.now() - _deviceBlockedAt > 10000) {
+                            _deviceBlockedAt = Date.now();
+                            onDeviceBlocked();
+                        }
+                    }).catch(() => {});
+                }
+                return res;
+            });
+        } catch (e) { return fetch(input, init); }
+    }
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { global: { fetch: deviceAwareFetch } });
 
     // Realtime token-refresh (locked convention, see PROJECT_LOG §3.6):
     // supabase-js does NOT forward a refreshed session token to the
@@ -2061,6 +2137,16 @@
             'setpin.title': 'My PIN', 'setpin.hint': "Your personal 4–6 digit PIN. You'll be able to log in with it.",
             'setpin.new_label': 'New PIN (4–6 digits)', 'setpin.save': 'Save PIN', 'setpin.saved': 'PIN saved.', 'setpin.bad_format': 'PIN must be 4–6 digits.',
             'setpin.already_set': 'You already have a PIN — enter a new one to change it.', 'setpin.not_set': "You don't have a PIN set yet.",
+            'dev.title': 'Devices', 'dev.paired_as': 'This device is named:', 'dev.not_paired': "This device isn't named yet.",
+            'dev.pair_hint': 'Enter the 8-digit code from a manager to name this device.', 'dev.code_ph': '0000 0000', 'dev.pair_btn': 'Name this device',
+            'dev.pair_ok': 'Device named.', 'dev.err_invalid': 'Wrong or expired code.', 'dev.err_too_many': 'Too many wrong codes. Try again in 15 minutes.',
+            'dev.err_already': 'This device is already named.', 'dev.add_title': 'Add a device', 'dev.store': 'Store', 'dev.name_label': 'Device name',
+            'dev.name_ph': 'e.g. Till 1', 'dev.create_code': 'Create code', 'dev.code_expires': 'Works once, for 10 minutes. Enter it on the new device.',
+            'dev.name_required': 'Enter a device name.', 'dev.list_title': 'Named devices', 'dev.none': 'None yet.', 'dev.remove': 'Remove',
+            'dev.remove_confirm': 'Remove this device?', 'dev.removed': 'Device removed.', 'dev.seen_title': 'Seen but not named',
+            'dev.seen_hint': 'These browsers signed in but have no name yet. Name them with a code.', 'dev.last_seen': 'last seen', 'dev.never': 'never',
+            'dev.inactive': 'removed', 'dev.loading': 'Loading...', 'dev.err_generic': 'Could not complete that. Check the connection.',
+            'dev.blocked': 'This device is not registered. Ask a manager for a pairing code.',
             'cart.split_cash_label': 'Cash (€)', 'cart.split_card_label': 'Card (€)',
             'cart.total': 'Total', 'cart.change_due': 'Change due', 'cart.checkout': 'Checkout',
             'vm.stock_note': 'Stock shown is for the location you are viewing.',
@@ -2407,6 +2493,16 @@
             'setpin.title': 'Mano PIN', 'setpin.hint': 'Jūsų asmeninis 4–6 skaitmenų PIN. Jį galėsite naudoti savo prisijungimui.',
             'setpin.new_label': 'Naujas PIN (4–6 skaitmenys)', 'setpin.save': 'Išsaugoti PIN', 'setpin.saved': 'PIN išsaugotas.', 'setpin.bad_format': 'PIN turi būti 4–6 skaitmenys.',
             'setpin.already_set': 'PIN jau nustatytas — įveskite naują, jei norite pakeisti.', 'setpin.not_set': 'PIN dar nenustatytas.',
+            'dev.title': 'Įrenginiai', 'dev.paired_as': 'Šio įrenginio pavadinimas:', 'dev.not_paired': 'Šis įrenginys dar neįvardytas.',
+            'dev.pair_hint': 'Įveskite 8 skaitmenų kodą iš vadovo, kad įvardytumėte šį įrenginį.', 'dev.code_ph': '0000 0000', 'dev.pair_btn': 'Įvardyti įrenginį',
+            'dev.pair_ok': 'Įrenginys įvardytas.', 'dev.err_invalid': 'Neteisingas arba pasibaigęs kodas.', 'dev.err_too_many': 'Per daug neteisingų kodų. Bandykite po 15 minučių.',
+            'dev.err_already': 'Šis įrenginys jau įvardytas.', 'dev.add_title': 'Pridėti įrenginį', 'dev.store': 'Parduotuvė', 'dev.name_label': 'Įrenginio pavadinimas',
+            'dev.name_ph': 'pvz. Kasa 1', 'dev.create_code': 'Sukurti kodą', 'dev.code_expires': 'Galioja vieną kartą, 10 minučių. Įveskite jį naujame įrenginyje.',
+            'dev.name_required': 'Įveskite įrenginio pavadinimą.', 'dev.list_title': 'Įvardyti įrenginiai', 'dev.none': 'Kol kas nėra.', 'dev.remove': 'Pašalinti',
+            'dev.remove_confirm': 'Pašalinti šį įrenginį?', 'dev.removed': 'Įrenginys pašalintas.', 'dev.seen_title': 'Matyti, bet neįvardyti',
+            'dev.seen_hint': 'Šios naršyklės prisijungė, bet dar neturi pavadinimo. Įvardykite jas kodu.', 'dev.last_seen': 'paskutinį kartą matytas', 'dev.never': 'niekada',
+            'dev.inactive': 'pašalintas', 'dev.loading': 'Kraunama...', 'dev.err_generic': 'Nepavyko. Patikrinkite ryšį.',
+            'dev.blocked': 'Šis įrenginys neregistruotas. Paprašykite vadovo susiejimo kodo.',
             'cart.split_cash_label': 'Grynieji (€)', 'cart.split_card_label': 'Kortelė (€)',
             'cart.total': 'Viso', 'cart.change_due': 'Grąža', 'cart.checkout': 'Apmokėti',
             'vm.stock_note': 'Rodomas kiekis yra peržiūrimoje parduotuvėje.',
@@ -3265,6 +3361,7 @@
         document.getElementById('navSuppliers').style.display = (PROFILE.role === 'admin' || PROFILE.role === 'manager') ? 'flex' : 'none';
         updateCachedLoginBanner();
         initWeatherWidget(); // fire-and-forget, never blocks app boot
+        deviceCheckIn();     // fire-and-forget, observe-only (see DEVICES section)
 
         await loadStores();
         setupLocationSelector();
@@ -4774,6 +4871,144 @@
         msg.style.color = 'var(--success-color)'; msg.textContent = t('setpin.saved');
         toast(t('setpin.saved'), 'success');
         setTimeout(() => closeModal('setOverridePinModal'), 900);
+    }
+
+    /* ============================================================
+       DEVICES (observe-only)
+       ------------------------------------------------------------
+       Every start reports this browser's DEVICE_KEY to the database
+       (rpc_device_ping) so the owner can see which phones/PCs use the
+       system. Nothing is blocked. A manager creates an 8-digit one-time
+       code (rpc_create_pairing_code); typing it here (rpc_pair_device)
+       gives this browser a name. Blocking exists server-side but is
+       switched off; this file only reacts to it (onDeviceBlocked) if it
+       is ever turned on. All calls here are best-effort and silent on
+       failure — they must never get in the way of a sale.
+       ============================================================ */
+    let DEVICE_STATE = null;   // { paired, label, store_id, mode } from rpc_device_ping
+
+    function deviceBrowserName(ua) {
+        ua = ua || '';
+        const os = /Android/i.test(ua) ? 'Android' : /iPhone|iPad/i.test(ua) ? 'iOS' : /Windows/i.test(ua) ? 'Windows'
+                 : /Mac OS/i.test(ua) ? 'Mac' : /Linux/i.test(ua) ? 'Linux' : '?';
+        const br = /Edg\//.test(ua) ? 'Edge' : /OPR\//.test(ua) ? 'Opera' : /Firefox\//.test(ua) ? 'Firefox'
+                 : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : '?';
+        return br + ' · ' + os;
+    }
+    function deviceWhen(ts) {
+        if (!ts) return t('dev.never');
+        try { return new Date(ts).toLocaleString(currentLocale(), { dateStyle: 'short', timeStyle: 'short' }); }
+        catch (e) { return String(ts); }
+    }
+    async function deviceCheckIn() {
+        try {
+            const { data, error } = await sb.rpc('rpc_device_ping', { p_key: DEVICE_KEY, p_user_agent: navigator.userAgent });
+            if (error || !data) return;
+            DEVICE_STATE = data;
+            updateDeviceBadge();
+        } catch (e) { /* observe-only: never surface */ }
+    }
+    function updateDeviceBadge() {
+        const b = document.getElementById('deviceNavBadge');
+        if (b) b.classList.toggle('hidden', !(isManagerOrAdmin() && DEVICE_STATE && !DEVICE_STATE.paired));
+    }
+    function onDeviceBlocked() {
+        // Only reachable if the server is set to enforce. Let the user enter a code.
+        DEVICE_STATE = Object.assign({}, DEVICE_STATE, { paired: false });
+        toast(t('dev.blocked'), 'error');
+        openDevicesModal();
+    }
+    function renderDeviceThisDevice() {
+        const el = document.getElementById('deviceThisStatus');
+        const box = document.getElementById('devicePairBox');
+        document.getElementById('devicePairMsg').textContent = '';
+        document.getElementById('devicePairCodeInput').value = '';
+        if (DEVICE_STATE && DEVICE_STATE.paired) {
+            el.textContent = t('dev.paired_as') + ' ' + (DEVICE_STATE.label || '');
+            box.style.display = 'none';
+        } else {
+            el.textContent = t('dev.not_paired');
+            box.style.display = '';
+        }
+    }
+    async function openDevicesModal() {
+        document.getElementById('devicesModal').classList.add('active');
+        if (!DEVICE_STATE) await deviceCheckIn();
+        renderDeviceThisDevice();
+        const priv = isManagerOrAdmin();
+        document.getElementById('devicesAdminSection').style.display = priv ? '' : 'none';
+        document.getElementById('deviceCodeBox').style.display = 'none';
+        if (priv) {
+            const own = PROFILE && PROFILE.store_id;
+            const stores = PROFILE.role === 'admin' ? STORES : STORES.filter(s => s.id === own);
+            const sel = document.getElementById('deviceNewStore');
+            sel.innerHTML = stores.map(s => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
+            if (own && stores.some(s => s.id === own)) sel.value = own;
+            loadDevicesList();
+        } else {
+            setTimeout(() => document.getElementById('devicePairCodeInput').focus(), 50);
+        }
+    }
+    async function pairThisDevice() {
+        const msg = document.getElementById('devicePairMsg');
+        const code = document.getElementById('devicePairCodeInput').value.replace(/\D/g, '');
+        msg.textContent = '';
+        if (code.length !== 8) { msg.textContent = t('dev.err_invalid'); return; }
+        try {
+            const { data, error } = await sb.rpc('rpc_pair_device', { p_code: code, p_key: DEVICE_KEY, p_user_agent: navigator.userAgent });
+            if (error || !data) { msg.textContent = t('dev.err_generic'); return; }
+            if (!data.ok) {
+                msg.textContent = data.error === 'too_many_attempts' ? t('dev.err_too_many')
+                                : data.error === 'already_paired' ? t('dev.err_already') : t('dev.err_invalid');
+                return;
+            }
+            toast(t('dev.pair_ok'), 'success');
+            await deviceCheckIn();
+            renderDeviceThisDevice();
+            if (isManagerOrAdmin()) loadDevicesList();
+        } catch (e) { msg.textContent = t('dev.err_generic'); }
+    }
+    async function createDeviceCode() {
+        const label = document.getElementById('deviceNewName').value.trim();
+        if (!label) { toast(t('dev.name_required'), 'warn'); return; }
+        try {
+            const { data, error } = await sb.rpc('rpc_create_pairing_code', {
+                p_store_id: Number(document.getElementById('deviceNewStore').value), p_label: label });
+            if (error || !data) { toast(error ? error.message : t('dev.err_generic'), 'error'); return; }
+            document.getElementById('deviceCodeValue').textContent = String(data.code).replace(/^(\d{4})(\d{4})$/, '$1 $2');
+            document.getElementById('deviceCodeBox').style.display = '';
+            document.getElementById('deviceNewName').value = '';
+        } catch (e) { toast(t('dev.err_generic'), 'error'); }
+    }
+    async function loadDevicesList() {
+        const named = document.getElementById('deviceListNamed');
+        const seen = document.getElementById('deviceListSeen');
+        named.textContent = seen.textContent = t('dev.loading');
+        try {
+            const { data, error } = await sb.rpc('rpc_list_devices');
+            if (error || !data) { named.textContent = seen.textContent = t('dev.err_generic'); return; }
+            const rowStyle = 'display:flex; justify-content:space-between; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid rgba(0,0,0,0.06);';
+            named.innerHTML = (data.devices || []).map(d => `
+                <div style="${rowStyle}${d.is_active ? '' : 'opacity:0.5;'}">
+                    <div><strong>${escapeHtml(d.label)}</strong> <span class="muted">· ${escapeHtml(d.store_name)}${d.is_active ? '' : ' · ' + escapeHtml(t('dev.inactive'))}</span><br>
+                    <span class="muted" style="font-size:0.8rem;">${escapeHtml(deviceBrowserName(d.user_agent))} · ${escapeHtml(t('dev.last_seen'))} ${escapeHtml(deviceWhen(d.last_seen_at))}</span></div>
+                    ${d.is_active ? `<button class="btn btn-ghost btn-sm" onclick="removeDevice('${d.id}')">${escapeHtml(t('dev.remove'))}</button>` : ''}
+                </div>`).join('') || escapeHtml(t('dev.none'));
+            seen.innerHTML = (data.unpaired || []).map(u => `
+                <div style="${rowStyle}">
+                    <div><strong>${escapeHtml(deviceBrowserName(u.user_agent))}</strong> <span class="muted">· ${escapeHtml(u.store_name || '')} · ${escapeHtml(u.user_name || '')}</span><br>
+                    <span class="muted" style="font-size:0.8rem;">${escapeHtml(t('dev.last_seen'))} ${escapeHtml(deviceWhen(u.last_seen_at))} · ${escapeHtml(String(u.ping_count))}×</span></div>
+                </div>`).join('') || escapeHtml(t('dev.none'));
+        } catch (e) { named.textContent = seen.textContent = t('dev.err_generic'); }
+    }
+    async function removeDevice(id) {
+        if (!confirm(t('dev.remove_confirm'))) return;
+        try {
+            const { error } = await sb.rpc('deregister_device', { p_device_id: id });
+            if (error) { toast(error.message, 'error'); return; }
+            toast(t('dev.removed'), 'success');
+            loadDevicesList();
+        } catch (e) { toast(t('dev.err_generic'), 'error'); }
     }
 
     function cartGrandTotal() {
