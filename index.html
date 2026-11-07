@@ -360,10 +360,6 @@
         .pm-btn.pm-magic { background: rgba(107,37,69,0.12); color: var(--accent-color); }
         .pm-btn.pm-magic:hover { background: var(--accent-color); color:#fff; }
         .pm-btn.pm-magic[disabled] { opacity:0.4; cursor:not-allowed; }
-        .pe-chips { display:flex; gap:4px; flex-wrap:wrap; justify-content:center; min-height:0; }
-        .pe-chip { border:none; border-radius:20px; padding:3px 9px; font-size:0.7rem; font-weight:600; cursor:default; background:rgba(36,22,30,0.08); color:var(--text-secondary); font-family:inherit; }
-        .pe-chip.pe-ready { background:var(--accent-color); color:#fff; cursor:pointer; }
-        .pe-chip.pe-failed { background:var(--danger-tint); color:var(--danger-color); cursor:pointer; }
         .pe-choice { display:flex; flex-direction:column; align-items:flex-start; gap:2px; width:100%; text-align:left; padding:14px 16px; margin-top:10px; border:1px solid rgba(36,22,30,0.15); border-radius:12px; background:var(--card-bg-raised); cursor:pointer; font-family:inherit; color:var(--text-primary); }
         .pe-choice:hover { border-color:var(--accent-color); }
         .pe-choice strong { font-size:0.95rem; }
@@ -374,6 +370,10 @@
         .pe-compare figcaption { font-size:0.75rem; font-weight:600; color:var(--text-secondary); }
         .pe-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:16px; }
         .pe-actions .btn { flex:1; min-width:140px; }
+        .pe-steps { margin:14px 0 0; padding-left:20px; display:flex; flex-direction:column; gap:12px; font-size:0.85rem; }
+        .pe-steps .btn { margin-top:6px; }
+        .pe-drop { display:flex; align-items:center; justify-content:center; margin-top:8px; padding:22px 12px; border:2px dashed rgba(36,22,30,0.25); border-radius:12px; cursor:pointer; font-weight:600; color:var(--text-secondary); text-align:center; }
+        .pe-drop:hover, .pe-drop.pe-over { border-color:var(--accent-color); color:var(--accent-color); }
         .pv-stage { max-width:calc(100vw - 150px); max-height:calc(100vh - 100px); max-height:calc(100dvh - 100px); overflow:auto; border-radius:8px; }
         .pv-stage img { display:block; max-width:calc(100vw - 150px); max-height:calc(100vh - 100px); max-height:calc(100dvh - 100px); object-fit:contain; cursor:zoom-in; background:#fff; }
         .pv-stage img.zoomed { max-width:none; max-height:none; cursor:zoom-out; }
@@ -1789,21 +1789,42 @@
         <div class="pv-caption" id="pvCaption"></div>
     </div>
 
-    <!-- AI PHOTO IMPROVEMENT: choose a look, then review Before | After (opened from the photo manager) -->
+    <!-- AI PHOTO IMPROVEMENT (assisted): choose a look → copy photo + prompt into Google Flow → add the result → review Before | After -->
     <div class="modal-overlay" id="peChooseModal" style="z-index:110;">
         <div class="modal-box narrow">
             <div class="close-modal" onclick="closeModal('peChooseModal')"><i class="fas fa-times"></i></div>
             <div class="vm-content">
                 <h2><i class="fas fa-wand-magic-sparkles"></i> <span data-i18n="pe.title">Improve photo</span></h2>
-                <p class="muted" style="font-size:0.8rem; margin-top:6px;" data-i18n="pe.hint">A helper makes the new picture in the background. Nothing changes until you review it and press a button.</p>
-                <button type="button" class="pe-choice" onclick="peQueue('clean')"><strong data-i18n="pe.clean">Clean background — item only</strong><span data-i18n="pe.clean_sub">The garment alone on a clean light background</span></button>
-                <button type="button" class="pe-choice" onclick="peQueue('model')"><strong data-i18n="pe.model">On a model — in a street</strong><span data-i18n="pe.model_sub">A person wearing it in a real setting</span></button>
+                <p class="muted" style="font-size:0.8rem; margin-top:6px;" data-i18n="pe.hint">Pick the look. Next you copy the photo and a ready-made prompt into Google Flow, then bring the new picture back here to review.</p>
+                <button type="button" class="pe-choice" onclick="peStartAssist('clean')"><strong data-i18n="pe.clean">Clean background — item only</strong><span data-i18n="pe.clean_sub">The garment alone on a clean light background</span></button>
+                <button type="button" class="pe-choice" onclick="peStartAssist('model')"><strong data-i18n="pe.model">On a model — in a street</strong><span data-i18n="pe.model_sub">A person wearing it in a real setting</span></button>
+            </div>
+        </div>
+    </div>
+    <div class="modal-overlay" id="peAssistModal" style="z-index:112;">
+        <div class="modal-box narrow">
+            <div class="close-modal" onclick="closeModal('peAssistModal')"><i class="fas fa-times"></i></div>
+            <div class="vm-content">
+                <h2><i class="fas fa-wand-magic-sparkles"></i> <span id="peAssistTitle">—</span></h2>
+                <ol class="pe-steps">
+                    <li><button type="button" class="btn btn-ghost btn-sm" onclick="peOpenFlow()"><i class="fas fa-up-right-from-square"></i> <span data-i18n="pe.s_open">Open Google Flow</span></button></li>
+                    <li><span data-i18n="pe.s_photo">Copy the photo, click Flow's prompt box and press Ctrl+V.</span><br><button type="button" class="btn btn-ghost btn-sm" onclick="peCopyPhoto()"><i class="fas fa-image"></i> <span data-i18n="pe.copy_photo">Copy photo</span></button></li>
+                    <li><span data-i18n="pe.s_prompt">Copy the prompt, paste it the same way and press send.</span><br><button type="button" class="btn btn-ghost btn-sm" onclick="peCopyPrompt()"><i class="fas fa-copy"></i> <span data-i18n="pe.copy_prompt">Copy prompt</span></button></li>
+                    <li data-i18n="pe.s_wait">Wait about a minute, then download the new picture from Flow.</li>
+                    <li><span data-i18n="pe.s_result">Add the new picture here:</span>
+                        <label class="pe-drop" id="peDrop" for="pe_result_input"
+                            ondragover="event.preventDefault(); this.classList.add('pe-over')" ondragleave="this.classList.remove('pe-over')" ondrop="peDrop(event)">
+                            <i class="fas fa-upload"></i>&nbsp;<span data-i18n="pe.drop">Choose, drop or paste the new picture</span>
+                        </label>
+                        <input type="file" id="pe_result_input" accept="image/*" style="display:none;" onchange="peResultChosen(this.files[0]); this.value='';">
+                    </li>
+                </ol>
             </div>
         </div>
     </div>
     <div class="modal-overlay" id="peReviewModal" style="z-index:115;">
         <div class="modal-box wide">
-            <div class="close-modal" onclick="closeModal('peReviewModal')"><i class="fas fa-times"></i></div>
+            <div class="close-modal" onclick="peCloseReview()"><i class="fas fa-times"></i></div>
             <div class="vm-content">
                 <h2><i class="fas fa-wand-magic-sparkles"></i> <span data-i18n="pe.review_title">Review new photo</span></h2>
                 <div class="pe-compare">
@@ -2150,14 +2171,15 @@
             'pm.hint': 'Tap a photo to enlarge it. The first photo is the cover shown in the POS and on the website.',
             'toast.photo_replaced': 'Photo replaced.',
             'pe.btn': 'Improve photo (AI)', 'pe.title': 'Improve photo',
-            'pe.hint': 'A helper makes the new picture in the background. Nothing changes until you review it and press a button.',
+            'pe.hint': 'Pick the look. Next you copy the photo and a ready-made prompt into Google Flow, then bring the new picture back here to review.',
             'pe.clean': 'Clean background — item only', 'pe.clean_sub': 'The garment alone on a clean light background',
             'pe.model': 'On a model — in a street', 'pe.model_sub': 'A person wearing it in a real setting',
-            'pe.save_first': 'Save the style first, then improve its photos.',
-            'pe.queued': 'Queued — it will show up on the photo when ready.',
-            'pe.already': 'This photo is already queued or ready for that look.',
-            'pe.v_clean': 'Clean', 'pe.v_model': 'Model',
-            'pe.st_pending': 'in queue', 'pe.st_processing': 'making…', 'pe.st_waiting': 'waiting for daily limit', 'pe.st_done': 'ready — review', 'pe.st_failed': 'failed — tap to retry',
+            'pe.s_open': 'Open Google Flow', 'pe.s_photo': 'Copy the photo, click Flow\'s prompt box and press Ctrl+V.',
+            'pe.s_prompt': 'Copy the prompt, paste it the same way and press send.',
+            'pe.s_wait': 'Wait about a minute, then download the new picture from Flow.', 'pe.s_result': 'Add the new picture here:',
+            'pe.copy_photo': 'Copy photo', 'pe.copy_prompt': 'Copy prompt', 'pe.drop': 'Choose, drop or paste the new picture',
+            'pe.photo_copied': 'Photo copied — paste it into Flow (Ctrl+V).', 'pe.prompt_copied': 'Prompt copied — paste it into Flow.',
+            'pe.copy_failed': 'This browser would not copy the photo, so it was saved as a file — drag it into Flow instead.',
             'pe.review_title': 'Review new photo', 'pe.before': 'Before', 'pe.after': 'After',
             'pe.replace': 'Replace this photo', 'pe.add': 'Add as extra photo', 'pe.discard': 'Discard',
             'pe.added': 'New photo added.', 'pe.discarded': 'Discarded.', 'pe.fetch_failed': 'Could not load the new picture.',
@@ -2495,14 +2517,15 @@
             'pm.hint': 'Spustelėkite nuotrauką, kad padidintumėte. Pirma nuotrauka yra viršelis, rodomas kasoje ir svetainėje.',
             'toast.photo_replaced': 'Nuotrauka pakeista.',
             'pe.btn': 'Pagerinti nuotrauką (DI)', 'pe.title': 'Pagerinti nuotrauką',
-            'pe.hint': 'Pagalbininkas naujos nuotraukos darbą atlieka fone. Niekas nesikeičia, kol jos neperžiūrėsite ir nepaspausite mygtuko.',
+            'pe.hint': 'Pasirinkite vaizdą. Toliau nukopijuosite nuotrauką ir paruoštą aprašymą į Google Flow, o gautą naują nuotrauką atsinešite čia peržiūrai.',
             'pe.clean': 'Švarus fonas – tik prekė', 'pe.clean_sub': 'Prekė viena ant švaraus šviesaus fono',
             'pe.model': 'Su modeliu – gatvėje', 'pe.model_sub': 'Žmogus su preke tikroje aplinkoje',
-            'pe.save_first': 'Pirmiausia išsaugokite modelį, tada tobulinkite jo nuotraukas.',
-            'pe.queued': 'Įtraukta į eilę – kai bus paruošta, atsiras prie nuotraukos.',
-            'pe.already': 'Ši nuotrauka tokiam variantui jau eilėje arba paruošta.',
-            'pe.v_clean': 'Švarus', 'pe.v_model': 'Modelis',
-            'pe.st_pending': 'eilėje', 'pe.st_processing': 'kuriama…', 'pe.st_waiting': 'laukia dienos limito', 'pe.st_done': 'paruošta – peržiūrėti', 'pe.st_failed': 'nepavyko – spauskite kartoti',
+            'pe.s_open': 'Atidaryti Google Flow', 'pe.s_photo': 'Nukopijuokite nuotrauką, spustelėkite Flow aprašymo lauką ir paspauskite Ctrl+V.',
+            'pe.s_prompt': 'Nukopijuokite aprašymą, įklijuokite taip pat ir paspauskite siųsti.',
+            'pe.s_wait': 'Palaukite apie minutę, tada atsisiųskite naują nuotrauką iš Flow.', 'pe.s_result': 'Pridėkite naują nuotrauką čia:',
+            'pe.copy_photo': 'Kopijuoti nuotrauką', 'pe.copy_prompt': 'Kopijuoti aprašymą', 'pe.drop': 'Pasirinkite, įmeskite arba įklijuokite naują nuotrauką',
+            'pe.photo_copied': 'Nuotrauka nukopijuota – įklijuokite į Flow (Ctrl+V).', 'pe.prompt_copied': 'Aprašymas nukopijuotas – įklijuokite į Flow.',
+            'pe.copy_failed': 'Naršyklė nukopijuoti nuotraukos neleido, todėl ji išsaugota kaip failas – nuvilkite ją į Flow.',
             'pe.review_title': 'Peržiūrėti naują nuotrauką', 'pe.before': 'Prieš', 'pe.after': 'Po',
             'pe.replace': 'Pakeisti šią nuotrauką', 'pe.add': 'Pridėti kaip papildomą', 'pe.discard': 'Atmesti',
             'pe.added': 'Nauja nuotrauka pridėta.', 'pe.discarded': 'Atmesta.', 'pe.fetch_failed': 'Nepavyko įkelti naujos nuotraukos.',
@@ -7066,9 +7089,8 @@
     function openPhotoManager() {
         document.getElementById('productPhotoModal').classList.add('active');
         renderPhotoManager();
-        peStart();
     }
-    function closePhotoManager() { peStop(); closePhotoViewer(); closeModal('productPhotoModal'); }
+    function closePhotoManager() { closePhotoViewer(); closeModal('productPhotoModal'); }
 
     function pmSetBusy(on, msg) {
         pmBusy = on;
@@ -7098,10 +7120,9 @@
                     <button type="button" class="pm-btn" onclick="pmPickReplace(${i})" title="${t('pm.replace')}"><i class="fas fa-upload"></i></button>
                     <button type="button" class="pm-btn" onclick="pmRotate(${i})" title="${t('pm.rotate')}"><i class="fas fa-rotate-right"></i></button>
                     <button type="button" class="pm-btn" onclick="pmDownload(${i})" title="${t('pm.download')}"><i class="fas fa-download"></i></button>
-                    <button type="button" class="pm-btn pm-magic" onclick="pePick(${i})" title="${t(editingProductId ? 'pe.btn' : 'pe.save_first')}"${editingProductId ? '' : ' disabled'}><i class="fas fa-wand-magic-sparkles"></i></button>
+                    <button type="button" class="pm-btn pm-magic" onclick="pePick(${i})" title="${t('pe.btn')}"><i class="fas fa-wand-magic-sparkles"></i></button>
                     <button type="button" class="pm-btn pm-danger" onclick="deletePhoto(${i})" title="${t('inv.remove_photo')}"><i class="fas fa-trash"></i></button>
                 </div>
-                ${peChipsHTML(url)}
             </div>`).join('');
         const addTile = n < PHOTO_MAX
             ? `<div class="pm-add" onclick="document.getElementById('pm_add_input').click()"><i class="fas fa-plus"></i><span>${t('pm.add')}</span></div>`
@@ -7276,101 +7297,122 @@
     }, true);
 
     /* ============================================================
-       AI PHOTO IMPROVEMENT — the ✨ button on each photo in the photo
-       manager. Queues a row in photo_enhance_jobs; a helper running in the
-       owner's Chrome (logged in to Google Flow) makes the new picture and
-       marks the job done; this code polls while the manager is open and
-       offers Before | After: replace the photo, add it as an extra photo,
-       or discard. Nothing is changed without that button press. Reuses the
-       manager's own pmReplaceWithBlob / uploadPhotoBlob / pmApply, so
-       ordering, cover and storage cleanup behave exactly like a manual
-       replace. Only for a saved style (jobs reference products.id); the
-       helper itself is a separate piece (see slebute-ops).
+       AI PHOTO IMPROVEMENT, assisted — the ✨ button on each photo in the
+       photo manager. Google Flow flags scripted use ("unusual activity"), so
+       this does NOT automate it: the app does the tedious parts and a person
+       does the clicking in Flow. Pick a look → copy the photo and the prompt to
+       the clipboard → paste them into Flow → add the finished picture back here
+       → Before | After → replace the photo, add it as an extra photo, or
+       discard. Nothing changes until that last button. Reuses the manager's
+       own pmReplaceWithBlob / uploadPhotoBlob / pmApply, so order, cover and
+       storage cleanup behave like a manual replace. Prompts come from
+       photo_enhance_prompts (admin-editable), with built-in fallbacks.
        ============================================================ */
-    const PE_LIVE = ['pending', 'processing', 'waiting_quota', 'done', 'failed'];
-    const PE_ACTIVE = ['pending', 'processing', 'waiting_quota'];
-    const PE_STATUS_KEY = { pending: 'pe.st_pending', processing: 'pe.st_processing', waiting_quota: 'pe.st_waiting', done: 'pe.st_done', failed: 'pe.st_failed' };
-    let peJobs = [];
-    let peLastSig = '';
-    let peTimer = null;
+    const PE_FLOW_URL = 'https://flow.google.com/';
+    const PE_FALLBACK_PROMPTS = {
+        clean: 'Edit the attached photo into a professional e-commerce product photo of exactly this garment. Keep the garment\'s exact colour, fabric texture, stitching, pockets, waistband, buttons and any label unchanged. Remove the hanger, rail and shop background. Show the garment alone in invisible-mannequin style, as if worn, with natural 3D shape, centered on a clean seamless light grey studio background with a soft natural shadow. Even soft studio lighting, sharp focus, no text, no props, no people.',
+        model: 'Using the attached photo, create a photorealistic fashion catalogue photo of a woman in her 40s wearing exactly this garment. Keep the garment\'s exact colour, fabric texture, cut, stitching, pockets, waistband and any label unchanged. Pair it with simple, neutral complementary pieces where needed. She stands naturally in a stylish European old-town street with soft natural daylight, shallow depth of field, full body visible. Realistic proportions, natural pose, sharp focus, no text, no logos, no watermark.'
+    };
+    let pePromptCache = null;
     let pePickIdx = -1;
-    let peReviewJob = null;
+    let peLook = 'clean';
+    let peReviewJob = null;      // { source_url, result_url (blob:) } while the review modal is open
 
-    // Background refresh: silent on error (it runs every few seconds), and only
-    // repaints the manager when something actually changed.
-    async function peLoadJobs() {
-        const pid = editingProductId;
-        if (!pid) { peJobs = []; return; }
-        const { data, error } = await sb.from('photo_enhance_jobs')
-            .select('id, source_url, variant, status, result_url, error')
-            .eq('product_id', pid).in('status', PE_LIVE).order('created_at', { ascending: false });
-        if (error || pid !== editingProductId) return;
-        const sig = JSON.stringify(data);
-        if (sig === peLastSig) return;
-        peLastSig = sig;
-        peJobs = data || [];
-        renderPhotoManager();
-    }
-    function peStart() {
-        peStop();
-        peLoadJobs();
-        peTimer = setInterval(() => { if (!document.hidden && peJobs.some(j => PE_ACTIVE.includes(j.status))) peLoadJobs(); }, 8000);
-    }
-    function peStop() {
-        if (peTimer) clearInterval(peTimer);
-        peTimer = null; peJobs = []; peLastSig = '';
-    }
-
-    // Small status chips under a photo (one per look: Clean / Model).
-    function peChipsHTML(url) {
-        const mine = peJobs.filter(j => j.source_url === url);
-        if (!mine.length) return '';
-        return `<div class="pe-chips">${mine.map(j => {
-            const cls = j.status === 'done' ? ' pe-ready' : j.status === 'failed' ? ' pe-failed' : '';
-            const click = (j.status === 'done' || j.status === 'failed') ? ` onclick="peChipClick('${j.id}')"` : '';
-            return `<button type="button" class="pe-chip${cls}"${click}>${t('pe.v_' + j.variant)} · ${t(PE_STATUS_KEY[j.status] || 'pe.st_pending')}</button>`;
-        }).join('')}</div>`;
+    async function peGetPrompt(variant) {
+        if (!pePromptCache) {
+            try {
+                const { data, error } = await sb.from('photo_enhance_prompts').select('variant, prompt');
+                if (!error && data && data.length) pePromptCache = Object.fromEntries(data.map(r => [r.variant, r.prompt]));
+            } catch (e) { /* offline or no access: fall back below */ }
+        }
+        return (pePromptCache && pePromptCache[variant]) || PE_FALLBACK_PROMPTS[variant];
     }
 
     function pePick(i) {
         if (pmBusy || !currentPhotoUrls[i]) return;
-        if (!editingProductId) { toast(t('pe.save_first'), 'warn'); return; }
         pePickIdx = i;
         document.getElementById('peChooseModal').classList.add('active');
     }
 
-    async function peQueue(variant) {
-        const url = currentPhotoUrls[pePickIdx];
+    function peStartAssist(look) {
+        peLook = look;
         closeModal('peChooseModal');
-        if (!url || !editingProductId) return;
-        const { error } = await sb.from('photo_enhance_jobs').insert({ product_id: editingProductId, source_url: url, variant });
-        if (error) {
-            if (error.code === '23505') toast(t('pe.already'), 'warn'); else toast(error.message, 'error');
-            return;
-        }
-        toast(t('pe.queued'), 'success');
-        peLastSig = '';
-        await peLoadJobs();
+        document.getElementById('peAssistTitle').innerText = t(look === 'model' ? 'pe.model' : 'pe.clean');
+        document.getElementById('peAssistModal').classList.add('active');
+        peGetPrompt(look);   // warm the cache so "Copy prompt" is instant
     }
 
-    async function peChipClick(id) {
-        const job = peJobs.find(j => j.id === id);
-        if (!job) return;
-        if (job.status === 'failed') {
-            // Retry: back into the queue. (A newer live job for the same look makes this a duplicate → told so.)
-            const { error } = await sb.from('photo_enhance_jobs').update({ status: 'pending', error: null }).eq('id', id);
-            if (error) { toast(error.code === '23505' ? t('pe.already') : error.message, error.code === '23505' ? 'warn' : 'error'); return; }
-            peLastSig = '';
-            await peLoadJobs();
-            return;
+    function peOpenFlow() { window.open(PE_FLOW_URL, '_blank', 'noopener'); }
+
+    // Puts the photo on the clipboard as an image so it can be pasted straight into
+    // Flow's prompt box. If this browser won't allow it, saves the file instead.
+    async function peCopyPhoto() {
+        const url = currentPhotoUrls[pePickIdx];
+        if (!url) return;
+        try {
+            const res = await fetch(url, { cache: 'no-store' });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const bmp = await createImageBitmap(await res.blob());
+            const c = document.createElement('canvas');
+            c.width = bmp.width; c.height = bmp.height;
+            c.getContext('2d').drawImage(bmp, 0, 0);
+            const png = await new Promise(r => c.toBlob(r, 'image/png'));
+            if (!png || !navigator.clipboard || !window.ClipboardItem) throw new Error('clipboard unavailable');
+            await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })]);
+            toast(t('pe.photo_copied'), 'success');
+        } catch (e) {
+            toast(t('pe.copy_failed'), 'warn');
+            pmDownload(pePickIdx);
         }
-        if (job.status !== 'done' || !job.result_url) return;
-        peReviewJob = job;
-        document.getElementById('peBeforeImg').src = job.source_url;
-        document.getElementById('peAfterImg').src = job.result_url;
-        document.getElementById('peReplaceBtn').disabled = !currentPhotoUrls.includes(job.source_url);
+    }
+
+    async function peCopyPrompt() {
+        const p = await peGetPrompt(peLook);
+        try {
+            await navigator.clipboard.writeText(p);
+        } catch (e) {
+            const ta = document.createElement('textarea');
+            ta.value = p; ta.style.position = 'fixed'; ta.style.opacity = '0';
+            document.body.appendChild(ta); ta.select();
+            try { document.execCommand('copy'); } catch (_) { /* nothing more to try */ }
+            ta.remove();
+        }
+        toast(t('pe.prompt_copied'), 'success');
+    }
+
+    // The finished picture from Flow (chosen, dropped or pasted) → Before | After.
+    async function peResultChosen(file) {
+        const url = currentPhotoUrls[pePickIdx];
+        if (!file || !/^image\//.test(file.type) || !url) return;
+        let blob;
+        try { blob = await compressImageFile(file); }   // same size/format as every other photo here
+        catch (e) { toast(t('toast.image_process_failed') + ' ' + e.message, 'error'); return; }
+        if (peReviewJob && peReviewJob.result_url) URL.revokeObjectURL(peReviewJob.result_url);
+        peReviewJob = { source_url: url, result_url: URL.createObjectURL(blob) };
+        document.getElementById('peBeforeImg').src = url;
+        document.getElementById('peAfterImg').src = peReviewJob.result_url;
+        document.getElementById('peReplaceBtn').disabled = false;
         document.getElementById('peAddBtn').disabled = currentPhotoUrls.length >= PHOTO_MAX;
+        closeModal('peAssistModal');
         document.getElementById('peReviewModal').classList.add('active');
+    }
+    function peDrop(ev) {
+        ev.preventDefault();
+        document.getElementById('peDrop').classList.remove('pe-over');
+        const f = ev.dataTransfer && ev.dataTransfer.files && ev.dataTransfer.files[0];
+        if (f) peResultChosen(f);
+    }
+    document.addEventListener('paste', (ev) => {
+        const m = document.getElementById('peAssistModal');
+        if (!m || !m.classList.contains('active')) return;
+        const f = ev.clipboardData && ev.clipboardData.files && ev.clipboardData.files[0];
+        if (f) { ev.preventDefault(); peResultChosen(f); }
+    });
+
+    function peCloseReview() {
+        if (peReviewJob && peReviewJob.result_url) URL.revokeObjectURL(peReviewJob.result_url);
+        peReviewJob = null;
+        closeModal('peReviewModal');
     }
 
     async function peAccept(mode) {
@@ -7384,7 +7426,7 @@
         try {
             let blob;
             try {
-                const res = await fetch(job.result_url, { cache: 'no-store' });
+                const res = await fetch(job.result_url);   // a blob: URL made from the chosen file
                 if (!res.ok) throw new Error('HTTP ' + res.status);
                 blob = await res.blob();
             } catch (e) { toast(t('pe.fetch_failed'), 'error'); return; }
@@ -7399,28 +7441,12 @@
                 }
             }
         } finally { pmSetBusy(false); }
-        if (!ok) return;
-        closeModal('peReviewModal');
-        await peFinish(job, 'accepted');
+        if (ok) peCloseReview();
     }
 
-    async function peDiscard() {
-        const job = peReviewJob;
-        if (!job) return;
-        closeModal('peReviewModal');
-        await peFinish(job, 'discarded');
+    function peDiscard() {
+        peCloseReview();
         toast(t('pe.discarded'), 'success');
-    }
-
-    // Closes the job and frees the helper's candidate file in Storage.
-    async function peFinish(job, status) {
-        const { error } = await sb.from('photo_enhance_jobs').update({ status }).eq('id', job.id);
-        if (error) { toast(error.message, 'error'); return; }
-        const path = storagePathFromUrl(job.result_url);
-        if (path) await sb.storage.from('pos-images').remove([path]);
-        peReviewJob = null;
-        peLastSig = '';
-        await peLoadJobs();
     }
 
     /* ============================================================
