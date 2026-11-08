@@ -2147,6 +2147,9 @@
             'dev.seen_hint': 'These browsers signed in but have no name yet. Name them with a code.', 'dev.last_seen': 'last seen', 'dev.never': 'never',
             'dev.inactive': 'removed', 'dev.loading': 'Loading...', 'dev.err_generic': 'Could not complete that. Check the connection.',
             'dev.blocked': 'This device is not registered. Ask a manager for a pairing code.',
+            'dev.waiting': "This device is waiting for the owner's approval.", 'dev.rejected_this': 'The owner rejected this device.',
+            'dev.pending': 'waiting', 'dev.rejected': 'rejected', 'dev.approve': 'Accept', 'dev.reject': 'Reject',
+            'dev.approved_toast': 'Device accepted.', 'dev.rejected_toast': 'Device rejected.',
             'cart.split_cash_label': 'Cash (€)', 'cart.split_card_label': 'Card (€)',
             'cart.total': 'Total', 'cart.change_due': 'Change due', 'cart.checkout': 'Checkout',
             'vm.stock_note': 'Stock shown is for the location you are viewing.',
@@ -2503,6 +2506,9 @@
             'dev.seen_hint': 'Šios naršyklės prisijungė, bet dar neturi pavadinimo. Įvardykite jas kodu.', 'dev.last_seen': 'paskutinį kartą matytas', 'dev.never': 'niekada',
             'dev.inactive': 'pašalintas', 'dev.loading': 'Kraunama...', 'dev.err_generic': 'Nepavyko. Patikrinkite ryšį.',
             'dev.blocked': 'Šis įrenginys neregistruotas. Paprašykite vadovo susiejimo kodo.',
+            'dev.waiting': 'Šis įrenginys laukia savininko patvirtinimo.', 'dev.rejected_this': 'Savininkas atmetė šį įrenginį.',
+            'dev.pending': 'laukia', 'dev.rejected': 'atmestas', 'dev.approve': 'Priimti', 'dev.reject': 'Atmesti',
+            'dev.approved_toast': 'Įrenginys priimtas.', 'dev.rejected_toast': 'Įrenginys atmestas.',
             'cart.split_cash_label': 'Grynieji (€)', 'cart.split_card_label': 'Kortelė (€)',
             'cart.total': 'Viso', 'cart.change_due': 'Grąža', 'cart.checkout': 'Apmokėti',
             'vm.stock_note': 'Rodomas kiekis yra peržiūrimoje parduotuvėje.',
@@ -4906,11 +4912,27 @@
             if (error || !data) return;
             DEVICE_STATE = data;
             updateDeviceBadge();
+            if (PROFILE && PROFILE.role === 'admin') refreshDevicePending();
         } catch (e) { /* observe-only: never surface */ }
+    }
+    // Owner only: how many new devices are waiting for Accept/Reject (drives the "!" badge).
+    let DEVICE_PENDING = 0;
+    async function refreshDevicePending() {
+        try {
+            const { data, error } = await sb.rpc('rpc_list_devices');
+            if (error || !data) return;
+            DEVICE_PENDING = Number(data.pending_count) || 0;
+            updateDeviceBadge();
+        } catch (e) { /* silent */ }
     }
     function updateDeviceBadge() {
         const b = document.getElementById('deviceNavBadge');
-        if (b) b.classList.toggle('hidden', !(isManagerOrAdmin() && DEVICE_STATE && !DEVICE_STATE.paired));
+        if (!b) return;
+        const unnamedMine = isManagerOrAdmin() && DEVICE_STATE && !DEVICE_STATE.paired;
+        const owner = PROFILE && PROFILE.role === 'admin';
+        const show = owner ? (DEVICE_PENDING > 0 || unnamedMine) : unnamedMine;
+        b.textContent = owner && DEVICE_PENDING > 0 ? String(DEVICE_PENDING) : '!';
+        b.classList.toggle('hidden', !show);
     }
     function onDeviceBlocked() {
         // Only reachable if the server is set to enforce. Let the user enter a code.
@@ -4927,7 +4949,8 @@
             el.textContent = t('dev.paired_as') + ' ' + (DEVICE_STATE.label || '');
             box.style.display = 'none';
         } else {
-            el.textContent = t('dev.not_paired');
+            const st = DEVICE_STATE && DEVICE_STATE.status;
+            el.textContent = st === 'pending' ? t('dev.waiting') : st === 'rejected' ? t('dev.rejected_this') : t('dev.not_paired');
             box.style.display = '';
         }
     }
@@ -4994,12 +5017,37 @@
                     <span class="muted" style="font-size:0.8rem;">${escapeHtml(deviceBrowserName(d.user_agent))} · ${escapeHtml(t('dev.last_seen'))} ${escapeHtml(deviceWhen(d.last_seen_at))}</span></div>
                     ${d.is_active ? `<button class="btn btn-ghost btn-sm" onclick="removeDevice('${d.id}')">${escapeHtml(t('dev.remove'))}</button>` : ''}
                 </div>`).join('') || escapeHtml(t('dev.none'));
-            seen.innerHTML = (data.unpaired || []).map(u => `
-                <div style="${rowStyle}">
-                    <div><strong>${escapeHtml(deviceBrowserName(u.user_agent))}</strong> <span class="muted">· ${escapeHtml(u.store_name || '')} · ${escapeHtml(u.user_name || '')}</span><br>
+            const canDecide = !!data.can_decide;
+            seen.innerHTML = (data.unpaired || []).map(u => {
+                const rejected = u.status === 'rejected';
+                const badge = `<span style="font-size:0.7rem; font-weight:700; padding:1px 6px; border-radius:8px; background:${rejected ? 'rgba(162,59,59,0.12)' : 'var(--warning-bg)'}; color:${rejected ? 'var(--danger-color)' : 'inherit'};">${escapeHtml(t(rejected ? 'dev.rejected' : 'dev.pending'))}</span>`;
+                const btns = canDecide
+                    ? `<div style="display:flex; gap:6px; flex-shrink:0;">
+                         <button class="btn btn-primary btn-sm" onclick="decideDevice('${escapeHtml(u.sighting_id)}','approve')">${escapeHtml(t('dev.approve'))}</button>
+                         ${rejected ? '' : `<button class="btn btn-ghost btn-sm" onclick="decideDevice('${escapeHtml(u.sighting_id)}','reject')">${escapeHtml(t('dev.reject'))}</button>`}
+                       </div>` : '';
+                return `
+                <div style="${rowStyle}${rejected ? 'opacity:0.65;' : ''}">
+                    <div><strong>${escapeHtml(deviceBrowserName(u.user_agent))}</strong> ${badge}<br>
+                    <span class="muted" style="font-size:0.85rem;">${escapeHtml(u.store_name || '')} · ${escapeHtml(u.user_name || '')}${u.country ? ' · ' + escapeHtml(u.country) : ''}</span><br>
                     <span class="muted" style="font-size:0.8rem;">${escapeHtml(t('dev.last_seen'))} ${escapeHtml(deviceWhen(u.last_seen_at))} · ${escapeHtml(String(u.ping_count))}×</span></div>
-                </div>`).join('') || escapeHtml(t('dev.none'));
+                    ${btns}
+                </div>`;
+            }).join('') || escapeHtml(t('dev.none'));
+            DEVICE_PENDING = Number(data.pending_count) || 0;
+            updateDeviceBadge();
         } catch (e) { named.textContent = seen.textContent = t('dev.err_generic'); }
+    }
+    // Owner only (the server enforces it): Accept adds the browser to the approved list
+    // (pos_devices) with a default name "Store – Browser · OS"; Reject marks it rejected.
+    // Today neither blocks anything — blocking is a separate, later switch.
+    async function decideDevice(sightingId, decision) {
+        try {
+            const { data, error } = await sb.rpc('rpc_decide_device', { p_key_hash: sightingId, p_decision: decision });
+            if (error || !data || !data.ok) { toast(error ? error.message : t('dev.err_generic'), 'error'); return; }
+            toast(t(decision === 'approve' ? 'dev.approved_toast' : 'dev.rejected_toast'), 'success');
+            loadDevicesList();
+        } catch (e) { toast(t('dev.err_generic'), 'error'); }
     }
     async function removeDevice(id) {
         if (!confirm(t('dev.remove_confirm'))) return;
