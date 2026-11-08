@@ -1096,7 +1096,10 @@
                     <div class="products-side">
                         <button class="btn btn-primary btn-block" onclick="startNewProduct()"><i class="fas fa-plus"></i> <span data-i18n="inv.new_style">New Style</span></button>
                         <input type="text" class="form-input mt-14 kb-toggle-input" inputmode="none" id="productSearchBox" placeholder="Search styles... (try multiple words, e.g. sale supplier)" data-i18n-placeholder="inv.search_styles" oninput="renderProductsList()" style="margin-top:14px;">
-                        <button type="button" class="category-chip hidden" id="noSizesFilterChip" onclick="toggleNoSizesFilter()" style="margin-top:8px; align-self:flex-start;"></button>
+                        <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;">
+                            <button type="button" class="category-chip hidden" id="noSizesFilterChip" onclick="toggleNoSizesFilter()"></button>
+                            <button type="button" class="category-chip hidden" id="webOnlyFilterChip" onclick="toggleWebOnlyFilter()"></button>
+                        </div>
                         <div class="products-list" id="productsListPanel"></div>
                     </div>
                     <div class="form-scroll">
@@ -2358,7 +2361,7 @@
             'toast.request_sent_suffix': 'sent!', 'toast.product_name_required': 'Product name is required.',
             'toast.add_size_required': 'Add at least one size with a price.', 'toast.style_saved': 'Style saved!',
             'toast.style_saved_no_sizes': 'Saved without sizes — add colours/sizes at the stock count.',
-            'inv.no_sizes_badge': 'No sizes', 'inv.no_sizes_filter': 'No sizes',
+            'inv.no_sizes_badge': 'No sizes', 'inv.no_sizes_filter': 'No sizes', 'inv.web_only_filter': 'On website',
             'toast.session_expired': 'Session expired — signing you in again.',
             'toast.image_process_failed': 'Could not process that image:', 'toast.enter_qty_add': 'Enter a quantity to add.',
             'toast.added_qty_suffix': 'added.', 'toast.incoming_qty_suffix': 'queued as incoming — see Pervežimai.', 'toast.save_stock_failed': 'Style saved, but some stock was NOT added — it is still shown as (+N); press Save again to retry.', 'toast.enter_valid_price': 'Enter a valid price.', 'toast.price_updated': 'Price updated.',
@@ -2714,7 +2717,7 @@
             'toast.request_sent_suffix': 'išsiųstas!', 'toast.product_name_required': 'Būtina įvesti prekės pavadinimą.',
             'toast.add_size_required': 'Pridėkite bent vieną dydį su kaina.', 'toast.style_saved': 'Modelis išsaugotas!',
             'toast.style_saved_no_sizes': 'Išsaugota be dydžių — spalvas/dydžius pridėkite inventorizacijos metu.',
-            'inv.no_sizes_badge': 'Be dydžių', 'inv.no_sizes_filter': 'Be dydžių',
+            'inv.no_sizes_badge': 'Be dydžių', 'inv.no_sizes_filter': 'Be dydžių', 'inv.web_only_filter': 'Svetainėje',
             'toast.session_expired': 'Sesija baigėsi — prisijungiama iš naujo.',
             'toast.image_process_failed': 'Nepavyko apdoroti nuotraukos:', 'toast.enter_qty_add': 'Įveskite pridedamą kiekį.',
             'toast.added_qty_suffix': 'pridėta.', 'toast.incoming_qty_suffix': 'įtraukta į atvykstančias prekes — žr. Pervežimai.', 'toast.save_stock_failed': 'Modelis išsaugotas, bet dalis kiekių NEBUVO pridėta — jie vis dar rodomi kaip (+N); spauskite „Išsaugoti“ dar kartą.', 'toast.enter_valid_price': 'Įveskite galiojančią kainą.', 'toast.price_updated': 'Kaina atnaujinta.',
@@ -2954,6 +2957,7 @@
     let saleOnly = false;             // "Sale" toggle in the POS header — narrows to products with at least one marked-down (is_clearance) variant in stock here
     let showAllStock = false;         // "Visos" toggle in the POS header — off = the grid only lists styles with stock (display or storage) at this store
     let lastHiddenOutOfStock = 0;     // how many styles the in-stock filter hid from the last render — feeds the empty-state "show all" hint
+    let webOnlyOnly = false;          // "Svetainėje" chip in Prekių valdymas — narrows the style list to styles featured on slebute.lt
     let noSizesOnly = false;          // "Be dydžių" chip in Prekių valdymas — narrows the style list to styles saved without any size yet
 
     // A cashier/manager check used in a couple of places below (marking an
@@ -5845,8 +5849,18 @@
             chip.classList.toggle('active', noSizesOnly);
             chip.innerHTML = `${t('inv.no_sizes_filter')} <span class="category-chip-count">${noSizesCount}</span>`;
         }
+        // "Svetainėje" chip: every style ticked "Rodyti svetainėje", in one place.
+        const webCount = products.filter(p => p.isFeaturedOnline).length;
+        if (webCount === 0) webOnlyOnly = false;
+        const webChip = document.getElementById('webOnlyFilterChip');
+        if (webChip) {
+            webChip.classList.toggle('hidden', webCount === 0);
+            webChip.classList.toggle('active', webOnlyOnly);
+            webChip.innerHTML = `<i class="fas fa-globe"></i> ${t('inv.web_only_filter')} <span class="category-chip-count">${webCount}</span>`;
+        }
         let list = searchProducts(q);
         if (noSizesOnly) list = list.filter(p => !hasSizes(p));
+        if (webOnlyOnly) list = list.filter(p => p.isFeaturedOnline);
         const panel = document.getElementById('productsListPanel');
         panel.innerHTML = list.map(p => `
             <div class="products-list-item ${editingProductId === p.id ? 'active' : ''}" onclick="loadProductForEdit(${p.id})">
@@ -5861,6 +5875,11 @@
 
     function toggleNoSizesFilter() {
         noSizesOnly = !noSizesOnly;
+        renderProductsList();
+    }
+
+    function toggleWebOnlyFilter() {
+        webOnlyOnly = !webOnlyOnly;
         renderProductsList();
     }
 
@@ -7916,6 +7935,7 @@
         toast(wantFeatured ? t('toast.featured_on') : t('toast.featured_off'), 'success');
         const p = products.find(x => x.id === editingProductId);
         if (p) { p.isFeaturedOnline = wantFeatured; syncFeaturedTitleField(p); }
+        renderProductsList(); // keeps the "Svetainėje" chip count/filter in step
     }
 
     // Optional customer-facing title for slebute.lt (featured_products.web_title).
