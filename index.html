@@ -1098,6 +1098,7 @@
                         <input type="text" class="form-input mt-14 kb-toggle-input" inputmode="none" id="productSearchBox" placeholder="Search styles... (try multiple words, e.g. sale supplier)" data-i18n-placeholder="inv.search_styles" oninput="renderProductsList()" style="margin-top:14px;">
                         <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;">
                             <button type="button" class="category-chip hidden" id="noSizesFilterChip" onclick="toggleNoSizesFilter()"></button>
+                            <button type="button" class="category-chip hidden" id="noPriceFilterChip" onclick="toggleNoPriceFilter()"></button>
                             <button type="button" class="category-chip hidden" id="webOnlyFilterChip" onclick="toggleWebOnlyFilter()"></button>
                         </div>
                         <div class="products-list" id="productsListPanel"></div>
@@ -1188,6 +1189,10 @@
                                     <button class="icon-btn add" onclick="addColorBlock()" title="Add color" data-i18n-title="inv.add_color"><i class="fas fa-plus"></i></button>
                                 </div>
                             </div>
+                            <label id="countModeLabel" style="display:flex; align-items:center; gap:8px; font-size:0.8rem; cursor:pointer; padding:8px 10px; margin-bottom:10px; border-radius:8px; border:1px solid var(--border-color, #ddd);">
+                                <input type="checkbox" id="countModeCheckbox" onchange="onCountModeToggle()">
+                                <span data-i18n="inv.count_mode">Stock count mode — quantities go straight into the shop's stock (not via Transfers)</span>
+                            </label>
                             <div id="colorBlocksContainer"></div>
                         </div>
 
@@ -2088,6 +2093,15 @@
     // invisible); only reload to the login screen if that also fails, so a
     // merely-stale-but-still-valid session doesn't interrupt anyone.
     let sessionRecoveryInProgress = false;
+    let reloadingForSession = false;
+    // The reload wipes the page, so a half-entered style is parked in this
+    // browser first (see stashStyleDraft) and offered back after signing in.
+    function reloadForDeadSession() {
+        toast(t('toast.session_expired'), 'warn');
+        try { stashStyleDraft(); } catch (e) {}
+        reloadingForSession = true; // the draft is parked — don't let the "leave page?" prompt block the reload
+        setTimeout(() => window.location.reload(), 1500);
+    }
     sb.auth.onAuthStateChange((_event, session) => {
         if (session) { sb.realtime.setAuth(session.access_token); return; }
         if (!PROFILE || sessionRecoveryInProgress) return; // not logged in yet, or already handling
@@ -2095,13 +2109,9 @@
         sb.auth.refreshSession()
             .then(({ data }) => {
                 if (data && data.session) { sessionRecoveryInProgress = false; return; }
-                toast(t('toast.session_expired'), 'warn');
-                setTimeout(() => window.location.reload(), 1500);
+                reloadForDeadSession();
             })
-            .catch(() => {
-                toast(t('toast.session_expired'), 'warn');
-                setTimeout(() => window.location.reload(), 1500);
-            });
+            .catch(() => { reloadForDeadSession(); });
     });
 
     /* ============================================================
@@ -2364,6 +2374,18 @@
             'toast.request_sent_suffix': 'sent!', 'toast.product_name_required': 'Product name is required.',
             'toast.add_size_required': 'Add at least one size with a price.', 'toast.style_saved': 'Style saved!',
             'toast.style_saved_no_sizes': 'Saved without sizes — add colours/sizes at the stock count.',
+            'toast.stock_needs_size': 'A quantity or SKU is typed on a row with no size — enter a size (e.g. "One size") or clear the row.',
+            'toast.price_needs_size': 'A price without a size cannot be stored yet — enter a size or clear the price.',
+            'toast.style_price_kept': 'Price saved for the style — it will fill in when you add sizes.',
+            'toast.sizes_without_price': 'size(s) saved without a price — they cannot be sold until a price is entered.',
+            'toast.no_price_cannot_sell': 'This item has no price yet — enter it in Manage Catalog.',
+            'toast.sku_taken': 'This SKU is already used by another item:',
+            'toast.size_duplicate': 'The same size is entered twice in one colour.',
+            'toast.draft_restored': 'Unsaved style draft restored — check it and press Save.',
+            'inv.no_price_badge': 'No price', 'inv.no_price_filter': 'No price',
+            'inv.count_mode': 'Stock count mode — quantities go straight into the shop\'s stock (not via Transfers)',
+            'toast.count_mode_on': 'Stock count mode ON — every + and new-size quantity goes straight into the shop\'s stock on Save. Switch it off after the count.',
+            'toast.count_mode_off': 'Stock count mode off — quantities go to Transfers as incoming again.',
             'inv.no_sizes_badge': 'No sizes', 'inv.no_sizes_filter': 'No sizes', 'inv.web_only_filter': 'On website',
             'toast.session_expired': 'Session expired — signing you in again.',
             'toast.image_process_failed': 'Could not process that image:', 'toast.enter_qty_add': 'Enter a quantity to add.',
@@ -2723,6 +2745,18 @@
             'toast.request_sent_suffix': 'išsiųstas!', 'toast.product_name_required': 'Būtina įvesti prekės pavadinimą.',
             'toast.add_size_required': 'Pridėkite bent vieną dydį su kaina.', 'toast.style_saved': 'Modelis išsaugotas!',
             'toast.style_saved_no_sizes': 'Išsaugota be dydžių — spalvas/dydžius pridėkite inventorizacijos metu.',
+            'toast.stock_needs_size': 'Įrašytas kiekis arba SKU, bet nėra dydžio — įveskite dydį (pvz. „Vienas dydis“) arba išvalykite eilutę.',
+            'toast.price_needs_size': 'Kaina be dydžio dar neišsaugoma — įveskite dydį arba ištrinkite kainą.',
+            'toast.style_price_kept': 'Kaina išsaugota modeliui — bus pritaikyta, kai pridėsite dydžius.',
+            'toast.sizes_without_price': 'dydis(-iai) išsaugoti be kainos — kasoje jų parduoti nebus galima, kol neįvesite kainos.',
+            'toast.no_price_cannot_sell': 'Šiai prekei dar neįvesta kaina — įveskite ją Prekių valdyme.',
+            'toast.sku_taken': 'Šis SKU jau naudojamas kitai prekei:',
+            'toast.size_duplicate': 'Tas pats dydis įvestas du kartus toje pačioje spalvoje.',
+            'toast.draft_restored': 'Atkurtas neišsaugotas modelio juodraštis — patikrinkite ir spauskite „Išsaugoti“.',
+            'inv.no_price_badge': 'Be kainos', 'inv.no_price_filter': 'Be kainos',
+            'inv.count_mode': 'Skaičiavimo režimas — kiekiai iš karto į parduotuvės likutį (ne per Pervežimus)',
+            'toast.count_mode_on': 'Skaičiavimo režimas ĮJUNGTAS — kiekvienas + ir naujo dydžio kiekis išsaugant iš karto patenka į parduotuvės likutį. Baigę skaičiuoti išjunkite.',
+            'toast.count_mode_off': 'Skaičiavimo režimas išjungtas — kiekiai vėl keliauja per Pervežimus kaip atvykstantys.',
             'inv.no_sizes_badge': 'Be dydžių', 'inv.no_sizes_filter': 'Be dydžių', 'inv.web_only_filter': 'Svetainėje',
             'toast.session_expired': 'Sesija baigėsi — prisijungiama iš naujo.',
             'toast.image_process_failed': 'Nepavyko apdoroti nuotraukos:', 'toast.enter_qty_add': 'Įveskite pridedamą kiekį.',
@@ -2964,7 +2998,8 @@
     let showAllStock = false;         // "Visos" toggle in the POS header — off = the grid only lists styles with stock (display or storage) at this store
     let lastHiddenOutOfStock = 0;     // how many styles the in-stock filter hid from the last render — feeds the empty-state "show all" hint
     let webOnlyOnly = false;          // "Svetainėje" chip in Prekių valdymas — narrows the style list to styles featured on slebute.lt
-    let noSizesOnly = false;          // "Be dydžių" chip in Prekių valdymas — narrows the style list to styles saved without any size yet
+    let noPriceOnly = false;          // "Be kainos" chip in Prekių valdymas — styles with at least one size saved without a price
+    let noSizesOnly = false;         // "Be dydžių" chip in Prekių valdymas — narrows the style list to styles saved without any size yet
 
     // A cashier/manager check used in a couple of places below (marking an
     // item down is a price change, same permission line product_variants
@@ -3850,9 +3885,27 @@
     //    product_variants / inventory shape but never selects cost_price at
     //    all — there's nothing for a cashier session to extract, even via
     //    devtools, no matter what it asks for.
+    // Style-level price: what a manager typed before any size existed (catalogue
+    // details are entered ahead of the stock count). Kept in product_style_prices
+    // (manager/admin-only: it carries a cost, so it cannot live on `products`,
+    // which every role can read) and used to pre-fill new size rows. Read separately
+    // and tolerantly: until that migration is live the table does not exist, and the
+    // catalogue must still load (the feature is then simply off).
+    let STYLE_PRICE_OK = null; // null = not checked yet
+    async function loadStylePrices() {
+        if (STYLE_PRICE_OK === false) return {};
+        const { data, error } = await sb.from('product_style_prices').select('product_id, price, cost_price');
+        if (error) { STYLE_PRICE_OK = false; return {}; }
+        STYLE_PRICE_OK = true;
+        const out = {};
+        (data || []).forEach(r => { out[r.product_id] = { price: Number(r.price), cost: r.cost_price == null ? null : Number(r.cost_price) }; });
+        return out;
+    }
+
     async function loadInventory() {
         const isPriv = PROFILE && (PROFILE.role === 'admin' || PROFILE.role === 'manager');
         let data, error;
+        const stylePricesP = isPriv ? loadStylePrices() : Promise.resolve({});
         if (isPriv) {
             ({ data, error } = await sb.from('products')
                 .select(`id, name, base_barcode, description, image_url, category, is_active, size_range, composition, supplier_id,
@@ -3879,8 +3932,14 @@
             return;
         }
 
+        const stylePrices = await stylePricesP;
         products = (data || []).map(prod => {
             const variants = [];
+            // Colours saved ahead of their sizes (no size row at all yet) — shown
+            // as empty colour blocks in Prekių valdymas so the name is not lost.
+            const emptyColors = (prod.product_colors || []).filter(c => !(c.product_variants || []).length)
+                .map(c => ({ id: c.id, name: c.color_name, hex: c.color_hex }));
+            const sp = stylePrices[prod.id];
             for (const color of (prod.product_colors || [])) {
                 for (const v of (color.product_variants || [])) {
                     if (!v.is_active) continue;
@@ -3925,6 +3984,8 @@
                 isFeaturedOnline: !!(featuredRow && featuredRow.is_active),
                 featuredWebTitle: (featuredRow && featuredRow.web_title) || '',
                 images,
+                emptyColors,
+                defaultPrice: sp ? sp.price : null, defaultCost: sp ? sp.cost : null,
                 variants
             };
         });
@@ -4499,6 +4560,9 @@
         if (typeof productOrId === 'object') { p = productOrId; v = variantIdOrObj; }
         else { p = products.find(x => x.id === productOrId); v = p ? p.variants.find(x => x.id === variantIdOrObj) : null; }
         if (!p || !v) return;
+        // A size saved without a price (allowed while the catalogue is being
+        // filled in) must never be rung up at €0.00.
+        if (!(Number(v.price) > 0)) { toast(t('toast.no_price_cannot_sell'), 'warn'); return; }
 
         const existing = cart.find(c => c.variantId === v.id);
         if (existing) {
@@ -5680,7 +5744,30 @@
     //   'shop'     straight into that shop's stock — audited ARRIVAL adjustment
     //              (rpc_record_stock_adjustment); the number changes on Save.
     // Flip this one word to change the behaviour for every size row.
-    const STAGED_PLUS_GOES_TO = 'incoming';
+    // Stock count mode (2026-11-12): while the shops are being counted the items
+    // are already on the shelf, so sending every + through Pervežimai (accept,
+    // scan out, scan in) is a wasted second step. The switch above the colours
+    // flips the destination to 'shop' on this device until it is switched off;
+    // the default stays 'incoming'. New sizes' typed quantities follow it too.
+    const COUNT_MODE_KEY = 'slebute_count_mode';
+    function countModeOn() { try { return localStorage.getItem(COUNT_MODE_KEY) === '1'; } catch (e) { return false; } }
+    let STAGED_PLUS_GOES_TO = countModeOn() ? 'shop' : 'incoming';
+    function syncCountModeUI() {
+        const box = document.getElementById('countModeCheckbox');
+        const label = document.getElementById('countModeLabel');
+        if (!box || !label) return;
+        const on = STAGED_PLUS_GOES_TO === 'shop';
+        box.checked = on;
+        label.style.background = on ? 'var(--warning-bg)' : '';
+        label.style.fontWeight = on ? '600' : 'normal';
+    }
+    function onCountModeToggle() {
+        const on = document.getElementById('countModeCheckbox').checked;
+        STAGED_PLUS_GOES_TO = on ? 'shop' : 'incoming';
+        try { on ? localStorage.setItem(COUNT_MODE_KEY, '1') : localStorage.removeItem(COUNT_MODE_KEY); } catch (e) {}
+        syncCountModeUI();
+        toast(t(on ? 'toast.count_mode_on' : 'toast.count_mode_off'), on ? 'warn' : 'info');
+    }
 
     function stagedUnits(styleId) {
         return Object.values(pendingStock[styleId] || {}).reduce((a, b) => a + b, 0);
@@ -5776,8 +5863,14 @@
 
     window.addEventListener('beforeunload', (e) => {
         const staged = Object.keys(pendingStock).reduce((a, id) => a + stagedUnits(id), 0);
+        if (reloadingForSession) return; // draft already parked by reloadForDeadSession()
         if (staged > 0 || stockCommitsInFlight > 0 || styleHasPendingEdits() || hasUnsavedDraftWork()) { e.preventDefault(); e.returnValue = ''; }
     });
+    // Whenever the page goes away (reload, closed tab, tablet putting the browser
+    // to sleep) a half-entered style is parked in this browser, and offered back
+    // the next time Prekių valdymas is opened.
+    window.addEventListener('pagehide', () => { try { stashStyleDraft(); } catch (e) {} });
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { try { stashStyleDraft(); } catch (e) {} } });
     // Style edits save themselves shortly after a field is finished, and again
     // whenever the page is hidden or closed (fields still being typed in are left
     // alone; the leave-page prompt above covers those).
@@ -5907,7 +6000,17 @@
             webChip.classList.toggle('active', webOnlyOnly);
             webChip.innerHTML = `<i class="fas fa-globe"></i> ${t('inv.web_only_filter')} <span class="category-chip-count">${webCount}</span>`;
         }
+        // "Be kainos" chip: styles with a size that still has no price (unsellable until it does).
+        const noPriceCount = products.filter(hasUnpricedSize).length;
+        if (noPriceCount === 0) noPriceOnly = false;
+        const priceChip = document.getElementById('noPriceFilterChip');
+        if (priceChip) {
+            priceChip.classList.toggle('hidden', noPriceCount === 0);
+            priceChip.classList.toggle('active', noPriceOnly);
+            priceChip.innerHTML = `${t('inv.no_price_filter')} <span class="category-chip-count">${noPriceCount}</span>`;
+        }
         let list = searchProducts(q);
+        if (noPriceOnly) list = list.filter(hasUnpricedSize);
         if (noSizesOnly) list = list.filter(p => !hasSizes(p));
         if (webOnlyOnly) list = list.filter(p => p.isFeaturedOnline);
         const panel = document.getElementById('productsListPanel');
@@ -5916,10 +6019,17 @@
                 ${photoTagHTML(p.image_url, 'products-list-thumb', false)}
                 <div class="pli-text">
                     <span>${escapeHtml(p.name)}${productHasClearanceVariant(p) ? ` <span class="sale-badge" title="${t('clearance.final_sale_title')}">${t('pos.sale_badge')}</span>` : ''}</span>
-                    ${p.base_barcode || !hasSizes(p) ? `<div class="pli-code">${escapeHtml(p.base_barcode || '')}${hasSizes(p) ? '' : ` <span class="nosize-badge">${t('inv.no_sizes_badge')}</span>`}</div>` : ''}
+                    ${p.base_barcode || !hasSizes(p) || hasUnpricedSize(p) ? `<div class="pli-code">${escapeHtml(p.base_barcode || '')}${hasSizes(p) ? '' : ` <span class="nosize-badge">${t('inv.no_sizes_badge')}</span>`}${hasUnpricedSize(p) ? ` <span class="nosize-badge">${t('inv.no_price_badge')}</span>` : ''}</div>` : ''}
                 </div>
                 ${productColorBubblesHTML(p)}
             </div>`).join('') || `<p class="muted" style="font-size:0.8rem; padding:8px;">${t('inv.no_styles')}</p>`;
+    }
+
+    function hasUnpricedSize(p) { return p.variants.some(v => !v.isClearance && !(Number(v.price) > 0)); }
+
+    function toggleNoPriceFilter() {
+        noPriceOnly = !noPriceOnly;
+        renderProductsList();
     }
 
     function toggleNoSizesFilter() {
@@ -6604,6 +6714,7 @@
     // placeholder — called only once the manager actually asks for a form,
     // either via New Style or by picking an existing style from the list.
     function showInventoryForm() {
+        syncCountModeUI();
         document.getElementById('invFormEmpty').classList.add('hidden');
         document.getElementById('invFormFields').classList.remove('hidden');
     }
@@ -6621,7 +6732,7 @@
 
     async function openStyleFromList(id) {
         if (!(await confirmLeaveDraft())) return;
-        loadProductForEdit(id);
+        loadProductForEdit(id, { dropDrafts: true });
     }
 
     async function startNewProduct() {
@@ -6655,14 +6766,18 @@
         setAutosaveStatus('');
     }
 
-    function loadProductForEdit(id) {
-        if (styleHasPendingEdits()) { flushStyleEdits({ includeFocused: true }).then(ok => { if (ok) renderProductForEdit(id); }); return; }
-        renderProductForEdit(id);
+    // opts.dropDrafts: the caller has already saved or deliberately discarded the
+    // new rows on the form. Otherwise, re-rendering the style that is already open
+    // keeps its unsaved new rows (see captureDraftRows).
+    function loadProductForEdit(id, opts = {}) {
+        if (styleHasPendingEdits()) { flushStyleEdits({ includeFocused: true }).then(ok => { if (ok) renderProductForEdit(id, opts); }); return; }
+        renderProductForEdit(id, opts);
     }
 
-    function renderProductForEdit(id) {
+    function renderProductForEdit(id, opts = {}) {
         const p = products.find(x => x.id === id);
         if (!p) return;
+        const keptDrafts = (id === editingProductId && !opts.dropDrafts) ? captureDraftRows() : [];
         showInventoryForm();
         leaveStyleFor(id);
         editingProductId = id;
@@ -6704,6 +6819,15 @@
                 isClearance: v.isClearance, clearanceReason: v.clearanceReason
             }));
         });
+        // Colours saved before any of their sizes: an empty block with one blank
+        // row (pre-filled with the style's price, if one was entered).
+        (p.emptyColors || []).forEach(c => {
+            if (byColor[c.name]) return;
+            addSizeRow(addColorBlock(c.name, c.hex, c.id));
+        });
+        // A style with a price but nothing else yet: show that price on a blank row.
+        if (!p.variants.length && !(p.emptyColors || []).length && p.defaultPrice != null) addColorBlock();
+        restoreDraftRows(keptDrafts);
         renderProductsList();
         refreshSaveButton();
         setAutosaveStatus('');
@@ -6773,7 +6897,7 @@
         else if (formHasWorkBeyondBarcode() && !confirm(t('inv.draft_discard_confirm'))) return;
         if (!products.find(p => p.id === id)) await loadInventory();
         if (editingProductId && !(await confirmLeaveDraft())) return;
-        loadProductForEdit(id);
+        loadProductForEdit(id, { dropDrafts: true });
     }
 
     // `products` only holds active styles, but base_barcode is unique across
@@ -6876,7 +7000,20 @@
         return blockId;
     }
 
-    function removeColorBlock(blockId) { document.getElementById(blockId)?.remove(); }
+    async function removeColorBlock(blockId) {
+        const block = document.getElementById(blockId);
+        if (!block) return;
+        // A colour that was saved ahead of its sizes exists in the database on its
+        // own — removing its (size-less) block removes that row too.
+        if (block.dataset.colorId && !block.querySelector('.size-row-existing')) {
+            const colorId = parseInt(block.dataset.colorId);
+            const { error } = await sb.from('product_colors').delete().eq('id', colorId);
+            if (error) { toast(error.message, 'error'); return; }
+            const p = products.find(x => x.id === editingProductId);
+            if (p) p.emptyColors = (p.emptyColors || []).filter(c => c.id !== colorId);
+        }
+        block.remove();
+    }
 
     function addSizeRow(blockId, prefill = {}) {
         const block = document.getElementById(blockId);
@@ -6927,7 +7064,7 @@
                 </div>
                 <div class="sre-price-group">
                     <div class="sre-field">
-                        <input type="text" inputmode="decimal" class="sre-price-input" value="${prefill.price||''}" title="${t('inv.col_price')}">
+                        <input type="text" inputmode="decimal" class="sre-price-input" value="${prefill.price||''}" ${Number(prefill.price) > 0 ? '' : `style="border-color:var(--danger-color)" placeholder="${t('inv.no_price_badge')}"`} title="${t('inv.col_price')}">
                     </div>
                     <div class="sre-field">
                         <input type="text" inputmode="decimal" class="sre-cost-input" value="${prefill.costPrice||''}" title="${t('inv.col_cost')}">
@@ -6945,11 +7082,16 @@
         }
 
         row.className = 'size-row';
+        // A new row starts from the style's own price/cost when one was entered
+        // ahead of the sizes (product_style_prices) — unless the caller says otherwise.
+        const openStyle = editingProductId ? products.find(x => x.id === editingProductId) : null;
+        const rowPrice = ('price' in prefill) ? prefill.price : (openStyle && openStyle.defaultPrice != null ? openStyle.defaultPrice : '');
+        const rowCost = ('cost' in prefill) ? prefill.cost : (openStyle && openStyle.defaultCost ? openStyle.defaultCost : '');
         row.innerHTML = `
             <input type="text" class="size-input" placeholder="M" title="${t('ds.col_size')}" value="${escapeHtml(prefill.size||'')}">
             <input type="text" class="sku-input" placeholder="auto" title="${t('inv.col_sku')}" value="${escapeHtml(prefill.sku||'')}">
-            <input type="text" inputmode="decimal" class="price-input" placeholder="0.00" title="${t('inv.col_price')}" value="${prefill.price||''}">
-            <input type="text" inputmode="decimal" class="cost-input" placeholder="0.00" title="${t('inv.col_cost')}">
+            <input type="text" inputmode="decimal" class="price-input" placeholder="0.00" title="${t('inv.col_price')}" value="${escapeHtml(String(rowPrice||''))}">
+            <input type="text" inputmode="decimal" class="cost-input" placeholder="0.00" title="${t('inv.col_cost')}" value="${escapeHtml(String(rowCost||''))}">
             <input type="number" class="stock1-input" placeholder="0" title="${STORES[0]?.name||'Store 1'}" value="${prefill.stock1||''}">
             <input type="number" class="stock2-input" placeholder="0" title="${STORES[1]?.name||'Store 2'}" value="${prefill.stock2||''}">
             <button class="icon-btn" onclick="this.closest('.size-row').remove()" title="${t('common.remove')}"><i class="fas fa-times"></i></button>
@@ -7083,9 +7225,97 @@
     // has not been saved yet.
     function hasUnsavedDraftWork() {
         if (document.getElementById('invFormFields').classList.contains('hidden')) return false;
-        const typedRows = Array.from(document.querySelectorAll('#colorBlocksContainer .size-row .size-input')).some(i => i.value.trim());
+        // Anything typed into a new row counts (a price or quantity with no size
+        // yet included), as does a new colour that has only been named.
+        const typedRows = captureDraftRows().length > 0;
         if (editingProductId) return typedRows;
         return typedRows || !!document.getElementById('new_name').value.trim() || !!document.getElementById('new_base_barcode').value.trim();
+    }
+
+    /* ---- Unsaved new rows: one way to read them off the form and put them back ----
+       New size rows only reach the database on Save Style. Several actions rebuild
+       the form from the catalogue (the ✓ on a saved size's price, deleting a size,
+       mark-down, the language switch) and used to wipe those rows; a page reload
+       (expired session, closed tab) lost them too. captureDraftRows() reads them,
+       restoreDraftRows() re-adds them after a rebuild, and stashStyleDraft() parks
+       them in this browser across a reload. */
+    function captureDraftRows() {
+        const style = editingProductId ? products.find(x => x.id === editingProductId) : null;
+        const defPrice = style && style.defaultPrice != null ? Number(style.defaultPrice) : null;
+        const out = [];
+        document.querySelectorAll('#colorBlocksContainer .color-block').forEach(block => {
+            const rows = [];
+            block.querySelectorAll('.size-row').forEach(row => {
+                const val = cls => (row.querySelector(cls).value || '').trim();
+                const r = { size: val('.size-input'), sku: val('.sku-input'), price: val('.price-input'), cost: val('.cost-input'), stock1: val('.stock1-input'), stock2: val('.stock2-input') };
+                // A row holding nothing but the style's own pre-filled price is not work.
+                const priceIsDefault = defPrice != null && Math.abs((parseMoney(r.price) || 0) - defPrice) < 0.005;
+                const priceTyped = (r.price && !priceIsDefault) || (r.cost && !(style && style.defaultCost != null && Math.abs((parseMoney(r.cost) || 0) - Number(style.defaultCost)) < 0.005));
+                if (r.size || r.sku || r.stock1 || r.stock2 || priceTyped) rows.push(r);
+            });
+            const isNew = !block.dataset.colorId;
+            const name = block.querySelector('.color-name-input').value.trim();
+            if (rows.length || (isNew && name)) {
+                out.push({ colorId: block.dataset.colorId ? parseInt(block.dataset.colorId) : null, name, hex: block.querySelector('.color-hex-input').value, rows });
+            }
+        });
+        return out;
+    }
+
+    function restoreDraftRows(drafts) {
+        (drafts || []).forEach(d => {
+            let block = d.colorId ? document.querySelector(`#colorBlocksContainer .color-block[data-color-id="${d.colorId}"]`) : null;
+            if (!block) {
+                block = document.getElementById(addColorBlock('', d.hex || '#333333'));
+                block.querySelector('.color-name-input').value = d.name || '';
+                if (d.rows.length) block.querySelectorAll('.size-row').forEach(r => r.remove());
+            }
+            d.rows.forEach(r => addSizeRow(block.id, r));
+        });
+    }
+
+    const STYLE_DRAFT_KEY = 'slebute_style_draft_v1';
+    function stashStyleDraft() {
+        if (!PROFILE || !isManagerOrAdmin()) return;
+        if (!hasUnsavedDraftWork()) {
+            // Only the catalogue screen itself may clear a parked draft — after a
+            // reload the user may sit on another screen for a while before returning.
+            if (document.getElementById('view-inventory').classList.contains('active')) localStorage.removeItem(STYLE_DRAFT_KEY);
+            return;
+        }
+        const val = id => document.getElementById(id).value;
+        localStorage.setItem(STYLE_DRAFT_KEY, JSON.stringify({
+            ts: Date.now(), user: PROFILE.id, productId: editingProductId || null,
+            fields: editingProductId ? null : {
+                new_base_barcode: val('new_base_barcode'), new_name: val('new_name'), new_category: val('new_category'),
+                new_size_range: val('new_size_range'), new_composition: val('new_composition'), new_description: val('new_description'),
+                new_supplier: val('new_supplier'), new_supplier_id: val('new_supplier_id')
+            },
+            photos: editingProductId ? null : currentPhotoUrls.slice(),
+            drafts: captureDraftRows()
+        }));
+    }
+
+    // Called on entering Prekių valdymas. Puts a parked draft back on screen
+    // (same user, under a day old, and only when the form holds no other work).
+    function maybeRestoreStyleDraft() {
+        let d = null;
+        try { d = JSON.parse(localStorage.getItem(STYLE_DRAFT_KEY) || 'null'); } catch (e) {}
+        if (!d || !PROFILE || d.user !== PROFILE.id || Date.now() - d.ts > 24 * 3600 * 1000) { if (d) localStorage.removeItem(STYLE_DRAFT_KEY); return; }
+        if (hasUnsavedDraftWork()) return;
+        if (d.productId) {
+            if (!products.length) return;                       // catalogue not loaded yet — try again on the next visit
+            if (!products.find(p => p.id === d.productId)) { localStorage.removeItem(STYLE_DRAFT_KEY); return; }
+            renderProductForEdit(d.productId, { dropDrafts: true });
+        } else {
+            renderNewProduct();
+            Object.entries(d.fields || {}).forEach(([id, v]) => { const el = document.getElementById(id); if (el) el.value = v || ''; });
+            if (Array.isArray(d.photos) && d.photos.length) { currentPhotoUrls = d.photos.slice(); renderPhotoGallery(); }
+            if ((d.drafts || []).length) document.getElementById('colorBlocksContainer').innerHTML = '';
+        }
+        restoreDraftRows(d.drafts);
+        localStorage.removeItem(STYLE_DRAFT_KEY);
+        toast(t('toast.draft_restored'), 'info');
     }
 
     let autosaveChain = Promise.resolve(true);
@@ -7189,35 +7419,106 @@
         // in parallel to `variants` (same order, zipped with the RPC's
         // returned variant IDs below) since the upsert payload itself no
         // longer carries a `stock` key.
+        // The catalogue is filled in ahead of the stock count, so a style may be
+        // saved with details still missing — but nothing typed is ever dropped
+        // without a word (until 2026-11-12 a row without a size was skipped
+        // silently: 59 typed prices were lost that way in six days):
+        //   price, no size      -> kept as the style's own price (pre-fills new sizes)
+        //   colour, no sizes    -> the colour itself is saved
+        //   size, no price      -> saved, flagged "Be kainos", unsellable until priced
+        //   quantity/SKU, no size -> Save stops and points at the row (a count cannot
+        //                          be stored without a size to hang it on)
+        const openStyle = editingProductId ? products.find(x => x.id === editingProductId) : null;
         const variants = [];
         const initialStockByRow = [];
-        const unpricedInputs = [];
-        document.querySelectorAll('#colorBlocksContainer .color-block').forEach(block => {
-            const colorName = block.querySelector('.color-name-input').value.trim() || 'Standard';
+        const blockedInputs = [];     // inputs to mark red when Save has to stop
+        let blockedReason = null;
+        let stylePrice = null;        // { price, cost } typed on a row with no size
+        const emptyColours = [];      // new colours named but given no size yet
+        const typedSkus = [];         // [{ sku, input, colorName, size }]
+        let unpricedCount = 0;
+        const blocks = Array.from(document.querySelectorAll('#colorBlocksContainer .color-block'));
+        // Spelling already in the database wins: "juoda" typed next to a saved
+        // "Juoda" must join that colour, not create a second one beside it.
+        const savedColourNames = blocks.filter(b => b.dataset.colorId).map(b => effectiveColourName(b, colourEdits));
+        blocks.forEach(block => {
+            let colorName = block.querySelector('.color-name-input').value.trim() || 'Standard';
+            if (!block.dataset.colorId) {
+                const same = savedColourNames.find(n => n.toLowerCase() === colorName.toLowerCase());
+                if (same) colorName = same;
+            }
             const colorHex = block.querySelector('.color-hex-input').value;
+            // Sizes this colour already has, by lower-cased name -> saved spelling.
+            const savedSizes = {};
+            block.querySelectorAll('.size-row-existing').forEach(r => {
+                if (r.querySelector('.sale-badge')) return;
+                const ctx = findVariantContext(parseInt(r.dataset.variantId));
+                if (ctx) savedSizes[String(ctx.size).trim().toLowerCase()] = ctx.size;
+            });
+            const seenNew = {};
+            let sizedRows = 0;
             block.querySelectorAll('.size-row').forEach(row => {
-                const size = row.querySelector('.size-input').value.trim();
-                if (!size) return;
-                const price = parseMoney(row.querySelector('.price-input').value) || 0;
-                if (!(price > 0)) unpricedInputs.push(row.querySelector('.price-input'));
+                const sizeEl = row.querySelector('.size-input');
+                let size = sizeEl.value.trim();
+                const priceEl = row.querySelector('.price-input');
+                const price = parseMoney(priceEl.value) || 0;
                 const cost = parseMoney(row.querySelector('.cost-input').value) || 0;
-                const sku = row.querySelector('.sku-input').value.trim();
+                const skuEl = row.querySelector('.sku-input');
+                const sku = skuEl.value.trim();
                 const s1 = parseInt(row.querySelector('.stock1-input').value) || 0;
                 const s2 = parseInt(row.querySelector('.stock2-input').value) || 0;
+                if (!size) {
+                    if (sku || s1 > 0 || s2 > 0) { blockedInputs.push(sizeEl); blockedReason = blockedReason || 'toast.stock_needs_size'; }
+                    else if (price > 0 && !stylePrice) stylePrice = { price, cost, input: priceEl };
+                    return;
+                }
+                const key = size.toLowerCase();
+                if (savedSizes[key]) size = savedSizes[key];            // "m" next to a saved "M" updates M
+                if (seenNew[key]) { blockedInputs.push(sizeEl); blockedReason = blockedReason || 'toast.size_duplicate'; return; }
+                seenNew[key] = true;
+                sizedRows++;
+                if (!(price > 0)) unpricedCount++;
+                if (sku) typedSkus.push({ sku, input: skuEl, colorName, size });
                 variants.push({ color_name: colorName, color_hex: colorHex, size, sku, price, cost_price: cost });
                 initialStockByRow.push({ [STORES[0]?.id]: s1, [STORES[1]?.id]: s2 });
             });
+            const typedName = block.querySelector('.color-name-input').value.trim();
+            if (!block.dataset.colorId && typedName && !sizedRows && !savedColourNames.some(n => n.toLowerCase() === typedName.toLowerCase())) {
+                emptyColours.push({ color_name: typedName, color_hex: colorHex });
+            }
         });
-        // A blank price used to be saved as €0.00 — a size that then sells for nothing
-        // (218 such sizes were live on 2026-11-12). Stop before anything is written.
-        if (unpricedInputs.length) {
-            unpricedInputs.forEach(inp => {
+        // A size with no price of its own takes the style's price when there is one.
+        const fallbackPrice = stylePrice || (openStyle && openStyle.defaultPrice != null ? { price: Number(openStyle.defaultPrice), cost: Number(openStyle.defaultCost || 0) } : null);
+        if (fallbackPrice) {
+            variants.forEach(v => { if (!(v.price > 0)) { v.price = fallbackPrice.price; if (!(v.cost_price > 0)) v.cost_price = fallbackPrice.cost; unpricedCount--; } });
+        }
+        if (stylePrice && STYLE_PRICE_OK !== true) { blockedInputs.push(stylePrice.input); blockedReason = blockedReason || 'toast.price_needs_size'; }
+        // The same SKU typed twice on this form.
+        typedSkus.forEach((a, i) => {
+            if (typedSkus.findIndex(b => b.sku.toLowerCase() === a.sku.toLowerCase()) !== i) { blockedInputs.push(a.input); blockedReason = blockedReason || 'toast.sku_taken'; }
+        });
+        const stopSave = (msg) => {
+            blockedInputs.forEach(inp => {
                 inp.style.borderColor = 'var(--danger-color)';
                 inp.addEventListener('input', () => { inp.style.borderColor = ''; }, { once: true });
             });
-            unpricedInputs[0].focus();
-            toast(t('toast.price_required'), 'warn');
+            blockedInputs[0].focus();
+            toast(msg, 'warn');
             return false;
+        };
+        if (blockedInputs.length) return stopSave(t(blockedReason));
+        // A hand-typed SKU that already belongs to another item used to reject the
+        // whole save (every other size with it) with a raw database error. Ask first.
+        if (typedSkus.length) {
+            const { data: taken } = await sb.from('product_variants').select('id, sku').in('sku', typedSkus.map(s => s.sku));
+            (taken || []).forEach(row => {
+                const mine = typedSkus.find(s => s.sku === row.sku);
+                const ctx = findVariantContext(row.id);
+                // Re-saving the very size that already owns this SKU is fine.
+                if (ctx && ctx.productId === editingProductId && ctx.size === mine.size && ctx.colorName === mine.colorName) return;
+                blockedInputs.push(mine.input);
+            });
+            if (blockedInputs.length) return stopSave(`${t('toast.sku_taken')} ${blockedInputs.map(i => i.value.trim()).join(', ')}`);
         }
         // A style may be saved with no size at all (request 2026-10-07): the
         // catalogue details are entered from home ahead of the stock count,
@@ -7260,7 +7561,28 @@
             toast(owner && !owner.active ? `${t('inv.delisted_code_prefix')}.` : t('toast.barcode_taken'), 'error');
             return false;
         }
+        if (error && error.code === '23505' && String(error.message).includes('product_variants_sku_key')) {
+            toast(`${t('toast.sku_taken')} ${typedSkus.map(s => s.sku).join(', ')}`, 'error');
+            return false;
+        }
         if (error) { toast(error.message, 'error'); return false; }
+
+        // What was typed ahead of the sizes: the style's price, and colours that
+        // have no size yet. Best-effort like the stock lines below — a failure is
+        // shown, it does not undo the style save.
+        if (stylePrice && STYLE_PRICE_OK === true) {
+            const { error: spErr } = await sb.from('product_style_prices')
+                .upsert({ product_id: data.product_id, price: stylePrice.price, cost_price: stylePrice.cost > 0 ? stylePrice.cost : null }, { onConflict: 'product_id' });
+            if (spErr) toast(spErr.message, 'error');
+            else toast(t('toast.style_price_kept'), 'success');
+        }
+        if (emptyColours.length) {
+            const { error: ecErr } = await sb.from('product_colors')
+                .upsert(emptyColours.map(c => Object.assign({ product_id: data.product_id }, c)), { onConflict: 'product_id,color_name', ignoreDuplicates: true });
+            if (ecErr) toast(ecErr.message, 'error');
+        }
+        if (unpricedCount > 0) toast(`${unpricedCount} ${t('toast.sizes_without_price')}`, 'warn');
+        try { localStorage.removeItem(STYLE_DRAFT_KEY); } catch (e) {}
 
         // Queue any typed-in initial stock as incoming shipments now that the
         // variant IDs exist. Best-effort per line — a failure here doesn't
@@ -7272,10 +7594,17 @@
             for (const [storeId, qty] of Object.entries(byStore)) {
                 if (storeId === 'undefined' || !qty || qty <= 0) continue;
                 incomingCalls.push(
-                    sb.rpc('rpc_add_incoming_stock', {
-                        p_variant_id: v.variant_id, p_target_location_id: parseInt(storeId),
-                        p_quantity: qty, p_notes: 'Naujas modelis (Prekių valdymas)'
-                    }).then(({ error: e }) => e && toast(`${v.sku}: ${e.message}`, 'error'))
+                    (STAGED_PLUS_GOES_TO === 'incoming'
+                        ? sb.rpc('rpc_add_incoming_stock', {
+                            p_variant_id: v.variant_id, p_target_location_id: parseInt(storeId),
+                            p_quantity: qty, p_notes: 'Naujas modelis (Prekių valdymas)'
+                        })
+                        // Stock count mode: counted on the shelf, so straight into that shop.
+                        : sb.rpc('rpc_record_stock_adjustment', {
+                            p_variant_id: v.variant_id, p_location_id: parseInt(storeId),
+                            p_quantity_change: qty, p_reason: 'ARRIVAL', p_notes: 'Inventorizacija — naujas dydis (Prekių valdymas)'
+                        })
+                    ).then(({ error: e }) => e && toast(`${v.sku}: ${e.message}`, 'error'))
                 );
             }
         });
@@ -7327,7 +7656,7 @@
         // a blank form — a manager mid-edit shouldn't have to re-find it in the
         // list after every save. "Naujas modelis" is the explicit way to start
         // a fresh blank style now that Save no longer doubles as a clear button.
-        loadProductForEdit(data.product_id);
+        loadProductForEdit(data.product_id, { dropDrafts: true }); // everything on the form was just saved
         // Sent units' "(+N)" are gone after the re-render above; anything that
         // failed is still staged and still shown.
         if (failedStaged.length) toast(t('toast.save_stock_failed'), 'warn');
@@ -12055,6 +12384,7 @@ ${qrBlock}${field(skuT.g, qrColX, skuT.y)}${field(colourT.g, qrColX, colourT.y)}
             // of dropping a manager who just wants to browse into a form.
             if (document.getElementById('colorBlocksContainer').children.length) showInventoryForm();
             else { document.getElementById('invFormFields').classList.add('hidden'); document.getElementById('invFormEmpty').classList.remove('hidden'); }
+            maybeRestoreStyleDraft(); // a draft parked before a reload / expired session
         }
         else if (view === 'requests') { enterRequestsView(); }
         else if (view === 'register') { renderRegisterView(); }
