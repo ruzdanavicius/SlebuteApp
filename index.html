@@ -1189,6 +1189,10 @@
                                     <button class="icon-btn add" onclick="addColorBlock()" title="Add color" data-i18n-title="inv.add_color"><i class="fas fa-plus"></i></button>
                                 </div>
                             </div>
+                            <label id="countModeLabel" style="display:flex; align-items:center; gap:8px; font-size:0.8rem; cursor:pointer; padding:8px 10px; margin-bottom:10px; border-radius:8px; border:1px solid var(--border-color, #ddd);">
+                                <input type="checkbox" id="countModeCheckbox" onchange="onCountModeToggle()">
+                                <span data-i18n="inv.count_mode">Stock count mode — quantities go straight into the shop's stock (not via Transfers)</span>
+                            </label>
                             <div id="colorBlocksContainer"></div>
                         </div>
 
@@ -2379,6 +2383,9 @@
             'toast.size_duplicate': 'The same size is entered twice in one colour.',
             'toast.draft_restored': 'Unsaved style draft restored — check it and press Save.',
             'inv.no_price_badge': 'No price', 'inv.no_price_filter': 'No price',
+            'inv.count_mode': 'Stock count mode — quantities go straight into the shop\'s stock (not via Transfers)',
+            'toast.count_mode_on': 'Stock count mode ON — every + and new-size quantity goes straight into the shop\'s stock on Save. Switch it off after the count.',
+            'toast.count_mode_off': 'Stock count mode off — quantities go to Transfers as incoming again.',
             'inv.no_sizes_badge': 'No sizes', 'inv.no_sizes_filter': 'No sizes', 'inv.web_only_filter': 'On website',
             'toast.session_expired': 'Session expired — signing you in again.',
             'toast.image_process_failed': 'Could not process that image:', 'toast.enter_qty_add': 'Enter a quantity to add.',
@@ -2747,6 +2754,9 @@
             'toast.size_duplicate': 'Tas pats dydis įvestas du kartus toje pačioje spalvoje.',
             'toast.draft_restored': 'Atkurtas neišsaugotas modelio juodraštis — patikrinkite ir spauskite „Išsaugoti“.',
             'inv.no_price_badge': 'Be kainos', 'inv.no_price_filter': 'Be kainos',
+            'inv.count_mode': 'Skaičiavimo režimas — kiekiai iš karto į parduotuvės likutį (ne per Pervežimus)',
+            'toast.count_mode_on': 'Skaičiavimo režimas ĮJUNGTAS — kiekvienas + ir naujo dydžio kiekis išsaugant iš karto patenka į parduotuvės likutį. Baigę skaičiuoti išjunkite.',
+            'toast.count_mode_off': 'Skaičiavimo režimas išjungtas — kiekiai vėl keliauja per Pervežimus kaip atvykstantys.',
             'inv.no_sizes_badge': 'Be dydžių', 'inv.no_sizes_filter': 'Be dydžių', 'inv.web_only_filter': 'Svetainėje',
             'toast.session_expired': 'Sesija baigėsi — prisijungiama iš naujo.',
             'toast.image_process_failed': 'Nepavyko apdoroti nuotraukos:', 'toast.enter_qty_add': 'Įveskite pridedamą kiekį.',
@@ -5734,7 +5744,30 @@
     //   'shop'     straight into that shop's stock — audited ARRIVAL adjustment
     //              (rpc_record_stock_adjustment); the number changes on Save.
     // Flip this one word to change the behaviour for every size row.
-    const STAGED_PLUS_GOES_TO = 'incoming';
+    // Stock count mode (2026-11-12): while the shops are being counted the items
+    // are already on the shelf, so sending every + through Pervežimai (accept,
+    // scan out, scan in) is a wasted second step. The switch above the colours
+    // flips the destination to 'shop' on this device until it is switched off;
+    // the default stays 'incoming'. New sizes' typed quantities follow it too.
+    const COUNT_MODE_KEY = 'slebute_count_mode';
+    function countModeOn() { try { return localStorage.getItem(COUNT_MODE_KEY) === '1'; } catch (e) { return false; } }
+    let STAGED_PLUS_GOES_TO = countModeOn() ? 'shop' : 'incoming';
+    function syncCountModeUI() {
+        const box = document.getElementById('countModeCheckbox');
+        const label = document.getElementById('countModeLabel');
+        if (!box || !label) return;
+        const on = STAGED_PLUS_GOES_TO === 'shop';
+        box.checked = on;
+        label.style.background = on ? 'var(--warning-bg)' : '';
+        label.style.fontWeight = on ? '600' : 'normal';
+    }
+    function onCountModeToggle() {
+        const on = document.getElementById('countModeCheckbox').checked;
+        STAGED_PLUS_GOES_TO = on ? 'shop' : 'incoming';
+        try { on ? localStorage.setItem(COUNT_MODE_KEY, '1') : localStorage.removeItem(COUNT_MODE_KEY); } catch (e) {}
+        syncCountModeUI();
+        toast(t(on ? 'toast.count_mode_on' : 'toast.count_mode_off'), on ? 'warn' : 'info');
+    }
 
     function stagedUnits(styleId) {
         return Object.values(pendingStock[styleId] || {}).reduce((a, b) => a + b, 0);
@@ -6681,6 +6714,7 @@
     // placeholder — called only once the manager actually asks for a form,
     // either via New Style or by picking an existing style from the list.
     function showInventoryForm() {
+        syncCountModeUI();
         document.getElementById('invFormEmpty').classList.add('hidden');
         document.getElementById('invFormFields').classList.remove('hidden');
     }
@@ -7560,10 +7594,17 @@
             for (const [storeId, qty] of Object.entries(byStore)) {
                 if (storeId === 'undefined' || !qty || qty <= 0) continue;
                 incomingCalls.push(
-                    sb.rpc('rpc_add_incoming_stock', {
-                        p_variant_id: v.variant_id, p_target_location_id: parseInt(storeId),
-                        p_quantity: qty, p_notes: 'Naujas modelis (Prekių valdymas)'
-                    }).then(({ error: e }) => e && toast(`${v.sku}: ${e.message}`, 'error'))
+                    (STAGED_PLUS_GOES_TO === 'incoming'
+                        ? sb.rpc('rpc_add_incoming_stock', {
+                            p_variant_id: v.variant_id, p_target_location_id: parseInt(storeId),
+                            p_quantity: qty, p_notes: 'Naujas modelis (Prekių valdymas)'
+                        })
+                        // Stock count mode: counted on the shelf, so straight into that shop.
+                        : sb.rpc('rpc_record_stock_adjustment', {
+                            p_variant_id: v.variant_id, p_location_id: parseInt(storeId),
+                            p_quantity_change: qty, p_reason: 'ARRIVAL', p_notes: 'Inventorizacija — naujas dydis (Prekių valdymas)'
+                        })
+                    ).then(({ error: e }) => e && toast(`${v.sku}: ${e.message}`, 'error'))
                 );
             }
         });
