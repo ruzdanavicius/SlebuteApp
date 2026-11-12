@@ -2248,7 +2248,7 @@
             'inv.select_or_new': 'Select a style from the list, or start a new one.',
             'inv.search_styles': 'Search styles...', 'inv.style_reference': 'Style Reference',
             'inv.base_barcode': 'Base Barcode (scan tag)', 'inv.base_barcode_hint': 'No barcode on the garment? Leave this blank — a reference like "keln-001" (from the category) is assigned automatically. It won\u2019t match future scans the way a real tag barcode would.', 'inv.loaded_existing': 'Loaded existing style — editing.',
-            'inv.delisted_code_prefix': 'This code belongs to the removed style', 'inv.restore_style': 'Restore style', 'toast.style_restored': 'Style restored — add the new stock.', 'toast.barcode_taken': 'This barcode is already in use by another style.',
+            'inv.delisted_code_prefix': 'This code belongs to the removed style', 'inv.restore_style': 'Restore style', 'toast.style_restored': 'Style restored — add the new stock.', 'toast.barcode_taken': 'This barcode is already in use by another style.', 'inv.barcode_clash_active': 'This code is already used by the style', 'inv.open_style': 'Open style', 'inv.barcode_clash_revert': 'Restore previous code', 'inv.draft_save_confirm': 'This style has unsaved sizes. Save them before leaving?', 'inv.draft_discard_confirm': 'Leave without saving? The unsaved sizes will be lost.', 'toast.price_required': 'Enter a price for every new size — it cannot be €0.',
             'inv.delist_blocked_prefix': 'Can’t delete — there are still', 'inv.delist_blocked_suffix': 'units (on display, in storage or incoming). Write them off or move them first.', 'inv.delist_blocked_server': 'Can’t delete — there is still stock, or an open transfer / pickup reservation. Write off or move the stock first.',
             'inv.product_name': 'Product Name', 'inv.category': 'Category',
             'inv.size_range': 'Size Range', 'inv.size_range_hint': '(printed on labels, e.g. "XS-XL")',
@@ -2607,7 +2607,7 @@
             'inv.select_or_new': 'Pasirinkite modelį iš sąrašo arba pradėkite naują.',
             'inv.search_styles': 'Ieškoti modelių...', 'inv.style_reference': 'Modelio informacija',
             'inv.base_barcode': 'Pagrindinis brūkšninis kodas', 'inv.base_barcode_hint': 'Ant drabužio nėra brūkšninio kodo? Palikite tuščią — nuoroda, pvz. „keln-001“ (iš kategorijos), bus priskirta automatiškai. Ji neatpažins būsimų skenavimų taip, kaip tikras kodas ant etiketės.', 'inv.loaded_existing': 'Įkeltas esamas modelis — redaguojama.',
-            'inv.delisted_code_prefix': 'Šis kodas priklauso išimtam modeliui', 'inv.restore_style': 'Atkurti modelį', 'toast.style_restored': 'Modelis atkurtas — pridėkite naujas prekes.', 'toast.barcode_taken': 'Šis brūkšninis kodas jau naudojamas kitam modeliui.',
+            'inv.delisted_code_prefix': 'Šis kodas priklauso išimtam modeliui', 'inv.restore_style': 'Atkurti modelį', 'toast.style_restored': 'Modelis atkurtas — pridėkite naujas prekes.', 'toast.barcode_taken': 'Šis brūkšninis kodas jau naudojamas kitam modeliui.', 'inv.barcode_clash_active': 'Šį kodą jau naudoja modelis', 'inv.open_style': 'Atidaryti modelį', 'inv.barcode_clash_revert': 'Grąžinti ankstesnį kodą', 'inv.draft_save_confirm': 'Šiame modelyje yra neišsaugotų dydžių. Išsaugoti prieš išeinant?', 'inv.draft_discard_confirm': 'Išeiti neišsaugojus? Neišsaugoti dydžiai bus prarasti.', 'toast.price_required': 'Įveskite kiekvieno naujo dydžio kainą — ji negali būti 0 €.',
             'inv.delist_blocked_prefix': 'Negalima ištrinti — dar yra', 'inv.delist_blocked_suffix': 'vnt. (vitrinoje, sandėlyje arba atvyksta). Pirmiausia nurašykite arba perkelkite juos.', 'inv.delist_blocked_server': 'Negalima ištrinti — dar yra prekių arba neužbaigtas pervežimas / rezervacija. Pirmiausia nurašykite arba perkelkite prekes.',
             'inv.product_name': 'Prekės pavadinimas', 'inv.category': 'Kategorija',
             'inv.size_range': 'Dydžių intervalas', 'inv.size_range_hint': '(spausdinama etiketėse, pvz. „XS-XL“)',
@@ -5662,6 +5662,7 @@
        INVENTORY MATRIX CREATOR
        ============================================================ */
     let editingProductId = null;
+    let blockedBarcode = null;          // a barcode the server refused for the open style (see showBarcodeClash)
 
     // Stock staged with a size row's + button but not saved yet. The row shows it
     // as "(+N)" beside the real count and the Save Style button counts it ("+7
@@ -5911,7 +5912,7 @@
         if (webOnlyOnly) list = list.filter(p => p.isFeaturedOnline);
         const panel = document.getElementById('productsListPanel');
         panel.innerHTML = list.map(p => `
-            <div class="products-list-item ${editingProductId === p.id ? 'active' : ''}" onclick="loadProductForEdit(${p.id})">
+            <div class="products-list-item ${editingProductId === p.id ? 'active' : ''}" onclick="openStyleFromList(${p.id})">
                 ${photoTagHTML(p.image_url, 'products-list-thumb', false)}
                 <div class="pli-text">
                     <span>${escapeHtml(p.name)}${productHasClearanceVariant(p) ? ` <span class="sale-badge" title="${t('clearance.final_sale_title')}">${t('pos.sale_badge')}</span>` : ''}</span>
@@ -6609,7 +6610,22 @@
 
     // Pending edits on the open style are saved first, so clearing or re-rendering
     // the form can never throw them away; if that save fails we stay on the form.
-    function startNewProduct() {
+    // Leaving a form that holds new size rows (or a brand-new style) that were never
+    // saved used to throw them away without a word — only closing the tab warned.
+    // Offer to save first; a second prompt makes discarding a deliberate choice.
+    async function confirmLeaveDraft() {
+        if (!hasUnsavedDraftWork()) return true;
+        if (confirm(t('inv.draft_save_confirm'))) return !!(await saveMatrixProduct());
+        return confirm(t('inv.draft_discard_confirm'));
+    }
+
+    async function openStyleFromList(id) {
+        if (!(await confirmLeaveDraft())) return;
+        loadProductForEdit(id);
+    }
+
+    async function startNewProduct() {
+        if (!(await confirmLeaveDraft())) return;
         if (styleHasPendingEdits()) { flushStyleEdits({ includeFocused: true }).then(ok => { if (ok) renderNewProduct(); }); return; }
         renderNewProduct();
     }
@@ -6618,6 +6634,7 @@
         showInventoryForm();
         leaveStyleFor(null);
         editingProductId = null;
+        blockedBarcode = null;
         ['new_base_barcode','new_name','new_category','new_size_range','new_composition','new_description'].forEach(id => document.getElementById(id).value = '');
         document.getElementById('new_supplier').value = '';
         document.getElementById('new_supplier_id').value = '';
@@ -6649,6 +6666,7 @@
         showInventoryForm();
         leaveStyleFor(id);
         editingProductId = id;
+        blockedBarcode = null;
         document.getElementById('printAllStyleBtn').classList.remove('hidden');
         document.getElementById('styleEditDeleteBtn').classList.remove('hidden');
         const featuredLabel = document.getElementById('featuredOnlineLabel');
@@ -6691,26 +6709,83 @@
         setAutosaveStatus('');
     }
 
+    // Barcode field left (typed or scanned). base_barcode is unique across ALL styles,
+    // including removed ones and ones created on another device since this screen
+    // loaded — the local `products` list knows none of those, so a clash only showed
+    // up as a rejected save. Check the database now and say who owns the code.
     async function autoFillProduct() {
-        const b = document.getElementById('new_base_barcode').value.trim();
+        const el = document.getElementById('new_base_barcode');
+        const b = el.value.trim();
+        blockedBarcode = null;
+        document.getElementById('delistedMsg').style.display = 'none';
         if (!b) return;
-        const existing = products.find(p => p.base_barcode === b);
-        if (existing) { loadProductForEdit(existing.id); return; }
-        document.getElementById('foundMsg').style.display = 'none';
-        if (!editingProductId) await showDelistedNotice(b);
+        const current = editingProductId ? products.find(p => p.id === editingProductId) : null;
+        if (current && (current.base_barcode || '') === b) return; // unchanged: nothing to look up (and no re-render over typed rows)
+        const local = products.find(p => p.base_barcode === b && p.id !== editingProductId);
+        const info = local ? { id: local.id, name: local.name, active: true } : await findBarcodeOwner(b);
+        if (el.value.trim() !== b) return; // changed while we were asking
+        if (!info) { document.getElementById('foundMsg').style.display = 'none'; return; }
+        // Scan-to-find on a blank form: jump straight to that style, as before.
+        if (info.active && !editingProductId && !formHasWorkBeyondBarcode()) {
+            if (!products.find(p => p.id === info.id)) await loadInventory();
+            loadProductForEdit(info.id);
+            return;
+        }
+        showBarcodeClash(info, b);
+    }
+
+    function formHasWorkBeyondBarcode() {
+        return !!document.getElementById('new_name').value.trim()
+            || Array.from(document.querySelectorAll('#colorBlocksContainer .size-row .size-input')).some(i => i.value.trim());
+    }
+
+    // Who owns this code (active or removed), other than the style on screen. null = free
+    // (or the lookup failed — the server still has the last word on save).
+    async function findBarcodeOwner(code) {
+        let q = sb.from('products').select('id, name, is_active').eq('base_barcode', code);
+        if (editingProductId) q = q.neq('id', editingProductId);
+        const { data, error } = await q.limit(1);
+        if (error || !data || !data.length) return null;
+        return { id: data[0].id, name: data[0].name, active: !!data[0].is_active };
+    }
+
+    function showBarcodeClash(info, code) {
+        const box = document.getElementById('delistedMsg');
+        const editing = !!editingProductId;
+        if (editing) blockedBarcode = code; // autosave must not keep re-sending a code the server already refused
+        let buttons = '';
+        if (info.active) buttons += `<button type="button" class="btn btn-ghost btn-sm" onclick="openClashStyle(${info.id})"><i class="fas fa-arrow-up-right-from-square"></i> ${t('inv.open_style')}</button>`;
+        else if (!editing) buttons += `<button type="button" class="btn btn-ghost btn-sm" onclick="restoreDelistedProduct(${info.id}, this)"><i class="fas fa-rotate-left"></i> ${t('inv.restore_style')}</button>`;
+        if (editing) buttons += `<button type="button" class="btn btn-ghost btn-sm" onclick="revertBarcodeField()"><i class="fas fa-rotate-left"></i> ${t('inv.barcode_clash_revert')}</button>`;
+        box.innerHTML = `<span>${info.active ? t('inv.barcode_clash_active') : t('inv.delisted_code_prefix')} „${escapeHtml(info.name)}“.</span>${buttons}`;
+        box.style.display = 'flex';
+    }
+
+    function revertBarcodeField() {
+        const p = editingProductId ? products.find(x => x.id === editingProductId) : null;
+        document.getElementById('new_base_barcode').value = p ? (p.base_barcode || '') : '';
+        blockedBarcode = null;
+        document.getElementById('delistedMsg').style.display = 'none';
+    }
+
+    async function openClashStyle(id) {
+        if (editingProductId) revertBarcodeField(); // the clashing edit must not travel with us
+        else if (formHasWorkBeyondBarcode() && !confirm(t('inv.draft_discard_confirm'))) return;
+        if (!products.find(p => p.id === id)) await loadInventory();
+        if (editingProductId && !(await confirmLeaveDraft())) return;
+        loadProductForEdit(id);
     }
 
     // `products` only holds active styles, but base_barcode is unique across
     // delisted ones too — offer to bring the old style back instead of failing on save.
+    // Returns the owner ({id, name, active}) when the code is taken, else null.
     async function showDelistedNotice(code) {
         const box = document.getElementById('delistedMsg');
         box.style.display = 'none';
-        const { data } = await sb.from('products').select('id, name').eq('base_barcode', code).eq('is_active', false).maybeSingle();
-        if (!data || document.getElementById('new_base_barcode').value.trim() !== code) return false;
-        box.innerHTML = `<span>${t('inv.delisted_code_prefix')} „${escapeHtml(data.name)}“.</span>
-            <button type="button" class="btn btn-ghost btn-sm" onclick="restoreDelistedProduct(${data.id}, this)"><i class="fas fa-rotate-left"></i> ${t('inv.restore_style')}</button>`;
-        box.style.display = 'flex';
-        return true;
+        const info = await findBarcodeOwner(code);
+        if (!info || document.getElementById('new_base_barcode').value.trim() !== code) return null;
+        showBarcodeClash(info, code);
+        return info;
     }
 
     async function restoreDelistedProduct(productId, btn) {
@@ -6979,6 +7054,7 @@
          ['composition', 'new_composition'], ['description', 'new_description']].forEach(([key, elId]) => {
             const el = document.getElementById(elId);
             const v = el.value.trim() || null;
+            if (key === 'base_barcode' && v && v === blockedBarcode) return; // already refused as taken — don't resend on every blur
             if (v !== (p[key] || null) && !skip(el)) out[key] = v;
         });
         const sup = document.getElementById('new_supplier_id').value || null;
@@ -7047,7 +7123,13 @@
             const { error } = await sb.rpc('rpc_upsert_fashion_product', {
                 p_product: Object.assign({ id: job.id }, job.product), p_variants: job.prices
             });
-            if (error) return fail(error.message);
+            if (error) {
+                if (error.code === '23505' && String(error.message).includes('base_barcode')) {
+                    if (editingProductId === job.id) showDelistedNotice(document.getElementById('new_base_barcode').value.trim());
+                    return fail(t('toast.barcode_taken'));
+                }
+                return fail(error.message);
+            }
         }
         await loadInventory();
         markColourEditsApplied(job.colours);
@@ -7109,6 +7191,7 @@
         // longer carries a `stock` key.
         const variants = [];
         const initialStockByRow = [];
+        const unpricedInputs = [];
         document.querySelectorAll('#colorBlocksContainer .color-block').forEach(block => {
             const colorName = block.querySelector('.color-name-input').value.trim() || 'Standard';
             const colorHex = block.querySelector('.color-hex-input').value;
@@ -7116,6 +7199,7 @@
                 const size = row.querySelector('.size-input').value.trim();
                 if (!size) return;
                 const price = parseMoney(row.querySelector('.price-input').value) || 0;
+                if (!(price > 0)) unpricedInputs.push(row.querySelector('.price-input'));
                 const cost = parseMoney(row.querySelector('.cost-input').value) || 0;
                 const sku = row.querySelector('.sku-input').value.trim();
                 const s1 = parseInt(row.querySelector('.stock1-input').value) || 0;
@@ -7124,6 +7208,17 @@
                 initialStockByRow.push({ [STORES[0]?.id]: s1, [STORES[1]?.id]: s2 });
             });
         });
+        // A blank price used to be saved as €0.00 — a size that then sells for nothing
+        // (218 such sizes were live on 2026-11-12). Stop before anything is written.
+        if (unpricedInputs.length) {
+            unpricedInputs.forEach(inp => {
+                inp.style.borderColor = 'var(--danger-color)';
+                inp.addEventListener('input', () => { inp.style.borderColor = ''; }, { once: true });
+            });
+            unpricedInputs[0].focus();
+            toast(t('toast.price_required'), 'warn');
+            return false;
+        }
         // A style may be saved with no size at all (request 2026-10-07): the
         // catalogue details are entered from home ahead of the stock count,
         // and the real colours/sizes are only known once the items are in
@@ -7161,8 +7256,8 @@
         btn.disabled = false; refreshSaveButton();
 
         if (error && error.code === '23505' && error.message.includes('base_barcode')) {
-            const delisted = await showDelistedNotice(payload_product.base_barcode);
-            toast(delisted ? `${t('inv.delisted_code_prefix')}.` : t('toast.barcode_taken'), 'warn');
+            const owner = await showDelistedNotice(payload_product.base_barcode);
+            toast(owner && !owner.active ? `${t('inv.delisted_code_prefix')}.` : t('toast.barcode_taken'), 'error');
             return false;
         }
         if (error) { toast(error.message, 'error'); return false; }
