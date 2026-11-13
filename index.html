@@ -6256,6 +6256,8 @@
     let storageTabPendingBatch = []; // [{ variantId, direction, sku, name, colorName, size, qty }] — staged, not yet submitted
 
     function setStorageTabScanDirection(dir) {
+        if (dir === 'COUNT' && !SHOP_COUNT_ENABLED) dir = 'TO_STORAGE';
+        document.getElementById('storageTabScanCountBtn').style.display = SHOP_COUNT_ENABLED ? '' : 'none';
         storageTabScanDirection = dir;
         document.getElementById('storageTabScanToStorageBtn').classList.toggle('active', dir === 'TO_STORAGE');
         document.getElementById('storageTabScanToDisplayBtn').classList.toggle('active', dir === 'TO_DISPLAY');
@@ -6414,6 +6416,11 @@
        so a reload or a dead tablet mid-count loses nothing. Applying is
        idempotent: deltas are recomputed from the live numbers each time,
        so a partly failed apply can simply be pressed again. */
+    // Master switch. Set to false once both shops are fully scanned in: the
+    // "Shop count" tab disappears and COUNT can't be selected. Flip back to
+    // true (and deploy) for a future stocktake. Applying zeroes unscanned
+    // stock, so it should not sit open to everyone between counts.
+    const SHOP_COUNT_ENABLED = true;
     const SHOP_COUNT_KEY_PREFIX = 'slebute_shop_count_';
     let shopCountBatch = {};      // variantId -> { qty, sku, name, colorName, size, at }
     let shopCountLocId = null;    // store the in-memory batch belongs to
