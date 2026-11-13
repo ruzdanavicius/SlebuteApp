@@ -535,6 +535,8 @@
         .storage-batch-dir { display:inline-block; font-size:0.6rem; font-weight:700; letter-spacing:0.02em; padding:1px 6px; border-radius:4px; margin-left:6px; vertical-align:middle; }
         .storage-batch-dir.to-storage { background: rgba(181,118,15,0.15); color:#b5760f; }
         .storage-batch-dir.to-display { background: var(--success-tint); color: var(--success-color); }
+        #storageTabCountBadge:not(:empty) { margin-left:4px; padding:0 6px; border-radius:8px; background: rgba(36,22,30,0.12); font-size:0.68rem; }
+        .storage-scan-panel .pay-tab.active #storageTabCountBadge:not(:empty) { background: rgba(255,255,255,0.25); }
         .storage-browse-panel { flex: 1; min-width: 0; }
         .storage-filter-row { display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; }
         .storage-filter-row input, .storage-filter-row select { flex: 1; min-width: 150px; }
@@ -1051,13 +1053,14 @@
                         <div style="display:flex; gap:8px; margin-bottom:10px;">
                             <div class="pay-tab" id="storageTabScanToStorageBtn" onclick="setStorageTabScanDirection('TO_STORAGE')"><i class="fas fa-box-archive"></i> <span data-i18n="storage.mode_to_storage">To storage</span></div>
                             <div class="pay-tab" id="storageTabScanToDisplayBtn" onclick="setStorageTabScanDirection('TO_DISPLAY')"><i class="fas fa-store"></i> <span data-i18n="storage.mode_to_display">To display</span></div>
+                            <div class="pay-tab" id="storageTabScanCountBtn" onclick="setStorageTabScanDirection('COUNT')"><i class="fas fa-clipboard-check"></i> <span data-i18n="storage.mode_count">Shop count</span><span id="storageTabCountBadge"></span></div>
                         </div>
                         <input type="text" id="storageTabScanManualInput" class="form-input kb-toggle-input" inputmode="none" data-i18n-placeholder="storage.manual_input_placeholder" placeholder="SKU (if the scanner can't read the tag)" onkeydown="if(event.key==='Enter'){event.preventDefault(); handleStorageTabScanManualEnter();}">
                         <p id="storageTabScanStatus" style="font-size:0.85rem; min-height:1.2em; margin:10px 0 6px; font-weight:600;"></p>
                         <div id="storageTabScanLogRows" class="storage-scan-log"></div>
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px; gap:10px;">
                             <div id="storageTabScanSessionTotal" style="font-weight:700; font-size:0.82rem;"></div>
-                            <button id="storageTabSubmitBtn" class="btn btn-primary" onclick="submitStorageTabBatch()" disabled><i class="fas fa-check"></i> <span data-i18n="storage.submit_batch">Submit batch</span></button>
+                            <button id="storageTabSubmitBtn" class="btn btn-primary" onclick="submitStorageTabBatch()" disabled><i class="fas fa-check"></i> <span id="storageTabSubmitLabel" data-i18n="storage.submit_batch">Submit batch</span></button>
                         </div>
                     </div>
 
@@ -2230,6 +2233,13 @@
             'storage.move_failed_prefix': "Couldn't move stock:",
             'storage.scan_panel_title': 'Scan into / out of storage', 'storage.scan_panel_hint': 'Pick a direction, then scan — each scan moves one unit. Nothing is relabeled.',
             'storage.mode_to_storage': 'To storage', 'storage.mode_to_display': 'To display',
+            'storage.mode_count': 'Shop count',
+            'storage.count_hint': 'Shop count: scan every item physically in this shop, one scan per unit. Applying sets the shop-floor stock to exactly what you scanned.',
+            'storage.count_apply': 'Apply count', 'storage.count_scanned': 'Scanned', 'storage.count_unscanned': 'Not scanned → 0', 'storage.count_system': 'system',
+            'storage.count_confirm': "{store}: set shop-floor stock to the scanned count?\n\nScanned: {units} units ({variants} variants)\nNot scanned, will be set to 0: {zeroed} variants (−{zeroedUnits} units)\nChanges to save: {changes}",
+            'storage.count_nothing': 'The count already matches the system — nothing to change.',
+            'storage.count_applying': 'Applying count…', 'storage.count_done_prefix': 'Count applied — changes:',
+            'storage.count_failed': 'failed — press Apply count again to retry the rest.',
             'storage.scan_hint': 'Scan an item to move it.', 'storage.manual_input_placeholder': "SKU (if the scanner can't read the tag)",
             'storage.nothing_on_display': 'Nothing on display here to move to storage.',
             'storage.nothing_in_storage': 'Nothing in storage here to bring out.',
@@ -2601,6 +2611,13 @@
             'storage.move_failed_prefix': 'Nepavyko perkelti prekės:',
             'storage.scan_panel_title': 'Nuskaityti į sandėlį / iš sandėlio', 'storage.scan_panel_hint': 'Pasirinkite kryptį, tada nuskaitykite — kiekvienas nuskaitymas perkelia vieną vienetą. Etikečių keisti nereikia.',
             'storage.mode_to_storage': 'Į sandėlį', 'storage.mode_to_display': 'Į prekybą',
+            'storage.mode_count': 'Inventorius',
+            'storage.count_hint': 'Inventorius: nuskaitykite kiekvieną šioje parduotuvėje esantį drabužį — vienas nuskaitymas = vienas vienetas. Pritaikius, prekybos salės likutis taps lygiai toks, kiek nuskaitėte.',
+            'storage.count_apply': 'Taikyti inventorių', 'storage.count_scanned': 'Nuskaityta', 'storage.count_unscanned': 'Nenuskaityta → 0', 'storage.count_system': 'sistemoje',
+            'storage.count_confirm': "{store}: nustatyti prekybos salės likutį pagal nuskaitytą kiekį?\n\nNuskaityta: {units} vnt. ({variants} variantų)\nNenuskaityta, bus nustatyta į 0: {zeroed} variantų (−{zeroedUnits} vnt.)\nIšsaugotinų pakeitimų: {changes}",
+            'storage.count_nothing': 'Nuskaitytas kiekis sutampa su sistema — keisti nėra ko.',
+            'storage.count_applying': 'Taikomas inventorius…', 'storage.count_done_prefix': 'Inventorius pritaikytas — pakeitimų:',
+            'storage.count_failed': 'nepavyko — paspauskite „Taikyti inventorių“ dar kartą likusiems.',
             'storage.scan_hint': 'Nuskaitykite prekę, kad ją perkeltumėte.', 'storage.manual_input_placeholder': 'SKU (jei skeneris neperskaito etiketės)',
             'storage.nothing_on_display': 'Šioje parduotuvėje prekyboje nieko nėra — perkelti į sandėlį nėra ko.',
             'storage.nothing_in_storage': 'Šioje parduotuvėje sandėlyje nieko nėra — atnešti į prekybą nėra ko.',
@@ -6242,6 +6259,15 @@
         storageTabScanDirection = dir;
         document.getElementById('storageTabScanToStorageBtn').classList.toggle('active', dir === 'TO_STORAGE');
         document.getElementById('storageTabScanToDisplayBtn').classList.toggle('active', dir === 'TO_DISPLAY');
+        document.getElementById('storageTabScanCountBtn').classList.toggle('active', dir === 'COUNT');
+        const submitLabel = document.getElementById('storageTabSubmitLabel');
+        const submitKey = dir === 'COUNT' ? 'storage.count_apply' : 'storage.submit_batch';
+        submitLabel.setAttribute('data-i18n', submitKey);
+        submitLabel.innerText = t(submitKey);
+        const scanStatus = document.getElementById('storageTabScanStatus');
+        scanStatus.innerText = t(dir === 'COUNT' ? 'storage.count_hint' : 'storage.scan_hint');
+        scanStatus.style.color = '';
+        renderStorageTabScanLog();
         // Clicking either direction button steals focus from the manual
         // input by default (it's the clicked element that becomes
         // document.activeElement) — hand it straight back so a scan can
@@ -6277,6 +6303,7 @@
     }
 
     function stageStorageTabScan(p, v, direction) {
+        if (direction === 'COUNT') { stageShopCountScan(p, v); return; }
         const status = document.getElementById('storageTabScanStatus');
         const locId = VIEW_LOCATION_ID; // scanning always stages against only the store currently being viewed
         const loc = (v.stockByLocation || {})[locId] || { quantity: 0, storage: 0 };
@@ -6313,6 +6340,8 @@
     }
 
     function renderStorageTabScanLog() {
+        updateShopCountBadge();
+        if (storageTabScanDirection === 'COUNT') { renderShopCountLog(); return; }
         const rows = document.getElementById('storageTabScanLogRows');
         rows.innerHTML = storageTabPendingBatch.length
             ? storageTabPendingBatch.map((r, i) => `
@@ -6339,6 +6368,7 @@
     // every view (this table, the POS grid, cart-line sibling hints)
     // reflects the real committed numbers, not the optimistic staged ones.
     async function submitStorageTabBatch() {
+        if (storageTabScanDirection === 'COUNT') { await submitShopCount(); return; }
         if (!storageTabPendingBatch.length) return;
         const btn = document.getElementById('storageTabSubmitBtn');
         const status = document.getElementById('storageTabScanStatus');
@@ -6366,6 +6396,168 @@
         renderStorageTab();
         btn.disabled = false;
         document.getElementById('storageTabScanManualInput')?.focus();
+    }
+
+    /* ============================================================
+       SHOP COUNT mode (2026-11-13) — "scan everything on the shelf".
+       ============================================================
+       Third mode of the scan panel. Used while a shop is being counted
+       for the first time after labelling: scan every garment (one scan =
+       one unit), then Apply. Applying makes the shop-floor quantity of
+       the store being viewed equal to the scanned count — REPLACE, not
+       add — via one audited CORRECTION adjustment per changed variant
+       (rpc_record_stock_adjustment, delta computed against fresh
+       inventory at apply time). Variants with stock that were never
+       scanned are set to 0. Storage-zone units are not touched.
+
+       Scans live only in this browser (localStorage, one slot per store)
+       so a reload or a dead tablet mid-count loses nothing. Applying is
+       idempotent: deltas are recomputed from the live numbers each time,
+       so a partly failed apply can simply be pressed again. */
+    const SHOP_COUNT_KEY_PREFIX = 'slebute_shop_count_';
+    let shopCountBatch = {};      // variantId -> { qty, sku, name, colorName, size, at }
+    let shopCountLocId = null;    // store the in-memory batch belongs to
+
+    function ensureShopCountLoaded() {
+        if (shopCountLocId === VIEW_LOCATION_ID) return;
+        shopCountLocId = VIEW_LOCATION_ID;
+        shopCountBatch = {};
+        try {
+            const raw = localStorage.getItem(SHOP_COUNT_KEY_PREFIX + VIEW_LOCATION_ID);
+            if (raw) shopCountBatch = JSON.parse(raw) || {};
+        } catch (e) { shopCountBatch = {}; }
+    }
+    function saveShopCount() {
+        try {
+            if (Object.keys(shopCountBatch).length) localStorage.setItem(SHOP_COUNT_KEY_PREFIX + shopCountLocId, JSON.stringify(shopCountBatch));
+            else localStorage.removeItem(SHOP_COUNT_KEY_PREFIX + shopCountLocId);
+        } catch (e) {}
+    }
+
+    // variantId -> { qty, sku } for every variant of the viewed store (shop floor only).
+    function shopCountSystemMap(locId) {
+        const m = new Map();
+        for (const p of products) for (const v of p.variants) {
+            m.set(v.id, { qty: ((v.stockByLocation || {})[locId] || {}).quantity || 0, sku: v.sku || `#${v.id}` });
+        }
+        return m;
+    }
+
+    function shopCountTotals() {
+        ensureShopCountLoaded();
+        const sys = shopCountSystemMap(VIEW_LOCATION_ID);
+        let units = 0, variants = 0, zeroed = 0, zeroedUnits = 0;
+        for (const l of Object.values(shopCountBatch)) { units += l.qty; variants++; }
+        for (const [vid, s] of sys) if (s.qty > 0 && !shopCountBatch[vid]) { zeroed++; zeroedUnits += s.qty; }
+        return { sys, units, variants, zeroed, zeroedUnits };
+    }
+
+    function updateShopCountBadge() {
+        ensureShopCountLoaded();
+        const units = Object.values(shopCountBatch).reduce((s, l) => s + l.qty, 0);
+        document.getElementById('storageTabCountBadge').innerText = units ? String(units) : '';
+    }
+
+    function stageShopCountScan(p, v) {
+        ensureShopCountLoaded();
+        const status = document.getElementById('storageTabScanStatus');
+        const line = shopCountBatch[v.id] || (shopCountBatch[v.id] = { qty: 0, sku: v.sku, name: p.name, colorName: v.colorName, size: v.size, at: 0 });
+        line.qty++;
+        line.at = Date.now();
+        saveShopCount();
+        status.innerText = `${v.sku} → ${line.qty}`;
+        status.style.color = 'var(--success-color)';
+        renderStorageTabScanLog();
+        document.getElementById('storageTabScanManualInput')?.focus();
+    }
+
+    function decrementShopCountLine(variantId) {
+        ensureShopCountLoaded();
+        const line = shopCountBatch[variantId];
+        if (!line) return;
+        if (--line.qty <= 0) delete shopCountBatch[variantId];
+        saveShopCount();
+        renderStorageTabScanLog();
+        document.getElementById('storageTabScanManualInput')?.focus();
+    }
+
+    function renderShopCountLog() {
+        const rows = document.getElementById('storageTabScanLogRows');
+        const { sys, units, variants, zeroed, zeroedUnits } = shopCountTotals();
+        const lines = Object.entries(shopCountBatch).map(([id, l]) => ({ id: Number(id), ...l })).sort((a, b) => b.at - a.at);
+        rows.innerHTML = lines.length
+            ? lines.map(r => `
+                <div class="scan-item-row">
+                    <div class="scan-item-info">
+                        <div class="si-name">${escapeHtml(r.name)} — ${escapeHtml(r.colorName)} / ${escapeHtml(r.size)}</div>
+                        <div class="si-sub">${escapeHtml(r.sku)} · ${t('storage.count_system')}: ${(sys.get(r.id) || { qty: 0 }).qty}</div>
+                    </div>
+                    <div class="scan-item-progress">${r.qty}</div>
+                    <button class="icon-btn" onclick="decrementShopCountLine(${r.id})" title="${t('common.remove')}"><i class="fas fa-minus"></i></button>
+                </div>`).join('')
+            : `<p class="muted" style="font-size:0.78rem; padding:4px;">${t('storage.session_empty')}</p>`;
+        document.getElementById('storageTabScanSessionTotal').innerHTML =
+            `${t('storage.count_scanned')}: ${units} (${variants})` +
+            (zeroed ? `<br><span class="muted" style="font-weight:600;">${t('storage.count_unscanned')}: ${zeroed} (−${zeroedUnits})</span>` : '');
+        document.getElementById('storageTabSubmitBtn').disabled = lines.length === 0;
+    }
+
+    async function submitShopCount() {
+        ensureShopCountLoaded();
+        if (!Object.keys(shopCountBatch).length) return;
+        const btn = document.getElementById('storageTabSubmitBtn');
+        const status = document.getElementById('storageTabScanStatus');
+        const locId = VIEW_LOCATION_ID;
+        btn.disabled = true;
+        status.innerText = t('storage.count_applying');
+        status.style.color = '';
+        try {
+            await loadInventory();   // fresh numbers: deltas must be against what the server holds now
+            const { sys, units, variants, zeroed, zeroedUnits } = shopCountTotals();
+            const changes = [];
+            for (const [id, l] of Object.entries(shopCountBatch)) {
+                const cur = (sys.get(Number(id)) || { qty: 0 }).qty;
+                if (l.qty !== cur) changes.push({ vid: Number(id), sku: l.sku, delta: l.qty - cur });
+            }
+            for (const [vid, s] of sys) if (s.qty > 0 && !shopCountBatch[vid]) changes.push({ vid, sku: s.sku, delta: -s.qty });
+
+            if (!changes.length) {
+                shopCountBatch = {}; saveShopCount();
+                status.innerText = t('storage.count_nothing');
+                toast(t('storage.count_nothing'), 'info');
+                return;
+            }
+            const store = STORES.find(s => s.id === locId);
+            const msg = t('storage.count_confirm').replace(/\{(\w+)\}/g, (_, k) =>
+                ({ store: store ? store.name : '', units, variants, zeroed, zeroedUnits, changes: changes.length }[k]));
+            if (!confirm(msg)) { status.innerText = ''; return; }
+
+            const note = `Shop count ${new Date().toISOString().slice(0, 10)}`;
+            let ok = 0, fail = 0;
+            for (const c of changes) {
+                const { error } = await sb.rpc('rpc_record_stock_adjustment', {
+                    p_variant_id: c.vid, p_location_id: locId, p_quantity_change: c.delta, p_reason: 'CORRECTION', p_notes: note
+                });
+                if (error) { fail++; console.error(c.sku, error); } else ok++;
+                status.innerText = `${t('storage.count_applying')} ${ok + fail}/${changes.length}`;
+            }
+            await loadInventory();
+            if (fail === 0) {
+                shopCountBatch = {}; saveShopCount();
+                status.innerText = `${t('storage.count_done_prefix')} ${ok}`;
+                status.style.color = 'var(--success-color)';
+                toast(status.innerText, 'success');
+            } else {
+                // Scans are kept: pressing Apply again recomputes against live numbers and only sends what is still different.
+                status.innerText = `${ok} ✓, ${fail} ${t('storage.count_failed')}`;
+                status.style.color = 'var(--danger-color)';
+                toast(status.innerText, 'warn');
+            }
+            renderStorageTab();
+        } finally {
+            renderStorageTabScanLog();
+            document.getElementById('storageTabScanManualInput')?.focus();
+        }
     }
 
     // Reuses #reorderPrintArea and its existing @media print CSS verbatim
