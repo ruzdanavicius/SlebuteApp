@@ -535,6 +535,7 @@
         .storage-batch-dir { display:inline-block; font-size:0.6rem; font-weight:700; letter-spacing:0.02em; padding:1px 6px; border-radius:4px; margin-left:6px; vertical-align:middle; }
         .storage-batch-dir.to-storage { background: rgba(181,118,15,0.15); color:#b5760f; }
         .storage-batch-dir.to-display { background: var(--success-tint); color: var(--success-color); }
+        .storage-scan-panel.count-mode #storageTabSubmitBtn { flex: 1 1 100%; justify-content: center; }
         #storageTabCountBadge:not(:empty) { margin-left:4px; padding:0 6px; border-radius:8px; background: rgba(36,22,30,0.12); font-size:0.68rem; }
         .storage-scan-panel .pay-tab.active #storageTabCountBadge:not(:empty) { background: rgba(255,255,255,0.25); }
         .storage-browse-panel { flex: 1; min-width: 0; }
@@ -1047,7 +1048,7 @@
                          misread or a change of mind before submitting
                          costs nothing. No relabeling — same barcode
                          already on the garment, every time. -->
-                    <div class="storage-scan-panel">
+                    <div class="storage-scan-panel" id="storageTabScanPanel">
                         <h3 style="margin:0 0 4px;" data-i18n="storage.scan_panel_title">Scan into / out of storage</h3>
                         <p class="muted" style="font-size:0.78rem; margin:0 0 10px;" data-i18n="storage.scan_panel_hint">Pick a direction, then scan — each scan stages one unit. Nothing is saved until you submit the batch.</p>
                         <div style="display:flex; gap:8px; margin-bottom:10px;">
@@ -1058,7 +1059,7 @@
                         <input type="text" id="storageTabScanManualInput" class="form-input kb-toggle-input" inputmode="none" data-i18n-placeholder="storage.manual_input_placeholder" placeholder="SKU (if the scanner can't read the tag)" onkeydown="if(event.key==='Enter'){event.preventDefault(); handleStorageTabScanManualEnter();}">
                         <p id="storageTabScanStatus" style="font-size:0.85rem; min-height:1.2em; margin:10px 0 6px; font-weight:600;"></p>
                         <div id="storageTabScanLogRows" class="storage-scan-log"></div>
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px; gap:10px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px; gap:10px; flex-wrap:wrap;">
                             <div id="storageTabScanSessionTotal" style="font-weight:700; font-size:0.82rem;"></div>
                             <button id="storageTabSubmitBtn" class="btn btn-primary" onclick="submitStorageTabBatch()" disabled><i class="fas fa-check"></i> <span id="storageTabSubmitLabel" data-i18n="storage.submit_batch">Submit batch</span></button>
                         </div>
@@ -2234,11 +2235,11 @@
             'storage.scan_panel_title': 'Scan into / out of storage', 'storage.scan_panel_hint': 'Pick a direction, then scan — each scan moves one unit. Nothing is relabeled.',
             'storage.mode_to_storage': 'To storage', 'storage.mode_to_display': 'To display',
             'storage.mode_count': 'Shop count',
-            'storage.count_hint': 'Shop count: scan every item physically in this shop, one scan per unit. Applying sets the shop-floor stock to exactly what you scanned.',
-            'storage.count_apply': 'Apply count', 'storage.count_scanned': 'Scanned', 'storage.count_unscanned': 'Not scanned → 0', 'storage.count_system': 'system',
-            'storage.count_confirm': "{store}: set shop-floor stock to the scanned count?\n\nScanned: {units} units ({variants} variants)\nNot scanned, will be set to 0: {zeroed} variants (−{zeroedUnits} units)\nChanges to save: {changes}",
-            'storage.count_applying': 'Applying count…', 'storage.count_done_prefix': 'Count applied — changes:',
-            'storage.count_failed': 'failed — press Apply count again to retry the rest.',
+            'storage.count_hint': 'Shop count: scan every item physically in this shop, one scan per unit. Submitting the final count sets the shop-floor stock to exactly what you scanned.',
+            'storage.count_apply': 'Submit final stock count to {store}', 'storage.count_scanned': 'Scanned', 'storage.count_unscanned': 'Not scanned → 0', 'storage.count_system': 'system',
+            'storage.count_confirm': "{store}: have you scanned ALL available items in the store?\n\nScanned: {units} units ({variants} variants)\nNot scanned, will be set to 0: {zeroed} variants (−{zeroedUnits} units)\n\nPress OK only if every item in the store has been scanned. The system stock will then match your scan.",
+            'storage.count_applying': 'Submitting stock count…', 'storage.count_done': 'Stock count submitted to {store} — {changes} variants changed.',
+            'storage.count_failed_prefix': 'Stock count NOT saved:',
             'storage.scan_hint': 'Scan an item to move it.', 'storage.manual_input_placeholder': "SKU (if the scanner can't read the tag)",
             'storage.nothing_on_display': 'Nothing on display here to move to storage.',
             'storage.nothing_in_storage': 'Nothing in storage here to bring out.',
@@ -2611,11 +2612,11 @@
             'storage.scan_panel_title': 'Nuskaityti į sandėlį / iš sandėlio', 'storage.scan_panel_hint': 'Pasirinkite kryptį, tada nuskaitykite — kiekvienas nuskaitymas perkelia vieną vienetą. Etikečių keisti nereikia.',
             'storage.mode_to_storage': 'Į sandėlį', 'storage.mode_to_display': 'Į prekybą',
             'storage.mode_count': 'Inventorius',
-            'storage.count_hint': 'Inventorius: nuskaitykite kiekvieną šioje parduotuvėje esantį drabužį — vienas nuskaitymas = vienas vienetas. Pritaikius, prekybos salės likutis taps lygiai toks, kiek nuskaitėte.',
-            'storage.count_apply': 'Taikyti inventorių', 'storage.count_scanned': 'Nuskaityta', 'storage.count_unscanned': 'Nenuskaityta → 0', 'storage.count_system': 'sistemoje',
-            'storage.count_confirm': "{store}: nustatyti prekybos salės likutį pagal nuskaitytą kiekį?\n\nNuskaityta: {units} vnt. ({variants} variantų)\nNenuskaityta, bus nustatyta į 0: {zeroed} variantų (−{zeroedUnits} vnt.)\nIšsaugotinų pakeitimų: {changes}",
-            'storage.count_applying': 'Taikomas inventorius…', 'storage.count_done_prefix': 'Inventorius pritaikytas — pakeitimų:',
-            'storage.count_failed': 'nepavyko — paspauskite „Taikyti inventorių“ dar kartą likusiems.',
+            'storage.count_hint': 'Inventorius: nuskaitykite kiekvieną šioje parduotuvėje esantį drabužį — vienas nuskaitymas = vienas vienetas. Pateikus galutinį inventorių, prekybos salės likutis taps lygiai toks, kiek nuskaitėte.',
+            'storage.count_apply': 'Pateikti galutinį inventorių — {store}', 'storage.count_scanned': 'Nuskaityta', 'storage.count_unscanned': 'Nenuskaityta → 0', 'storage.count_system': 'sistemoje',
+            'storage.count_confirm': "{store}: ar nuskaitėte VISAS parduotuvėje esančias prekes?\n\nNuskaityta: {units} vnt. ({variants} variantų)\nNenuskaityta, bus nustatyta į 0: {zeroed} variantų (−{zeroedUnits} vnt.)\n\nSpauskite Gerai tik jei nuskaitytas kiekvienas parduotuvės drabužis. Sistemos likutis taps toks, kaip nuskaityta.",
+            'storage.count_applying': 'Pateikiamas inventorius…', 'storage.count_done': 'Inventorius pateiktas — {store}, pakeista variantų: {changes}.',
+            'storage.count_failed_prefix': 'Inventorius NEIŠSAUGOTAS:',
             'storage.scan_hint': 'Nuskaitykite prekę, kad ją perkeltumėte.', 'storage.manual_input_placeholder': 'SKU (jei skeneris neperskaito etiketės)',
             'storage.nothing_on_display': 'Šioje parduotuvėje prekyboje nieko nėra — perkelti į sandėlį nėra ko.',
             'storage.nothing_in_storage': 'Šioje parduotuvėje sandėlyje nieko nėra — atnešti į prekybą nėra ko.',
@@ -6260,10 +6261,14 @@
         document.getElementById('storageTabScanToStorageBtn').classList.toggle('active', dir === 'TO_STORAGE');
         document.getElementById('storageTabScanToDisplayBtn').classList.toggle('active', dir === 'TO_DISPLAY');
         document.getElementById('storageTabScanCountBtn').classList.toggle('active', dir === 'COUNT');
+        document.getElementById('storageTabScanPanel').classList.toggle('count-mode', dir === 'COUNT');
         const submitLabel = document.getElementById('storageTabSubmitLabel');
-        const submitKey = dir === 'COUNT' ? 'storage.count_apply' : 'storage.submit_batch';
-        submitLabel.setAttribute('data-i18n', submitKey);
-        submitLabel.innerText = t(submitKey);
+        if (dir === 'COUNT') {
+            updateShopCountSubmitLabel();
+        } else {
+            submitLabel.setAttribute('data-i18n', 'storage.submit_batch');
+            submitLabel.innerText = t('storage.submit_batch');
+        }
         const scanStatus = document.getElementById('storageTabScanStatus');
         scanStatus.innerText = t(dir === 'COUNT' ? 'storage.count_hint' : 'storage.scan_hint');
         scanStatus.style.color = '';
@@ -6402,18 +6407,17 @@
        SHOP COUNT mode (2026-11-13) — "scan everything on the shelf".
        ============================================================
        Third mode of the scan panel. Used while a shop is being counted
-       for the first time after labelling: scan every garment (one scan =
-       one unit), then Apply. Applying makes the shop-floor quantity of
-       the store being viewed equal to the scanned count — REPLACE, not
-       add — via one audited CORRECTION adjustment per changed variant
-       (rpc_record_stock_adjustment, delta computed against fresh
-       inventory at apply time). Variants with stock that were never
-       scanned are set to 0. Storage-zone units are not touched.
+       for the first time after labelling, and for every later stocktake:
+       scan every garment (one scan = one unit), then submit the final
+       count. Submitting makes the shop-floor quantity of the store being
+       viewed equal to the scanned count — REPLACE, not add — through
+       rpc_submit_shop_count (one transaction; the result is kept in
+       shop_count_sessions / shop_count_lines). Variants with stock that
+       were never scanned are set to 0. Storage-zone units are not touched.
 
        Scans live only in this browser (localStorage, one slot per store)
-       so a reload or a dead tablet mid-count loses nothing. Applying is
-       idempotent: deltas are recomputed from the live numbers each time,
-       so a partly failed apply can simply be pressed again. */
+       so a reload or a dead tablet mid-count loses nothing; they are
+       cleared only after the server has accepted the count. */
     // Master switch. Set to false once both shops are fully scanned in: the
     // "Shop count" tab disappears and COUNT can't be selected. Flip back to
     // true (and deploy) for a future stocktake. Applying zeroes unscanned
@@ -6469,7 +6473,6 @@
         const line = shopCountBatch[v.id] || (shopCountBatch[v.id] = { qty: 0, sku: v.sku, name: p.name, colorName: v.colorName, size: v.size, at: 0 });
         line.qty++;
         line.at = Date.now();
-        clearShopCountPlan();
         saveShopCount();
         status.innerText = `${v.sku} → ${line.qty}`;
         status.style.color = 'var(--success-color)';
@@ -6482,13 +6485,13 @@
         const line = shopCountBatch[variantId];
         if (!line) return;
         if (--line.qty <= 0) delete shopCountBatch[variantId];
-        clearShopCountPlan();
         saveShopCount();
         renderStorageTabScanLog();
         document.getElementById('storageTabScanManualInput')?.focus();
     }
 
     function renderShopCountLog() {
+        updateShopCountSubmitLabel();
         const rows = document.getElementById('storageTabScanLogRows');
         const { sys, units, variants, zeroed, zeroedUnits } = shopCountTotals();
         const lines = Object.entries(shopCountBatch).map(([id, l]) => ({ id: Number(id), ...l })).sort((a, b) => b.at - a.at);
@@ -6509,87 +6512,66 @@
         document.getElementById('storageTabSubmitBtn').disabled = lines.length === 0;
     }
 
-    // Every count line is written to the audit log, matched ones too
-    // (quantity_change 0), with the note
-    //   "Shop count YYYY-MM-DD #<session> expected=<system> scanned=<counted>"
-    // so a count can be analysed later straight from stock_adjustments:
-    //   notes like 'Shop count %', expected/scanned parsed from the note,
-    //   quantity_change = scanned - expected. Variants that were neither
-    // scanned nor in stock are not part of the count and get no row.
-    // The plan (expected values frozen at the moment Apply is confirmed) is
-    // kept in localStorage until every line is sent, so a retry after a
-    // partial failure reuses the original expected numbers and session id
-    // instead of recomputing against half-applied stock. Any new scan or
-    // undo discards the plan.
-    const SHOP_COUNT_PLAN_PREFIX = 'slebute_shop_count_plan_';
-    function loadShopCountPlan() {
-        try { return JSON.parse(localStorage.getItem(SHOP_COUNT_PLAN_PREFIX + VIEW_LOCATION_ID) || 'null'); } catch (e) { return null; }
+    // The whole count goes to the server in ONE call, rpc_submit_shop_count(): it
+    // locks the store's stock, reads "expected" itself, makes the shop-floor
+    // quantity equal to the scanned quantity for every scanned or in-stock
+    // variant (unscanned stock -> 0), keeps the result in shop_count_sessions /
+    // shop_count_lines (matches included) and writes one CORRECTION adjustment per
+    // changed variant. All or nothing: on any error nothing is saved and the scans
+    // stay on this device for another try.
+    function shopCountStoreName() {
+        const s = STORES.find(x => x.id === VIEW_LOCATION_ID);
+        return s ? s.name : '';
     }
-    function saveShopCountPlan(plan) {
-        try { localStorage.setItem(SHOP_COUNT_PLAN_PREFIX + VIEW_LOCATION_ID, JSON.stringify(plan)); } catch (e) {}
+
+    function fillTemplate(str, vals) {
+        let out = str;
+        for (const k of Object.keys(vals)) out = out.split('{' + k + '}').join(String(vals[k]));
+        return out;
     }
-    function clearShopCountPlan() {
-        try { localStorage.removeItem(SHOP_COUNT_PLAN_PREFIX + VIEW_LOCATION_ID); } catch (e) {}
+
+    // The final button names the shop it will change. Plain text, no data-i18n,
+    // so a language switch cannot replace it with the nameless template.
+    function updateShopCountSubmitLabel() {
+        const label = document.getElementById('storageTabSubmitLabel');
+        label.removeAttribute('data-i18n');
+        label.innerText = fillTemplate(t('storage.count_apply'), { store: shopCountStoreName() });
     }
 
     async function submitShopCount() {
         ensureShopCountLoaded();
-        if (!Object.keys(shopCountBatch).length) return;
+        const entries = Object.entries(shopCountBatch);
+        if (!entries.length) return;
         const btn = document.getElementById('storageTabSubmitBtn');
         const status = document.getElementById('storageTabScanStatus');
         const locId = VIEW_LOCATION_ID;
+        const store = shopCountStoreName();
         btn.disabled = true;
-        status.innerText = t('storage.count_applying');
-        status.style.color = '';
         try {
-            let plan = loadShopCountPlan();
-            if (!plan) {
-                await loadInventory();   // fresh numbers: expected must be what the server holds now
-                const { sys, units, variants, zeroed, zeroedUnits } = shopCountTotals();
-                const items = [];
-                for (const [id, l] of Object.entries(shopCountBatch)) {
-                    const expected = (sys.get(Number(id)) || { qty: 0 }).qty;
-                    items.push({ vid: Number(id), sku: l.sku, expected, scanned: l.qty, done: false });
-                }
-                for (const [vid, s] of sys) if (s.qty > 0 && !shopCountBatch[vid]) items.push({ vid, sku: s.sku, expected: s.qty, scanned: 0, done: false });
-                const changed = items.filter(i => i.scanned !== i.expected).length;
-                const store = STORES.find(s => s.id === locId);
-                const msg = t('storage.count_confirm').replace(/\{(\w+)\}/g, (_, k) =>
-                    ({ store: store ? store.name : '', units, variants, zeroed, zeroedUnits, changes: changed }[k]));
-                if (!confirm(msg)) { status.innerText = ''; return; }
-                const d = new Date();
-                const p2 = n => String(n).padStart(2, '0');
-                plan = {
-                    session: `${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}T${p2(d.getHours())}${p2(d.getMinutes())}`,
-                    date: `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`,
-                    items
-                };
-                saveShopCountPlan(plan);
-            }
+            await loadInventory();   // fresh numbers for the "not scanned -> 0" figures in the question
+            const { units, variants, zeroed, zeroedUnits } = shopCountTotals();
+            const msg = fillTemplate(t('storage.count_confirm'), { store, units, variants, zeroed, zeroedUnits });
+            if (!confirm(msg)) { status.innerText = ''; return; }
 
-            let ok = 0, fail = 0;
-            const todo = plan.items.filter(i => !i.done);
-            for (const it of todo) {
-                const { error } = await sb.rpc('rpc_record_stock_adjustment', {
-                    p_variant_id: it.vid, p_location_id: locId, p_quantity_change: it.scanned - it.expected, p_reason: 'CORRECTION',
-                    p_notes: `Shop count ${plan.date} #${plan.session} expected=${it.expected} scanned=${it.scanned}`
-                });
-                if (error) { fail++; console.error(it.sku, error); } else { ok++; it.done = true; saveShopCountPlan(plan); }
-                status.innerText = `${t('storage.count_applying')} ${ok + fail}/${todo.length}`;
-            }
-            await loadInventory();
-            if (fail === 0) {
-                const changed = plan.items.filter(i => i.scanned !== i.expected).length;
-                shopCountBatch = {}; saveShopCount(); clearShopCountPlan();
-                status.innerText = `${t('storage.count_done_prefix')} ${changed}`;
-                status.style.color = 'var(--success-color)';
-                toast(status.innerText, 'success');
-            } else {
-                // Scans and plan are kept: pressing Apply again sends only the lines still not saved.
-                status.innerText = `${ok} ✓, ${fail} ${t('storage.count_failed')}`;
+            status.innerText = t('storage.count_applying');
+            status.style.color = '';
+            const { data, error } = await sb.rpc('rpc_submit_shop_count', {
+                p_location_id: locId,
+                p_lines: entries.map(([id, l]) => ({ variant_id: Number(id), quantity: l.qty })),
+                p_confirmed_complete: true
+            });
+            if (error) {
+                console.error('rpc_submit_shop_count', error);
+                status.innerText = `${t('storage.count_failed_prefix')} ${error.message}`;
                 status.style.color = 'var(--danger-color)';
-                toast(status.innerText, 'warn');
+                toast(status.innerText, 'error');
+                return;
             }
+            shopCountBatch = {}; saveShopCount();
+            await loadInventory();
+            status.innerText = fillTemplate(t('storage.count_done'), { store, changes: (data && data.lines_changed) || 0 });
+            status.style.color = 'var(--success-color)';
+            toast(status.innerText, 'success');
             renderStorageTab();
         } finally {
             renderStorageTabScanLog();
