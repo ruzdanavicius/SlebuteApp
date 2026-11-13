@@ -2237,7 +2237,6 @@
             'storage.count_hint': 'Shop count: scan every item physically in this shop, one scan per unit. Applying sets the shop-floor stock to exactly what you scanned.',
             'storage.count_apply': 'Apply count', 'storage.count_scanned': 'Scanned', 'storage.count_unscanned': 'Not scanned → 0', 'storage.count_system': 'system',
             'storage.count_confirm': "{store}: set shop-floor stock to the scanned count?\n\nScanned: {units} units ({variants} variants)\nNot scanned, will be set to 0: {zeroed} variants (−{zeroedUnits} units)\nChanges to save: {changes}",
-            'storage.count_nothing': 'The count already matches the system — nothing to change.',
             'storage.count_applying': 'Applying count…', 'storage.count_done_prefix': 'Count applied — changes:',
             'storage.count_failed': 'failed — press Apply count again to retry the rest.',
             'storage.scan_hint': 'Scan an item to move it.', 'storage.manual_input_placeholder': "SKU (if the scanner can't read the tag)",
@@ -2615,7 +2614,6 @@
             'storage.count_hint': 'Inventorius: nuskaitykite kiekvieną šioje parduotuvėje esantį drabužį — vienas nuskaitymas = vienas vienetas. Pritaikius, prekybos salės likutis taps lygiai toks, kiek nuskaitėte.',
             'storage.count_apply': 'Taikyti inventorių', 'storage.count_scanned': 'Nuskaityta', 'storage.count_unscanned': 'Nenuskaityta → 0', 'storage.count_system': 'sistemoje',
             'storage.count_confirm': "{store}: nustatyti prekybos salės likutį pagal nuskaitytą kiekį?\n\nNuskaityta: {units} vnt. ({variants} variantų)\nNenuskaityta, bus nustatyta į 0: {zeroed} variantų (−{zeroedUnits} vnt.)\nIšsaugotinų pakeitimų: {changes}",
-            'storage.count_nothing': 'Nuskaitytas kiekis sutampa su sistema — keisti nėra ko.',
             'storage.count_applying': 'Taikomas inventorius…', 'storage.count_done_prefix': 'Inventorius pritaikytas — pakeitimų:',
             'storage.count_failed': 'nepavyko — paspauskite „Taikyti inventorių“ dar kartą likusiems.',
             'storage.scan_hint': 'Nuskaitykite prekę, kad ją perkeltumėte.', 'storage.manual_input_placeholder': 'SKU (jei skeneris neperskaito etiketės)',
@@ -6471,6 +6469,7 @@
         const line = shopCountBatch[v.id] || (shopCountBatch[v.id] = { qty: 0, sku: v.sku, name: p.name, colorName: v.colorName, size: v.size, at: 0 });
         line.qty++;
         line.at = Date.now();
+        clearShopCountPlan();
         saveShopCount();
         status.innerText = `${v.sku} → ${line.qty}`;
         status.style.color = 'var(--success-color)';
@@ -6483,6 +6482,7 @@
         const line = shopCountBatch[variantId];
         if (!line) return;
         if (--line.qty <= 0) delete shopCountBatch[variantId];
+        clearShopCountPlan();
         saveShopCount();
         renderStorageTabScanLog();
         document.getElementById('storageTabScanManualInput')?.focus();
@@ -6509,6 +6509,29 @@
         document.getElementById('storageTabSubmitBtn').disabled = lines.length === 0;
     }
 
+    // Every count line is written to the audit log, matched ones too
+    // (quantity_change 0), with the note
+    //   "Shop count YYYY-MM-DD #<session> expected=<system> scanned=<counted>"
+    // so a count can be analysed later straight from stock_adjustments:
+    //   notes like 'Shop count %', expected/scanned parsed from the note,
+    //   quantity_change = scanned - expected. Variants that were neither
+    // scanned nor in stock are not part of the count and get no row.
+    // The plan (expected values frozen at the moment Apply is confirmed) is
+    // kept in localStorage until every line is sent, so a retry after a
+    // partial failure reuses the original expected numbers and session id
+    // instead of recomputing against half-applied stock. Any new scan or
+    // undo discards the plan.
+    const SHOP_COUNT_PLAN_PREFIX = 'slebute_shop_count_plan_';
+    function loadShopCountPlan() {
+        try { return JSON.parse(localStorage.getItem(SHOP_COUNT_PLAN_PREFIX + VIEW_LOCATION_ID) || 'null'); } catch (e) { return null; }
+    }
+    function saveShopCountPlan(plan) {
+        try { localStorage.setItem(SHOP_COUNT_PLAN_PREFIX + VIEW_LOCATION_ID, JSON.stringify(plan)); } catch (e) {}
+    }
+    function clearShopCountPlan() {
+        try { localStorage.removeItem(SHOP_COUNT_PLAN_PREFIX + VIEW_LOCATION_ID); } catch (e) {}
+    }
+
     async function submitShopCount() {
         ensureShopCountLoaded();
         if (!Object.keys(shopCountBatch).length) return;
@@ -6519,43 +6542,50 @@
         status.innerText = t('storage.count_applying');
         status.style.color = '';
         try {
-            await loadInventory();   // fresh numbers: deltas must be against what the server holds now
-            const { sys, units, variants, zeroed, zeroedUnits } = shopCountTotals();
-            const changes = [];
-            for (const [id, l] of Object.entries(shopCountBatch)) {
-                const cur = (sys.get(Number(id)) || { qty: 0 }).qty;
-                if (l.qty !== cur) changes.push({ vid: Number(id), sku: l.sku, delta: l.qty - cur });
+            let plan = loadShopCountPlan();
+            if (!plan) {
+                await loadInventory();   // fresh numbers: expected must be what the server holds now
+                const { sys, units, variants, zeroed, zeroedUnits } = shopCountTotals();
+                const items = [];
+                for (const [id, l] of Object.entries(shopCountBatch)) {
+                    const expected = (sys.get(Number(id)) || { qty: 0 }).qty;
+                    items.push({ vid: Number(id), sku: l.sku, expected, scanned: l.qty, done: false });
+                }
+                for (const [vid, s] of sys) if (s.qty > 0 && !shopCountBatch[vid]) items.push({ vid, sku: s.sku, expected: s.qty, scanned: 0, done: false });
+                const changed = items.filter(i => i.scanned !== i.expected).length;
+                const store = STORES.find(s => s.id === locId);
+                const msg = t('storage.count_confirm').replace(/\{(\w+)\}/g, (_, k) =>
+                    ({ store: store ? store.name : '', units, variants, zeroed, zeroedUnits, changes: changed }[k]));
+                if (!confirm(msg)) { status.innerText = ''; return; }
+                const d = new Date();
+                const p2 = n => String(n).padStart(2, '0');
+                plan = {
+                    session: `${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}T${p2(d.getHours())}${p2(d.getMinutes())}`,
+                    date: `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`,
+                    items
+                };
+                saveShopCountPlan(plan);
             }
-            for (const [vid, s] of sys) if (s.qty > 0 && !shopCountBatch[vid]) changes.push({ vid, sku: s.sku, delta: -s.qty });
 
-            if (!changes.length) {
-                shopCountBatch = {}; saveShopCount();
-                status.innerText = t('storage.count_nothing');
-                toast(t('storage.count_nothing'), 'info');
-                return;
-            }
-            const store = STORES.find(s => s.id === locId);
-            const msg = t('storage.count_confirm').replace(/\{(\w+)\}/g, (_, k) =>
-                ({ store: store ? store.name : '', units, variants, zeroed, zeroedUnits, changes: changes.length }[k]));
-            if (!confirm(msg)) { status.innerText = ''; return; }
-
-            const note = `Shop count ${new Date().toISOString().slice(0, 10)}`;
             let ok = 0, fail = 0;
-            for (const c of changes) {
+            const todo = plan.items.filter(i => !i.done);
+            for (const it of todo) {
                 const { error } = await sb.rpc('rpc_record_stock_adjustment', {
-                    p_variant_id: c.vid, p_location_id: locId, p_quantity_change: c.delta, p_reason: 'CORRECTION', p_notes: note
+                    p_variant_id: it.vid, p_location_id: locId, p_quantity_change: it.scanned - it.expected, p_reason: 'CORRECTION',
+                    p_notes: `Shop count ${plan.date} #${plan.session} expected=${it.expected} scanned=${it.scanned}`
                 });
-                if (error) { fail++; console.error(c.sku, error); } else ok++;
-                status.innerText = `${t('storage.count_applying')} ${ok + fail}/${changes.length}`;
+                if (error) { fail++; console.error(it.sku, error); } else { ok++; it.done = true; saveShopCountPlan(plan); }
+                status.innerText = `${t('storage.count_applying')} ${ok + fail}/${todo.length}`;
             }
             await loadInventory();
             if (fail === 0) {
-                shopCountBatch = {}; saveShopCount();
-                status.innerText = `${t('storage.count_done_prefix')} ${ok}`;
+                const changed = plan.items.filter(i => i.scanned !== i.expected).length;
+                shopCountBatch = {}; saveShopCount(); clearShopCountPlan();
+                status.innerText = `${t('storage.count_done_prefix')} ${changed}`;
                 status.style.color = 'var(--success-color)';
                 toast(status.innerText, 'success');
             } else {
-                // Scans are kept: pressing Apply again recomputes against live numbers and only sends what is still different.
+                // Scans and plan are kept: pressing Apply again sends only the lines still not saved.
                 status.innerText = `${ok} ✓, ${fail} ${t('storage.count_failed')}`;
                 status.style.color = 'var(--danger-color)';
                 toast(status.innerText, 'warn');
