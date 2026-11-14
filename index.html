@@ -9328,6 +9328,11 @@
         });
         if (newRows.length) toast(`${t('toast.price_filled_for')} ${newRows.length} ${t('toast.new_sizes_save_suffix')}`, 'success');
         if (existingRows.length === 0) return;
+        // Style autosave must not run alongside this write: the Apply click
+        // blurs the bulk price box, whose change event arms the 1.2 s autosave
+        // timer. Cancel it and let any autosave already writing finish first.
+        clearTimeout(autosaveTimer);
+        await autosaveChain;
         const variants = Array.from(existingRows).map(row => {
             const ctx = findVariantContext(parseInt(row.dataset.variantId));
             // Blank bulk cost keeps each size's saved cost — the RPC would
@@ -9341,17 +9346,24 @@
         btn.disabled = false; btn.innerText = t('inv.apply_to_all_sizes');
         if (error) { toast(error.message, 'error'); return; }
         toast(`${t('toast.price_updated_for')} ${variants.length} ${t('toast.sizes_suffix')}`, 'success');
+        // Put the saved values into the rows' inputs NOW, before the catalogue
+        // reloads. Otherwise the inputs still hold the old prices while
+        // `products` holds the new ones, snapshotStyleEdits() reads that as
+        // "typed, unsaved edits", and the autosave inside loadProductForEdit
+        // writes the OLD prices straight back over the bulk update.
+        // Marked-down rows (sale badge) keep their own price: the upsert above
+        // touches the regular variant, not the clearance one.
+        existingRows.forEach(row => {
+            if (row.querySelector('.sale-badge')) return;
+            row.querySelector('.sre-price-input').value = price;
+            if (costRaw !== '') row.querySelector('.sre-cost-input').value = cost || '';
+        });
         await loadInventory();
         // Re-rendering the form would wipe any unsaved new size rows (this
-        // color's or another's), so in that case just mirror the saved
-        // values into the existing rows' inputs instead.
+        // color's or another's), so in that case keep the form as it is
+        // (the inputs above already mirror the saved values).
         const hasUnsavedRows = Array.from(document.querySelectorAll('#colorBlocksContainer .size-row .size-input')).some(i => i.value.trim());
-        if (hasUnsavedRows) {
-            existingRows.forEach(row => {
-                row.querySelector('.sre-price-input').value = price;
-                if (costRaw !== '') row.querySelector('.sre-cost-input').value = cost || '';
-            });
-        } else if (editingProductId) loadProductForEdit(editingProductId);
+        if (!hasUnsavedRows && editingProductId) loadProductForEdit(editingProductId);
     }
 
     async function confirmStockAdjustment() {
