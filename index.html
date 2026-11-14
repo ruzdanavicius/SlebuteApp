@@ -469,7 +469,8 @@
         .category-suggest-box { display:none; position:absolute; top:100%; left:0; right:0; background:var(--card-bg); border:var(--glass-border); border-radius:10px; margin-top:4px; box-shadow:0 10px 24px var(--shadow-color); max-height:220px; overflow-y:auto; z-index:20; }
         .category-suggest-box.open { display:block; }
         .category-suggest-item { padding:10px 14px; font-size:0.85rem; cursor:pointer; }
-        .category-suggest-item:hover { background:var(--accent-tint); color:var(--accent-color); }
+        .category-suggest-item:hover, .category-suggest-item.active { background:var(--accent-tint); color:var(--accent-color); }
+        .category-suggest-count { float:right; margin-left:10px; color:var(--text-muted, #8a7f85); font-size:0.75rem; }
         .form-group label { display: block; color: var(--text-secondary); margin-bottom: 7px; font-size: 0.82rem; }
         .form-input { width: 100%; background: var(--input-bg); border: 1px solid rgba(36,22,30,0.14); padding: 11px; border-radius: 8px; color: var(--text-primary); font-size: 0.92rem; outline: none; transition: 0.2s; }
         .form-input:focus { border-color: var(--accent-color); box-shadow: 0 0 0 3px var(--accent-tint); }
@@ -1100,7 +1101,7 @@
                 <div class="split-layout">
                     <div class="products-side">
                         <button class="btn btn-primary btn-block" onclick="startNewProduct()"><i class="fas fa-plus"></i> <span data-i18n="inv.new_style">New Style</span></button>
-                        <input type="text" class="form-input mt-14 kb-toggle-input" inputmode="none" id="productSearchBox" placeholder="Search styles... (try multiple words, e.g. sale supplier)" data-i18n-placeholder="inv.search_styles" oninput="renderProductsList()" style="margin-top:14px;">
+                        <input type="text" class="form-input mt-14 kb-toggle-input" inputmode="none" id="productSearchBox" placeholder="Search styles... (try multiple words, e.g. sale supplier)" data-i18n-placeholder="inv.search_styles" oninput="renderProductsList()" onkeydown="if(event.key==='Enter'){event.preventDefault();openFirstStyleFromSearch();}" style="margin-top:14px;">
                         <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;">
                             <button type="button" class="category-chip hidden" id="noSizesFilterChip" onclick="toggleNoSizesFilter()"></button>
                             <button type="button" class="category-chip hidden" id="noPriceFilterChip" onclick="toggleNoPriceFilter()"></button>
@@ -1150,7 +1151,7 @@
                                     <label data-i18n="inv.category">Category</label>
                                     <input type="text" class="form-input" id="new_category" placeholder="e.g. Hoodies" autocomplete="off"
                                         oninput="onCategoryInput()" onfocus="onCategoryInput()" onblur="hideCategorySuggestions()"
-                                        onkeydown="if(event.key==='Escape') hideCategorySuggestions()">
+                                        onkeydown="suggestKeyNav(event, 'categorySuggestBox', selectCategorySuggestion, onCategoryInput, hideCategorySuggestions)">
                                     <div class="category-suggest-box" id="categorySuggestBox"></div>
                                 </div>
                             </div>
@@ -1160,13 +1161,16 @@
                             </div>
                             <div class="form-group">
                                 <label data-i18n="inv.composition">Composition</label> <span class="helper-text" style="display:inline;" data-i18n="inv.composition_hint">(optional, printed on labels — up to 8 items, e.g. "65% Cotton, 35% Polyester")</span>
-                                <input type="text" class="form-input" id="new_composition" placeholder='e.g. 65% Cotton, 35% Polyester'>
+                                <input type="text" class="form-input" id="new_composition" placeholder='e.g. 65% Cotton, 35% Polyester' autocomplete="off"
+                                    oninput="onCompositionInput()" onfocus="onCompositionInput()" onblur="hideCompositionSuggestions()"
+                                    onkeydown="suggestKeyNav(event, 'compositionSuggestBox', selectCompositionSuggestion, onCompositionInput, hideCompositionSuggestions)">
+                                <div class="category-suggest-box" id="compositionSuggestBox"></div>
                             </div>
                             <div class="form-group">
                                 <label data-i18n="inv.supplier_label">Supplier</label>
                                 <input type="text" class="form-input kb-toggle-input" inputmode="none" id="new_supplier" placeholder="Type to search or add a supplier..." data-i18n-placeholder="inv.supplier_search_placeholder" autocomplete="off"
                                     oninput="onSupplierInput()" onfocus="onSupplierInput()" onblur="hideSupplierSuggestions()"
-                                    onkeydown="if(event.key==='Escape') hideSupplierSuggestions()">
+                                    onkeydown="suggestKeyNav(event, 'supplierSuggestBox', selectSupplierSuggestion, onSupplierInput, hideSupplierSuggestions)">
                                 <input type="hidden" id="new_supplier_id" value="">
                                 <div class="category-suggest-box" id="supplierSuggestBox"></div>
                             </div>
@@ -6030,6 +6034,7 @@
         if (noPriceOnly) list = list.filter(hasUnpricedSize);
         if (noSizesOnly) list = list.filter(p => !hasSizes(p));
         if (webOnlyOnly) list = list.filter(p => p.isFeaturedOnline);
+        lastProductsListShown = list;
         const panel = document.getElementById('productsListPanel');
         panel.innerHTML = list.map(p => `
             <div class="products-list-item ${editingProductId === p.id ? 'active' : ''}" onclick="openStyleFromList(${p.id})">
@@ -6040,6 +6045,23 @@
                 </div>
                 ${productColorBubblesHTML(p)}
             </div>`).join('') || `<p class="muted" style="font-size:0.8rem; padding:8px;">${t('inv.no_styles')}</p>`;
+    }
+
+    // Enter in the Manage Catalog search box opens the style on the right —
+    // no mouse needed after typing or scanning a code. An exact SKU or style
+    // code hit wins (a code can also appear inside longer names/descriptions,
+    // so the first row isn't always the right one); otherwise the first row
+    // currently shown in the list, respecting the filter chips.
+    let lastProductsListShown = [];
+    function openFirstStyleFromSearch() {
+        const q = (document.getElementById('productSearchBox').value || '').trim().toLowerCase();
+        const shown = lastProductsListShown;
+        const exact = q && shown.find(p =>
+            (p.base_barcode || '').toLowerCase() === q ||
+            p.variants.some(v => (v.sku || '').toLowerCase() === q));
+        const target = exact || shown[0];
+        if (!target) { toast(t('inv.no_styles'), 'warn'); return; }
+        openStyleFromList(target.id);
     }
 
     function hasUnpricedSize(p) { return p.variants.some(v => !v.isClearance && !(Number(v.price) > 0)); }
@@ -6896,6 +6918,85 @@
        Prevents the classic free-text drift ("Hoodies" vs "hoodies" vs
        "Hoodie") without ever blocking a legitimately new category.
        ============================================================ */
+    // Shared keyboard handling for the suggestion boxes below (Category,
+    // Supplier, Composition): Down/Up move a highlight through the items,
+    // Enter picks the highlighted one, Esc closes. Down on a closed box
+    // reopens it. Enter with nothing highlighted is left alone, so typing a
+    // brand-new value and pressing Enter behaves exactly as before. Mouse
+    // selection (onmousedown on the item) is untouched.
+    function suggestKeyNav(e, boxId, selectFn, reopenFn, hideFn) {
+        const box = document.getElementById(boxId);
+        const items = [...box.querySelectorAll('.category-suggest-item')];
+        const isOpen = box.classList.contains('open') && items.length > 0;
+        const activeIdx = items.findIndex(el => el.classList.contains('active'));
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (!isOpen) { reopenFn(); return; }
+            const next = e.key === 'ArrowDown'
+                ? (activeIdx + 1) % items.length
+                : (activeIdx <= 0 ? items.length - 1 : activeIdx - 1);
+            items.forEach(el => el.classList.remove('active'));
+            items[next].classList.add('active');
+            items[next].scrollIntoView({ block: 'nearest' });
+        } else if (e.key === 'Enter') {
+            if (isOpen && activeIdx >= 0) { e.preventDefault(); selectFn(activeIdx); }
+        } else if (e.key === 'Escape') {
+            hideFn();
+        }
+    }
+
+    /* ============================================================
+       COMPOSITION (Sudėtis) AUTOCOMPLETE — suggests compositions already
+       used on other styles, most-used first, so the same blend is picked
+       rather than retyped (and mistyped). Free text stays allowed: a new
+       composition is simply typed. Matching ignores case and Lithuanian
+       diacritics, and every space-separated word must appear somewhere in
+       the entry, so "visk 45" finds "50% Viskozė, 45% Poliesteris, ...".
+       ============================================================ */
+    let filteredCompositionSuggestions = []; // [{ text, count }]
+
+    function foldLt(s) {
+        return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+    }
+
+    function onCompositionInput() {
+        const input = document.getElementById('new_composition');
+        const box = document.getElementById('compositionSuggestBox');
+        const raw = input.value.trim();
+        const tokens = foldLt(raw).split(/\s+/).filter(Boolean);
+        const counts = new Map();
+        products.forEach(p => {
+            const c = (p.composition || '').trim();
+            if (c) counts.set(c, (counts.get(c) || 0) + 1);
+        });
+        filteredCompositionSuggestions = [...counts]
+            .map(([text, count]) => ({ text, count }))
+            .filter(s => { const f = foldLt(s.text); return tokens.every(tok => f.includes(tok)); })
+            .sort((a, b) => b.count - a.count || a.text.localeCompare(b.text))
+            .slice(0, 8);
+        // Nothing to offer, or the only entry is exactly what is already typed.
+        if (filteredCompositionSuggestions.length === 0 ||
+            (filteredCompositionSuggestions.length === 1 && filteredCompositionSuggestions[0].text === raw)) {
+            box.classList.remove('open');
+            return;
+        }
+        box.innerHTML = filteredCompositionSuggestions.map((s, i) =>
+            `<div class="category-suggest-item" onmousedown="selectCompositionSuggestion(${i})">${escapeHtml(s.text)}<span class="category-suggest-count">${s.count}</span></div>`
+        ).join('');
+        box.classList.add('open');
+    }
+
+    function selectCompositionSuggestion(i) {
+        const s = filteredCompositionSuggestions[i];
+        if (!s) return;
+        document.getElementById('new_composition').value = s.text;
+        hideCompositionSuggestions();
+    }
+
+    function hideCompositionSuggestions() {
+        document.getElementById('compositionSuggestBox').classList.remove('open');
+    }
+
     let filteredCategorySuggestions = [];
 
     function onCategoryInput() {
