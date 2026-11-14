@@ -392,6 +392,7 @@
 
         .empty-state { text-align:center; padding: 60px 20px; color: var(--text-secondary); }
         .empty-state i { font-size: 2rem; margin-bottom: 12px; opacity: 0.5; display:block; }
+        .empty-state .btn i { font-size: inherit; margin-bottom: 0; opacity: 1; display: inline-block; }
 
         /* Remote Banner */
         .remote-mode .product-card { border-color: rgba(139, 95, 28, 0.35); }
@@ -2642,7 +2643,7 @@
             'quickopen.float_label': 'Pradinė kasos suma (€)', 'quickopen.open_continue': 'Atidaryti ir tęsti pardavimą',
             'receipt.print': 'Spausdinti', 'receipt.close': 'Uždaryti',
             'inv.title': 'Prekių valdymas', 'inv.print_labels': 'Spausdinti etiketes', 'inv.new_style': 'Naujas modelis',
-            'inv.select_or_new': 'Pasirinkite modelį iš sąrašo arba pradėkite naują.',
+            'inv.select_or_new': 'Pasirinkite modelį iš sąrašo arba pridėkite naują',
             'inv.search_styles': 'Ieškoti modelių...', 'inv.style_reference': 'Modelio informacija',
             'inv.base_barcode': 'Pagrindinis brūkšninis kodas', 'inv.base_barcode_hint': 'Ant drabužio nėra brūkšninio kodo? Palikite tuščią — nuoroda, pvz. „keln-001“ (iš kategorijos), bus priskirta automatiškai. Ji neatpažins būsimų skenavimų taip, kaip tikras kodas ant etiketės.', 'inv.loaded_existing': 'Įkeltas esamas modelis — redaguojama.',
             'inv.delisted_code_prefix': 'Šis kodas priklauso išimtam modeliui', 'inv.restore_style': 'Atkurti modelį', 'toast.style_restored': 'Modelis atkurtas — pridėkite naujas prekes.', 'toast.barcode_taken': 'Šis brūkšninis kodas jau naudojamas kitam modeliui.', 'inv.barcode_clash_active': 'Šį kodą jau naudoja modelis', 'inv.open_style': 'Atidaryti modelį', 'inv.barcode_clash_revert': 'Grąžinti ankstesnį kodą', 'inv.draft_save_confirm': 'Šiame modelyje yra neišsaugotų dydžių. Išsaugoti prieš išeinant?', 'inv.draft_discard_confirm': 'Išeiti neišsaugojus? Neišsaugoti dydžiai bus prarasti.', 'toast.price_required': 'Įveskite kiekvieno naujo dydžio kainą — ji negali būti 0 €.',
@@ -7853,16 +7854,26 @@
         // item objects, so adjusting a quantity here would silently mutate
         // whatever's sitting in the header queue too, and printing from
         // here would leave duplicates behind to accidentally reprint later.
-        const newLabelItems = newVariantsOut.map((v, i) => ({
-            productName: data.product_name, sizeRange: data.size_range, composition: data.composition,
-            colorName: v.color_name, size: v.size, price: v.price, sku: v.sku,
-            copies: Math.max(1, Object.values(initialStockByRow[i] || {}).reduce((a,b) => a + (parseInt(b)||0), 0))
-        }));
+        const labelCopies = newVariantsOut.map((v, i) =>
+            Math.max(1, Object.values(initialStockByRow[i] || {}).reduce((a,b) => a + (parseInt(b)||0), 0)));
         await Promise.all([loadInventory(), loadIncomingSummary()]);
-        // The save RPC doesn't return base_barcode (it may be auto-assigned
-        // server-side), so read it from the freshly reloaded style list.
-        const savedBaseBarcode = products.find(p => p.id === data.product_id)?.base_barcode || '';
-        newLabelItems.forEach(it => { it.baseBarcode = savedBaseBarcode; });
+        // Labels are built from the style as it now sits in the database (the
+        // list was just reloaded, after the save finished) — NOT from the save
+        // RPC's return value, which does not carry composition/base_barcode and
+        // so printed labels missing whatever had just been edited.
+        const savedStyle = products.find(p => p.id === data.product_id);
+        const newLabelItems = newVariantsOut.map((v, i) => {
+            const ctx = findVariantContext(v.variant_id);
+            return {
+                productName: savedStyle?.name ?? data.product_name,
+                baseBarcode: savedStyle?.base_barcode || '',
+                sizeRange: savedStyle ? (savedStyle.size_range || null) : data.size_range,
+                composition: savedStyle ? (savedStyle.composition || null) : null,
+                colorName: ctx?.colorName ?? v.color_name, size: ctx?.size ?? v.size,
+                price: ctx?.price ?? v.price, sku: ctx?.sku ?? v.sku,
+                copies: labelCopies[i]
+            };
+        });
         // Stay on the style just saved (new or existing) instead of resetting to
         // a blank form — a manager mid-edit shouldn't have to re-find it in the
         // list after every save. "Naujas modelis" is the explicit way to start
@@ -12497,6 +12508,10 @@ ${qrBlock}${field(skuT.g, qrColX, skuT.y)}${field(colourT.g, qrColX, colourT.y)}
             if (errored) summary += ` · ${t('common.error_prefix')} ${errored}`;
             status.innerText = summary;
         }
+        // Everything is sent to the printer by now — close the popup so the
+        // next item can be worked on. Left open if any label failed, so the
+        // error stays visible and can be retried.
+        if (errored === 0) closeModal('labelPrintModal');
     }
 
     function setReceiptPaper(size) {
