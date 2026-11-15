@@ -7309,7 +7309,7 @@
                 <span>${t('ds.col_size')}</span><span>${t('inv.col_sku')}</span><span>${t('inv.col_price')}</span><span>${t('inv.col_cost')}</span><span>${STORES[0]?.name||'Store 1'}</span><span>${STORES[1]?.name||'Store 2'}</span><span></span>
             </div>
             <div class="size-rows"></div>`}
-            <button class="btn btn-ghost btn-sm mt-8" onclick="addSizeRow('${blockId}')"><i class="fas fa-plus"></i> ${t('inv.add_size')}</button>
+            <button class="btn btn-ghost btn-sm mt-8" onclick="addSizeRow('${blockId}', { focus: true })"><i class="fas fa-plus"></i> ${t('inv.add_size')}</button>
         `;
         container.appendChild(div);
         if (colorId) {
@@ -7408,18 +7408,49 @@
         // A new row starts from the style's own price/cost when one was entered
         // ahead of the sizes (product_style_prices) — unless the caller says otherwise.
         const openStyle = editingProductId ? products.find(x => x.id === editingProductId) : null;
-        const rowPrice = ('price' in prefill) ? prefill.price : (openStyle && openStyle.defaultPrice != null ? openStyle.defaultPrice : '');
-        const rowCost = ('cost' in prefill) ? prefill.cost : (openStyle && openStyle.defaultCost ? openStyle.defaultCost : '');
+        // Otherwise it starts as a one-off COPY of the price/cost on the nearest
+        // existing size (same colour first, then any other colour) — not a link.
+        const sib = (!('price' in prefill) && !('cost' in prefill)) ? siblingPriceCost(block) : null;
+        const rowPrice = ('price' in prefill) ? prefill.price : (sib ? sib.price : (openStyle && openStyle.defaultPrice != null ? openStyle.defaultPrice : ''));
+        const rowCost = ('cost' in prefill) ? prefill.cost : (sib ? sib.cost : (openStyle && openStyle.defaultCost ? openStyle.defaultCost : ''));
+        // data-copied remembers what was copied, so Save/draft logic can tell an
+        // untouched copy from a price the user actually typed (see copiedUntouched).
+        const copiedAttr = v => sib ? ` data-copied="${escapeHtml(String(v || ''))}"` : '';
         row.innerHTML = `
             <input type="text" class="size-input" placeholder="M" title="${t('ds.col_size')}" value="${escapeHtml(prefill.size||'')}">
             <input type="text" class="sku-input" placeholder="auto" title="${t('inv.col_sku')}" value="${escapeHtml(prefill.sku||'')}">
-            <input type="text" inputmode="decimal" class="price-input" placeholder="0.00" title="${t('inv.col_price')}" value="${escapeHtml(String(rowPrice||''))}">
-            <input type="text" inputmode="decimal" class="cost-input" placeholder="0.00" title="${t('inv.col_cost')}" value="${escapeHtml(String(rowCost||''))}">
+            <input type="text" inputmode="decimal" class="price-input" placeholder="0.00" title="${t('inv.col_price')}" value="${escapeHtml(String(rowPrice||''))}"${copiedAttr(rowPrice)}>
+            <input type="text" inputmode="decimal" class="cost-input" placeholder="0.00" title="${t('inv.col_cost')}" value="${escapeHtml(String(rowCost||''))}"${copiedAttr(rowCost)}>
             <input type="number" class="stock1-input" placeholder="0" title="${STORES[0]?.name||'Store 1'}" value="${prefill.stock1||''}">
             <input type="number" class="stock2-input" placeholder="0" title="${STORES[1]?.name||'Store 2'}" value="${prefill.stock2||''}">
             <button class="icon-btn" onclick="this.closest('.size-row').remove()" title="${t('common.remove')}"><i class="fas fa-times"></i></button>
         `;
         rowsContainer.appendChild(row);
+        if (prefill.focus) row.querySelector('.size-input').focus();
+    }
+
+    // Price/cost of the last size that has a price: in this colour block first,
+    // else the last such size in any other colour block. Reads the inputs' current
+    // values (saved sizes and unsaved rows alike). null when nothing has a price yet.
+    function siblingPriceCost(block) {
+        const scan = root => {
+            const rows = [...root.querySelectorAll('.size-row-existing, .size-row')].reverse();
+            for (const r of rows) {
+                const price = (r.querySelector('.sre-price-input, .price-input')?.value || '').trim();
+                if (price) return { price, cost: (r.querySelector('.sre-cost-input, .cost-input')?.value || '').trim() };
+            }
+            return null;
+        };
+        const here = scan(block);
+        if (here) return here;
+        const others = [...document.querySelectorAll('#colorBlocksContainer .color-block')].filter(b => b !== block).reverse();
+        for (const b of others) { const found = scan(b); if (found) return found; }
+        return null;
+    }
+
+    // True while an input still holds exactly the value copied in by addSizeRow.
+    function copiedUntouched(input) {
+        return !!input && input.dataset.copied !== undefined && input.value.trim() === input.dataset.copied;
     }
 
     /* ---- Style edits: one definition of "what changed" for Save Style and autosave ----
@@ -7573,7 +7604,7 @@
                 const r = { size: val('.size-input'), sku: val('.sku-input'), price: val('.price-input'), cost: val('.cost-input'), stock1: val('.stock1-input'), stock2: val('.stock2-input') };
                 // A row holding nothing but the style's own pre-filled price is not work.
                 const priceIsDefault = defPrice != null && Math.abs((parseMoney(r.price) || 0) - defPrice) < 0.005;
-                const priceTyped = (r.price && !priceIsDefault) || (r.cost && !(style && style.defaultCost != null && Math.abs((parseMoney(r.cost) || 0) - Number(style.defaultCost)) < 0.005));
+                const priceTyped = (r.price && !priceIsDefault && !copiedUntouched(row.querySelector('.price-input'))) || (r.cost && !copiedUntouched(row.querySelector('.cost-input')) && !(style && style.defaultCost != null && Math.abs((parseMoney(r.cost) || 0) - Number(style.defaultCost)) < 0.005));
                 if (r.size || r.sku || r.stock1 || r.stock2 || priceTyped) rows.push(r);
             });
             const isNew = !block.dataset.colorId;
@@ -7792,7 +7823,7 @@
                 const s2 = parseInt(row.querySelector('.stock2-input').value) || 0;
                 if (!size) {
                     if (sku || s1 > 0 || s2 > 0) { blockedInputs.push(sizeEl); blockedReason = blockedReason || 'toast.stock_needs_size'; }
-                    else if (price > 0 && !stylePrice) stylePrice = { price, cost, input: priceEl };
+                    else if (price > 0 && !stylePrice && !copiedUntouched(priceEl)) stylePrice ={ price, cost, input: priceEl };
                     return;
                 }
                 const key = size.toLowerCase();
