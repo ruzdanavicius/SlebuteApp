@@ -1195,7 +1195,6 @@
                                 <span data-i18n="inv.colors_sizes">Colors &amp; Sizes</span>
                                 <div style="display:flex; align-items:center; gap:10px;">
                                     <button class="btn btn-ghost hidden" id="printAllStyleBtn" style="font-size:0.72rem; padding:5px 10px;" onclick="editingProductId && printLabelsForProduct(editingProductId)"><i class="fas fa-print"></i> <span data-i18n="inv.print_all_style">Print all labels for this style</span></button>
-                                    <button class="icon-btn add" onclick="addColorBlock()" title="Add color" data-i18n-title="inv.add_color"><i class="fas fa-plus"></i></button>
                                 </div>
                             </div>
                             <label id="countModeLabel" style="display:flex; align-items:center; gap:8px; font-size:0.8rem; cursor:pointer; padding:8px 10px; margin-bottom:10px; border-radius:8px; border:1px solid var(--border-color, #ddd);">
@@ -1203,6 +1202,7 @@
                                 <span data-i18n="inv.count_mode">Stock count mode — quantities go straight into the shop's stock (not via Transfers)</span>
                             </label>
                             <div id="colorBlocksContainer"></div>
+                            <button class="btn btn-ghost btn-block" id="addColorBottomBtn" style="margin-top:12px; padding:12px;" onclick="addColorBlock()"><i class="fas fa-plus"></i> <span data-i18n="inv.add_new_color">Add new color</span></button>
                         </div>
 
                         <div style="display:flex; gap:12px;">
@@ -2441,7 +2441,7 @@
             'common.remove': 'Remove', 'common.add': 'Add', 'common.print_title': 'Print', 'common.no_data': 'No data.',
             'common.live_updates': 'Live — updates automatically', 'common.show_keyboard': 'Show keyboard',
             'inv.remove_color': 'Remove color', 'inv.save_price_cost': 'Save price/cost', 'inv.supplier_label': 'Supplier',
-            'inv.add_color': 'Add color',
+            'inv.add_color': 'Add color', 'inv.add_new_color': 'Add new color',
             'inv.delist_title': 'Delete this size', 'inv.delist_confirm_zero_prefix': 'Delete',
             'toast.variant_delisted': 'Size deleted.',
             'inv.featured_online': 'Feature on website', 'inv.web_title': 'Website title', 'inv.web_title_hint': 'Shown to customers on slebute.lt instead of the POS name. Leave blank to use the POS name.', 'toast.web_title_saved': 'Website title saved.', 'toast.featured_on': 'Added to the website showcase.', 'toast.featured_off': 'Removed from the website showcase.',
@@ -2818,7 +2818,7 @@
             'common.remove': 'Pašalinti', 'common.add': 'Pridėti', 'common.print_title': 'Spausdinti', 'common.no_data': 'Nėra duomenų.',
             'common.live_updates': 'Tiesiogiai — atnaujinama automatiškai', 'common.show_keyboard': 'Rodyti klaviatūrą',
             'inv.remove_color': 'Šalinti spalvą', 'inv.save_price_cost': 'Išsaugoti kainą/savikainą', 'inv.supplier_label': 'Tiekėjas',
-            'inv.add_color': 'Pridėti spalvą',
+            'inv.add_color': 'Pridėti spalvą', 'inv.add_new_color': 'Pridėti naują spalvą',
             'inv.delist_title': 'Ištrinti šį dydį', 'inv.delist_confirm_zero_prefix': 'Ištrinti',
             'toast.variant_delisted': 'Dydis ištrintas.',
             'inv.featured_online': 'Rodyti svetainėje', 'inv.web_title': 'Pavadinimas svetainėje', 'inv.web_title_hint': 'Rodomas klientams slebute.lt vietoje kasos pavadinimo. Palikite tuščią, jei norite naudoti kasos pavadinimą.', 'toast.web_title_saved': 'Svetainės pavadinimas išsaugotas.', 'toast.featured_on': 'Pridėta į svetainės vitriną.', 'toast.featured_off': 'Pašalinta iš svetainės vitrinos.',
