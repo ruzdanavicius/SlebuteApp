@@ -2443,7 +2443,7 @@
             'common.live_updates': 'Live — updates automatically', 'common.show_keyboard': 'Show keyboard',
             'inv.remove_color': 'Remove color', 'inv.save_price_cost': 'Save price/cost', 'inv.supplier_label': 'Supplier',
             'inv.add_color': 'Add color', 'inv.add_new_color': 'Add new color',
-            'inv.delist_title': 'Delete this size', 'inv.delist_confirm_zero_prefix': 'Delete',
+            'inv.delist_title': 'Delete this size', 'inv.delist_confirm_zero_prefix': 'Delete', 'inv.delist_color_sizes_suffix': 'sizes', 'toast.color_delisted': 'Colour deleted.',
             'toast.variant_delisted': 'Size deleted.',
             'inv.featured_online': 'Feature on website', 'inv.web_title': 'Website title', 'inv.web_title_hint': 'Shown to customers on slebute.lt instead of the POS name. Leave blank to use the POS name.', 'toast.web_title_saved': 'Website title saved.', 'toast.featured_on': 'Added to the website showcase.', 'toast.featured_off': 'Removed from the website showcase.',
             'inv.edit_delete_toggle': 'Edit / Delete', 'inv.delete_style': 'Delete Style',
@@ -2820,7 +2820,7 @@
             'common.live_updates': 'Tiesiogiai — atnaujinama automatiškai', 'common.show_keyboard': 'Rodyti klaviatūrą',
             'inv.remove_color': 'Šalinti spalvą', 'inv.save_price_cost': 'Išsaugoti kainą/savikainą', 'inv.supplier_label': 'Tiekėjas',
             'inv.add_color': 'Pridėti spalvą', 'inv.add_new_color': 'Pridėti naują spalvą',
-            'inv.delist_title': 'Ištrinti šį dydį', 'inv.delist_confirm_zero_prefix': 'Ištrinti',
+            'inv.delist_title': 'Ištrinti šį dydį', 'inv.delist_confirm_zero_prefix': 'Ištrinti', 'inv.delist_color_sizes_suffix': 'dydž.', 'toast.color_delisted': 'Spalva ištrinta.',
             'toast.variant_delisted': 'Dydis ištrintas.',
             'inv.featured_online': 'Rodyti svetainėje', 'inv.web_title': 'Pavadinimas svetainėje', 'inv.web_title_hint': 'Rodomas klientams slebute.lt vietoje kasos pavadinimo. Palikite tuščią, jei norite naudoti kasos pavadinimą.', 'toast.web_title_saved': 'Svetainės pavadinimas išsaugotas.', 'toast.featured_on': 'Pridėta į svetainės vitriną.', 'toast.featured_off': 'Pašalinta iš svetainės vitrinos.',
             'inv.edit_delete_toggle': 'Redaguoti / Ištrinti', 'inv.delete_style': 'Ištrinti modelį',
@@ -7367,6 +7367,10 @@
     async function removeColorBlock(blockId) {
         const block = document.getElementById(blockId);
         if (!block) return;
+        // A saved colour WITH sizes: removing only the block from the screen left
+        // every size live in the database (it came back on reload). Delist them all,
+        // exactly like the per-size trash does, behind the same stock guard.
+        if (block.dataset.colorId && block.querySelector('.size-row-existing')) { await delistWholeColour(block); return; }
         // A colour that was saved ahead of its sizes exists in the database on its
         // own — removing its (size-less) block removes that row too.
         if (block.dataset.colorId && !block.querySelector('.size-row-existing')) {
@@ -8720,6 +8724,28 @@
         if (units > 0) { delistBlockedToast(units); return; }
         if (!confirm(`${t('inv.delist_confirm_zero_prefix')} ${label}?`)) return;
         delistVariant(variantId);
+    }
+
+    // Trash on a saved colour block: delist every saved size in it (rpc_delist_variant,
+    // one by one — there is no colour-level RPC). Refused up front while any size still
+    // has units; the server re-checks each size (STOCK_REMAINING), so a failure part-way
+    // leaves the remaining sizes in place and the screen is reloaded to show the truth.
+    async function delistWholeColour(block) {
+        const colourName = block.querySelector('.color-name-input').value.trim() || block.dataset.origName || '';
+        const ids = [...block.querySelectorAll('.size-row-existing')].map(r => parseInt(r.dataset.variantId)).filter(Boolean);
+        const all = products.flatMap(p => p.variants);
+        const units = ids.reduce((sum, id) => { const v = all.find(x => x.id === id); return sum + (v ? variantOpenUnits(v) : 0); }, 0);
+        if (units > 0) { delistBlockedToast(units); return; }
+        if (!confirm(`${t('inv.delist_confirm_zero_prefix')} ${colourName} (${ids.length} ${t('inv.delist_color_sizes_suffix')})?`)) return;
+        let failed = null;
+        for (const id of ids) {
+            const { error } = await sb.rpc('rpc_delist_variant', { p_variant_id: id });
+            if (error) { failed = error; break; }
+        }
+        if (failed) failed.message.startsWith('STOCK_REMAINING') ? delistBlockedToast(0) : toast(failed.message, 'error');
+        else { toast(t('toast.color_delisted'), 'success'); block.remove(); } // unsaved rows typed into this colour go with it
+        await loadInventory();
+        if (editingProductId) loadProductForEdit(editingProductId);
     }
 
     async function delistVariant(variantId) {
