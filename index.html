@@ -6054,7 +6054,29 @@
                     ${p.base_barcode || !hasSizes(p) || hasUnpricedSize(p) ? `<div class="pli-code">${escapeHtml(p.base_barcode || '')}${hasSizes(p) ? '' : ` <span class="nosize-badge">${t('inv.no_sizes_badge')}</span>`}${hasUnpricedSize(p) ? ` <span class="nosize-badge">${t('inv.no_price_badge')}</span>` : ''}</div>` : ''}
                 </div>
                 ${productColorBubblesHTML(p)}
-            </div>`).join('') || `<p class="muted" style="font-size:0.8rem; padding:8px;">${t('inv.no_styles')}</p>`;
+            </div>`).join('') || `<p class="muted" style="font-size:0.8rem; padding:8px;">${t('inv.no_styles')}</p><div id="searchRestoreHint"></div>`;
+        scheduleDelistedSearchLookup(q.trim(), list.length === 0 && searchProducts(q).length === 0);
+    }
+
+    // Nothing in the list matches what was typed: the text may be the code of a
+    // style that was removed earlier (`products` only holds active ones), so ask
+    // the database and offer to bring it back — same Restore as on the style form.
+    let delistedLookupTimer = null;
+    function scheduleDelistedSearchLookup(q, nothingMatched) {
+        clearTimeout(delistedLookupTimer);
+        if (!nothingMatched || !q || /\s/.test(q)) return;
+        delistedLookupTimer = setTimeout(async () => {
+            const { data, error } = await sb.from('products').select('id, name').eq('base_barcode', q).eq('is_active', false).limit(1);
+            const hint = document.getElementById('searchRestoreHint');
+            if (error || !data || !data.length || !hint) return;
+            if ((document.getElementById('productSearchBox').value || '').trim() !== q) return; // typed on while we asked
+            hint.innerHTML = `<div class="helper-text delisted-msg" style="display:flex; margin:6px 0;"><span>${t('inv.delisted_code_prefix')} „${escapeHtml(data[0].name)}“.</span><button type="button" class="btn btn-ghost btn-sm" onclick="restoreDelistedFromSearch(${data[0].id}, this)"><i class="fas fa-rotate-left"></i> ${t('inv.restore_style')}</button></div>`;
+        }, 300);
+    }
+
+    async function restoreDelistedFromSearch(productId, btn) {
+        if (!(await confirmLeaveDraft())) return; // restoring opens that style, so unsaved rows on screen must be dealt with first
+        await restoreDelistedProduct(productId, btn);
     }
 
     // Enter in the Manage Catalog search box opens the style on the right —
@@ -7058,13 +7080,26 @@
         loadProductForEdit(id, { dropDrafts: true });
     }
 
-    async function startNewProduct() {
-        if (!(await confirmLeaveDraft())) return;
-        if (styleHasPendingEdits()) { flushStyleEdits({ includeFocused: true }).then(ok => { if (ok) renderNewProduct(); }); return; }
-        renderNewProduct();
+    // What was typed in "Ieškoti modelių" when nothing matched it — treated as the
+    // style code the user is about to create. One token only: several words are a
+    // name search, not a code. '' = nothing worth carrying over.
+    function unmatchedSearchCode() {
+        const q = (document.getElementById('productSearchBox').value || '').trim();
+        if (!q || /\s/.test(q) || searchProducts(q).length) return '';
+        return q;
     }
 
-    function renderNewProduct() {
+    async function startNewProduct() {
+        if (!(await confirmLeaveDraft())) return;
+        const code = unmatchedSearchCode();
+        if (styleHasPendingEdits()) { flushStyleEdits({ includeFocused: true }).then(ok => { if (ok) renderNewProduct(code); }); return; }
+        renderNewProduct(code);
+    }
+
+    // `code`: Main SKU to start from (the unmatched search text). It lands in the
+    // Main SKU field with the caret there for corrections, and goes through the
+    // same lookup as a typed code, so a removed style owning it is offered back.
+    function renderNewProduct(code = '') {
         showInventoryForm();
         leaveStyleFor(null);
         editingProductId = null;
@@ -7087,6 +7122,12 @@
         renderProductsList();
         refreshSaveButton();
         setAutosaveStatus('');
+        if (code) {
+            const el = document.getElementById('new_base_barcode');
+            el.value = code;
+            el.focus();
+            autoFillProduct();
+        }
     }
 
     // opts.dropDrafts: the caller has already saved or deliberately discarded the
