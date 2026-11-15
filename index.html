@@ -4119,7 +4119,7 @@
             if (p.category) counts[p.category] = (counts[p.category] || 0) + 1;
             else uncategorizedCount++;
         }
-        const cats = Object.keys(counts).sort((a, b) => a.localeCompare(b));
+        const cats = Object.keys(counts).sort(compareCategories);
         if (cats.length === 0 && uncategorizedCount === 0) {
             bar.innerHTML = '';
             bar.classList.add('hidden');
@@ -4242,6 +4242,11 @@
         return true;
     }
 
+    // Categories carry a 2-digit order suffix ("Suknelės 01" … "Striukės 09"): sort by that number, then name; un-numbered / '—' go last.
+    function compareCategories(a, b) {
+        const n = s => { const m = /(\d+)\s*$/.exec(s || ''); return m ? parseInt(m[1], 10) : 9999; };
+        return (n(a) - n(b)) || String(a).localeCompare(String(b), 'lt');
+    }
     function escapeHtml(s) { const d = document.createElement('div'); d.innerText = s || ''; return d.innerHTML.replace(/'/g, '&#39;'); }
 
     /* Shared "no photo" rendering for every product/cover image slot
@@ -6175,7 +6180,7 @@
         const colors = [...new Set(candidates.map(r => r.color).filter(Boolean))].sort((a, b) => a.localeCompare(b));
         document.getElementById('storageTabColor').innerHTML =
             `<option value="">${t('storage.filter_all_colors')}</option>` + colors.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
-        const cats = [...new Set(candidates.map(r => r.category).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+        const cats = [...new Set(candidates.map(r => r.category).filter(Boolean))].sort(compareCategories);
         document.getElementById('storageTabCategory').innerHTML =
             `<option value="">${t('storage.filter_all_categories')}</option>` + cats.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
         const supIds = [...new Set(candidates.map(r => r.supplierId).filter(Boolean))];
@@ -7003,7 +7008,7 @@
         const input = document.getElementById('new_category');
         const box = document.getElementById('categorySuggestBox');
         const val = input.value.trim().toLowerCase();
-        const all = [...new Set(products.map(p => p.category).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+        const all = [...new Set(products.map(p => p.category).filter(Boolean))].sort(compareCategories);
         filteredCategorySuggestions = (val ? all.filter(c => c.toLowerCase().includes(val)) : all).slice(0, 8);
         if (filteredCategorySuggestions.length === 0) { box.classList.remove('open'); return; }
         box.innerHTML = filteredCategorySuggestions.map((c, i) =>
