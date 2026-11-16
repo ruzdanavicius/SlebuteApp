@@ -2274,7 +2274,7 @@
             'inv.select_or_new': 'Select a style from the list, or start a new one.',
             'inv.search_styles': 'Search styles...', 'inv.style_reference': 'Style Reference',
             'inv.base_barcode': 'Base Barcode (scan tag)', 'inv.base_barcode_hint': 'No barcode on the garment? Leave this blank — a reference like "keln-001" (from the category) is assigned automatically. It won\u2019t match future scans the way a real tag barcode would.', 'inv.loaded_existing': 'Loaded existing style — editing.',
-            'inv.delisted_code_prefix': 'This code belongs to the removed style', 'inv.restore_style': 'Restore style', 'toast.style_restored': 'Style restored — add the new stock.', 'toast.barcode_taken': 'This barcode is already in use by another style.', 'inv.barcode_clash_active': 'This code is already used by the style', 'inv.open_style': 'Open style', 'inv.barcode_clash_revert': 'Restore previous code', 'inv.draft_save_confirm': 'This style has unsaved sizes. Save them before leaving?', 'inv.draft_discard_confirm': 'Leave without saving? The unsaved sizes will be lost.', 'toast.price_required': 'Enter a price for every new size — it cannot be €0.',
+            'inv.delisted_code_prefix': 'This code belongs to the removed style', 'inv.restore_style': 'Restore style', 'toast.style_restored': 'Style restored — add the new stock.', 'toast.barcode_taken': 'This barcode is already in use by another style.', 'inv.barcode_clash_active': 'This code is already used by the style', 'inv.open_style': 'Open style', 'toast.style_open_failed': 'Could not open that style — reload the page and try again.', 'inv.barcode_clash_revert': 'Restore previous code', 'inv.draft_save_confirm': 'This style has unsaved sizes. Save them before leaving?', 'inv.draft_discard_confirm': 'Leave without saving? The unsaved sizes will be lost.', 'toast.price_required': 'Enter a price for every new size — it cannot be €0.',
             'inv.delist_blocked_prefix': 'Can’t delete — there are still', 'inv.delist_blocked_suffix': 'units (on display, in storage or incoming). Write them off or move them first.', 'inv.delist_blocked_server': 'Can’t delete — there is still stock, or an open transfer / pickup reservation. Write off or move the stock first.',
             'inv.product_name': 'Product Name', 'inv.category': 'Category',
             'inv.size_range': 'Size Range', 'inv.size_range_hint': '(printed on labels, e.g. "XS-XL")',
@@ -2651,7 +2651,7 @@
             'inv.select_or_new': 'Pasirinkite modelį iš sąrašo arba pridėkite naują',
             'inv.search_styles': 'Ieškoti modelių...', 'inv.style_reference': 'Modelio informacija',
             'inv.base_barcode': 'Pagrindinis brūkšninis kodas', 'inv.base_barcode_hint': 'Ant drabužio nėra brūkšninio kodo? Palikite tuščią — nuoroda, pvz. „keln-001“ (iš kategorijos), bus priskirta automatiškai. Ji neatpažins būsimų skenavimų taip, kaip tikras kodas ant etiketės.', 'inv.loaded_existing': 'Įkeltas esamas modelis — redaguojama.',
-            'inv.delisted_code_prefix': 'Šis kodas priklauso išimtam modeliui', 'inv.restore_style': 'Atkurti modelį', 'toast.style_restored': 'Modelis atkurtas — pridėkite naujas prekes.', 'toast.barcode_taken': 'Šis brūkšninis kodas jau naudojamas kitam modeliui.', 'inv.barcode_clash_active': 'Šį kodą jau naudoja modelis', 'inv.open_style': 'Atidaryti modelį', 'inv.barcode_clash_revert': 'Grąžinti ankstesnį kodą', 'inv.draft_save_confirm': 'Šiame modelyje yra neišsaugotų dydžių. Išsaugoti prieš išeinant?', 'inv.draft_discard_confirm': 'Išeiti neišsaugojus? Neišsaugoti dydžiai bus prarasti.', 'toast.price_required': 'Įveskite kiekvieno naujo dydžio kainą — ji negali būti 0 €.',
+            'inv.delisted_code_prefix': 'Šis kodas priklauso išimtam modeliui', 'inv.restore_style': 'Atkurti modelį', 'toast.style_restored': 'Modelis atkurtas — pridėkite naujas prekes.', 'toast.barcode_taken': 'Šis brūkšninis kodas jau naudojamas kitam modeliui.', 'inv.barcode_clash_active': 'Šį kodą jau naudoja modelis', 'inv.open_style': 'Atidaryti modelį', 'toast.style_open_failed': 'Modelio atidaryti nepavyko — perkraukite puslapį ir bandykite dar kartą.', 'inv.barcode_clash_revert': 'Grąžinti ankstesnį kodą', 'inv.draft_save_confirm': 'Šiame modelyje yra neišsaugotų dydžių. Išsaugoti prieš išeinant?', 'inv.draft_discard_confirm': 'Išeiti neišsaugojus? Neišsaugoti dydžiai bus prarasti.', 'toast.price_required': 'Įveskite kiekvieno naujo dydžio kainą — ji negali būti 0 €.',
             'inv.delist_blocked_prefix': 'Negalima ištrinti — dar yra', 'inv.delist_blocked_suffix': 'vnt. (vitrinoje, sandėlyje arba atvyksta). Pirmiausia nurašykite arba perkelkite juos.', 'inv.delist_blocked_server': 'Negalima ištrinti — dar yra prekių arba neužbaigtas pervežimas / rezervacija. Pirmiausia nurašykite arba perkelkite prekes.',
             'inv.product_name': 'Prekės pavadinimas', 'inv.category': 'Kategorija',
             'inv.size_range': 'Dydžių intervalas', 'inv.size_range_hint': '(spausdinama etiketėse, pvz. „XS-XL“)',
@@ -3929,8 +3929,17 @@
         let data, error;
         const stylePricesP = isPriv ? loadStylePrices() : Promise.resolve({});
         if (isPriv) {
-            ({ data, error } = await sb.from('products')
-                .select(`id, name, base_barcode, description, image_url, category, is_active, size_range, composition, supplier_id,
+            // The API hands back at most 1000 rows per request. Once the catalogue
+            // grew past 1000 styles, everything after the 1000th name (T…, V…, Ž…)
+            // silently went missing here: not searchable, not sellable from this
+            // screen, yet still owning its code in the database. So read page by
+            // page until a short page says that was the last one. `id` breaks ties
+            // between equal names so a style can't fall between two pages.
+            const PAGE = 1000;
+            data = [];
+            for (let from = 0; ; from += PAGE) {
+                const res = await sb.from('products')
+                    .select(`id, name, base_barcode, description, image_url, category, is_active, size_range, composition, supplier_id,
                     product_colors ( id, color_name, color_hex, image_url,
                         product_variants ( id, size, sku, price, cost_price, vat_rate, is_active, is_clearance, clearance_reason, source_variant_id,
                             inventory ( quantity, reserved_quantity, storage_quantity, location_id, safety_stock_threshold )
@@ -3938,8 +3947,13 @@
                     ),
                     featured_products ( is_active, web_title ),
                     product_images ( id, image_url, sort_order )`)
-                .eq('is_active', true)
-                .order('name'));
+                    .eq('is_active', true)
+                    .order('name').order('id')
+                    .range(from, from + PAGE - 1);
+                if (res.error) { error = res.error; break; }
+                data.push(...(res.data || []));
+                if ((res.data || []).length < PAGE) break;
+            }
         } else {
             ({ data, error } = await sb.rpc('rpc_get_pos_catalog'));
         }
@@ -7216,8 +7230,8 @@
         // Scan-to-find on a blank form: jump straight to that style, as before.
         if (info.active && !editingProductId && !formHasWorkBeyondBarcode()) {
             if (!products.find(p => p.id === info.id)) await loadInventory();
-            loadProductForEdit(info.id);
-            return;
+            // Still not in the list: say who owns the code instead of doing nothing.
+            if (products.find(p => p.id === info.id)) { loadProductForEdit(info.id); return; }
         }
         showBarcodeClash(info, b);
     }
@@ -7257,9 +7271,12 @@
     }
 
     async function openClashStyle(id) {
+        // Make sure the style can actually be opened before asking to give up what
+        // is on the form — otherwise the prompt repeats and nothing ever opens.
+        if (!products.find(p => p.id === id)) await loadInventory();
+        if (!products.find(p => p.id === id)) { toast(t('toast.style_open_failed'), 'error'); return; }
         if (editingProductId) revertBarcodeField(); // the clashing edit must not travel with us
         else if (formHasWorkBeyondBarcode() && !confirm(t('inv.draft_discard_confirm'))) return;
-        if (!products.find(p => p.id === id)) await loadInventory();
         if (editingProductId && !(await confirmLeaveDraft())) return;
         loadProductForEdit(id, { dropDrafts: true });
     }
