@@ -1202,6 +1202,14 @@
                                 <input type="checkbox" id="countModeCheckbox" onchange="onCountModeToggle()">
                                 <span data-i18n="inv.count_mode">Stock count mode — quantities go straight into the shop's stock (not via Transfers)</span>
                             </label>
+                            <!-- Admin only (hidden for everyone else; rpc_receive_into_storage refuses non-admins too). -->
+                            <div id="storageModeBox" class="hidden" style="margin-bottom:10px;">
+                                <label id="storageModeLabel" style="display:flex; align-items:center; gap:8px; font-size:0.8rem; cursor:pointer; padding:8px 10px; border-radius:8px; border:1px solid var(--border-color, #ddd);">
+                                    <input type="checkbox" id="storageModeCheckbox" onchange="onStorageModeToggle()">
+                                    <span data-i18n="inv.storage_mode">New goods straight into storage — quantities skip the shop floor and go into the storeroom of the chosen shop</span>
+                                </label>
+                                <select id="storageModeStore" class="form-input hidden" style="margin-top:6px;" onchange="onStorageModeStoreChange()" title="Shop"></select>
+                            </div>
                             <div id="colorBlocksContainer"></div>
                             <button class="btn btn-ghost btn-block" id="addColorBottomBtn" style="margin-top:12px; padding:12px;" onclick="addColorBlock()"><i class="fas fa-plus"></i> <span data-i18n="inv.add_new_color">Add new color</span></button>
                         </div>
@@ -2400,6 +2408,11 @@
             'toast.draft_restored': 'Unsaved style draft restored — check it and press Save.',
             'inv.no_price_badge': 'No price', 'inv.no_price_filter': 'No price',
             'inv.count_mode': 'Stock count mode — quantities go straight into the shop\'s stock (not via Transfers)',
+            'inv.storage_mode': 'New goods straight into storage — quantities skip the shop floor and go into the storeroom of the chosen shop (admin)',
+            'toast.storage_mode_on': 'Straight-to-storage ON — every + and new-size quantity goes into the storeroom of:',
+            'toast.storage_mode_off': 'Straight-to-storage off.',
+            'toast.storage_mode_other_shop': 'Straight-to-storage is on for one shop only — pick the other shop in the list, or switch it off.',
+            'toast.storage_qty_suffix': 'into storage',
             'toast.count_mode_on': 'Stock count mode ON — every + and new-size quantity goes straight into the shop\'s stock on Save. Switch it off after the count.',
             'toast.count_mode_off': 'Stock count mode off — quantities go to Transfers as incoming again.',
             'inv.no_sizes_badge': 'No sizes', 'inv.no_sizes_filter': 'No sizes', 'inv.web_only_filter': 'On website',
@@ -2777,6 +2790,11 @@
             'toast.draft_restored': 'Atkurtas neišsaugotas modelio juodraštis — patikrinkite ir spauskite „Išsaugoti“.',
             'inv.no_price_badge': 'Be kainos', 'inv.no_price_filter': 'Be kainos',
             'inv.count_mode': 'Skaičiavimo režimas — kiekiai iš karto į parduotuvės likutį (ne per Pervežimus)',
+            'inv.storage_mode': 'Naujos prekės tiesiai į sandėlį — kiekiai neina į prekybos salę, o patenka į pasirinktos parduotuvės sandėlį (admin)',
+            'toast.storage_mode_on': 'Tiesiai į sandėlį ĮJUNGTA — kiekvienas + ir naujo dydžio kiekis patenka į sandėlį:',
+            'toast.storage_mode_off': 'Tiesiai į sandėlį išjungta.',
+            'toast.storage_mode_other_shop': 'Tiesiai į sandėlį veikia tik vienai parduotuvei — pasirinkite kitą parduotuvę sąraše arba išjunkite.',
+            'toast.storage_qty_suffix': 'į sandėlį',
             'toast.count_mode_on': 'Skaičiavimo režimas ĮJUNGTAS — kiekvienas + ir naujo dydžio kiekis išsaugant iš karto patenka į parduotuvės likutį. Baigę skaičiuoti išjunkite.',
             'toast.count_mode_off': 'Skaičiavimo režimas išjungtas — kiekiai vėl keliauja per Pervežimus kaip atvykstantys.',
             'inv.no_sizes_badge': 'Be dydžių', 'inv.no_sizes_filter': 'Be dydžių', 'inv.web_only_filter': 'Svetainėje',
@@ -5793,6 +5811,21 @@
     const COUNT_MODE_KEY = 'slebute_count_mode';
     function countModeOn() { try { return localStorage.getItem(COUNT_MODE_KEY) === '1'; } catch (e) { return false; } }
     let STAGED_PLUS_GOES_TO = countModeOn() ? 'shop' : 'incoming';
+    // Third destination, admin only: 'storage' = straight into the storeroom of
+    // STORAGE_MODE_STORE_ID (rpc_receive_into_storage — arrival + move to storage
+    // in one transaction, so the units are never sellable on the shop floor and an
+    // Inventorius count can't zero them). Deliberately NOT remembered across page
+    // loads: a forgotten tick would silently send every later arrival to a
+    // storeroom. Switching it off falls back to whatever count mode says.
+    let STORAGE_MODE_STORE_ID = null;
+    function storageModeAllowed() { return !!(PROFILE && PROFILE.role === 'admin'); }
+    function storageModeStoreId() {
+        return (STAGED_PLUS_GOES_TO === 'storage' && storageModeAllowed()) ? STORAGE_MODE_STORE_ID : null;
+    }
+    function storageModeStoreName() {
+        const s = STORES.find(x => x.id === STORAGE_MODE_STORE_ID);
+        return s ? s.name : '';
+    }
     function syncCountModeUI() {
         const box = document.getElementById('countModeCheckbox');
         const label = document.getElementById('countModeLabel');
@@ -5801,6 +5834,7 @@
         box.checked = on;
         label.style.background = on ? 'var(--warning-bg)' : '';
         label.style.fontWeight = on ? '600' : 'normal';
+        syncStorageModeUI();
     }
     function onCountModeToggle() {
         const on = document.getElementById('countModeCheckbox').checked;
@@ -5808,6 +5842,60 @@
         try { on ? localStorage.setItem(COUNT_MODE_KEY, '1') : localStorage.removeItem(COUNT_MODE_KEY); } catch (e) {}
         syncCountModeUI();
         toast(t(on ? 'toast.count_mode_on' : 'toast.count_mode_off'), on ? 'warn' : 'info');
+    }
+
+    function syncStorageModeUI() {
+        const wrap = document.getElementById('storageModeBox');
+        if (!wrap) return;
+        if (!storageModeAllowed()) {          // cashier / manager: not shown, not active
+            wrap.classList.add('hidden');
+            if (STAGED_PLUS_GOES_TO === 'storage') STAGED_PLUS_GOES_TO = countModeOn() ? 'shop' : 'incoming';
+            return;
+        }
+        wrap.classList.remove('hidden');
+        const sel = document.getElementById('storageModeStore');
+        if (sel && sel.options.length !== STORES.length) {
+            sel.innerHTML = STORES.map(s => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
+        }
+        if (STORAGE_MODE_STORE_ID == null) STORAGE_MODE_STORE_ID = (STORES.find(s => s.id === VIEW_LOCATION_ID) || STORES[0] || {}).id ?? null;
+        if (sel && STORAGE_MODE_STORE_ID != null) sel.value = String(STORAGE_MODE_STORE_ID);
+        const on = STAGED_PLUS_GOES_TO === 'storage';
+        const box = document.getElementById('storageModeCheckbox');
+        const label = document.getElementById('storageModeLabel');
+        box.checked = on;
+        label.style.background = on ? 'var(--warning-bg)' : '';
+        label.style.fontWeight = on ? '600' : 'normal';
+        sel.classList.toggle('hidden', !on);
+    }
+    function onStorageModeToggle() {
+        if (!storageModeAllowed()) return;
+        const on = document.getElementById('storageModeCheckbox').checked;
+        STAGED_PLUS_GOES_TO = on ? 'storage' : (countModeOn() ? 'shop' : 'incoming');
+        syncCountModeUI();
+        toast(on ? `${t('toast.storage_mode_on')} ${storageModeStoreName()}` : t('toast.storage_mode_off'), on ? 'warn' : 'info');
+    }
+    function onStorageModeStoreChange() {
+        const id = parseInt(document.getElementById('storageModeStore').value);
+        if (!id) return;
+        STORAGE_MODE_STORE_ID = id;
+        if (STAGED_PLUS_GOES_TO === 'storage') toast(`${t('toast.storage_mode_on')} ${storageModeStoreName()}`, 'warn');
+    }
+
+    // One staged unit-count to its destination (STAGED_PLUS_GOES_TO). In storage
+    // mode only the chosen shop's units are accepted — a unit staged for the other
+    // shop comes back as an error (the caller re-stages it) instead of silently
+    // landing in the wrong storeroom.
+    async function sendStagedUnits(variantId, storeId, qty, note) {
+        if (STAGED_PLUS_GOES_TO === 'incoming') {
+            return sb.rpc('rpc_add_incoming_stock', { p_variant_id: variantId, p_target_location_id: storeId, p_quantity: qty, p_notes: note });
+        }
+        if (STAGED_PLUS_GOES_TO === 'storage') {
+            if (!storageModeAllowed() || storeId !== STORAGE_MODE_STORE_ID) {
+                return { error: { message: t('toast.storage_mode_other_shop') } };
+            }
+            return sb.rpc('rpc_receive_into_storage', { p_variant_id: variantId, p_location_id: storeId, p_quantity: qty, p_notes: note });
+        }
+        return sb.rpc('rpc_record_stock_adjustment', { p_variant_id: variantId, p_location_id: storeId, p_quantity_change: qty, p_reason: 'ARRIVAL', p_notes: note });
     }
 
     function stagedUnits(styleId) {
@@ -5840,15 +5928,7 @@
         let sent = 0;
         const failed = [];
         for (const st of items) {
-            const { error: e } = STAGED_PLUS_GOES_TO === 'incoming'
-                ? await sb.rpc('rpc_add_incoming_stock', {
-                    p_variant_id: st.variantId, p_target_location_id: st.storeId,
-                    p_quantity: st.qty, p_notes: note
-                })
-                : await sb.rpc('rpc_record_stock_adjustment', {
-                    p_variant_id: st.variantId, p_location_id: st.storeId,
-                    p_quantity_change: st.qty, p_reason: 'ARRIVAL', p_notes: note
-                });
+            const { error: e } = await sendStagedUnits(st.variantId, st.storeId, st.qty, note);
             if (e) { failed.push(st); toast(`${st.label}: ${e.message}`, 'error'); continue; }
             sent += st.qty;
             const ctx = findVariantContext(st.variantId);
@@ -5859,6 +5939,7 @@
     }
 
     function stagedSuffix() {
+        if (STAGED_PLUS_GOES_TO === 'storage') return `${t('toast.storage_qty_suffix')} (${storageModeStoreName()})`;
         return t(STAGED_PLUS_GOES_TO === 'incoming' ? 'toast.incoming_qty_suffix' : 'toast.added_qty_suffix');
     }
 
@@ -5937,6 +6018,10 @@
         const bucket = pendingStock[editingProductId] || {};
         const staged = bucket[key] || 0;
         if (delta > 0) {
+            // Storage mode is for one shop at a time: a + on the other shop's cell would
+            // otherwise look like it counts, then be refused on Save.
+            const sm = storageModeStoreId();
+            if (sm != null && Number(storeId) !== sm) { toast(t('toast.storage_mode_other_shop'), 'warn'); return; }
             bucket[key] = staged + 1;
         } else if (staged > 0) {
             if (staged === 1) delete bucket[key]; else bucket[key] = staged - 1;
@@ -8047,6 +8132,13 @@
                 const sku = skuEl.value.trim();
                 const s1 = parseInt(row.querySelector('.stock1-input').value) || 0;
                 const s2 = parseInt(row.querySelector('.stock2-input').value) || 0;
+                // Storage mode takes one shop's quantity only — block the other column up
+                // front rather than saving the style and then refusing its stock.
+                const smId = storageModeStoreId();
+                if (smId != null) {
+                    if (s1 > 0 && STORES[0]?.id !== smId) { blockedInputs.push(row.querySelector('.stock1-input')); blockedReason = blockedReason || 'toast.storage_mode_other_shop'; }
+                    if (s2 > 0 && STORES[1]?.id !== smId) { blockedInputs.push(row.querySelector('.stock2-input')); blockedReason = blockedReason || 'toast.storage_mode_other_shop'; }
+                }
                 if (!size) {
                     if (sku || s1 > 0 || s2 > 0) { blockedInputs.push(sizeEl); blockedReason = blockedReason || 'toast.stock_needs_size'; }
                     else if (price > 0 && !stylePrice && !copiedUntouched(priceEl)) stylePrice ={ price, cost, input: priceEl };
@@ -8173,18 +8265,12 @@
             const byStore = initialStockByRow[i] || {};
             for (const [storeId, qty] of Object.entries(byStore)) {
                 if (storeId === 'undefined' || !qty || qty <= 0) continue;
+                // Destination follows STAGED_PLUS_GOES_TO: Transfers (default), the shop
+                // floor (count mode: counted on the shelf), or — admin — the storeroom.
                 incomingCalls.push(
-                    (STAGED_PLUS_GOES_TO === 'incoming'
-                        ? sb.rpc('rpc_add_incoming_stock', {
-                            p_variant_id: v.variant_id, p_target_location_id: parseInt(storeId),
-                            p_quantity: qty, p_notes: 'Naujas modelis (Prekių valdymas)'
-                        })
-                        // Stock count mode: counted on the shelf, so straight into that shop.
-                        : sb.rpc('rpc_record_stock_adjustment', {
-                            p_variant_id: v.variant_id, p_location_id: parseInt(storeId),
-                            p_quantity_change: qty, p_reason: 'ARRIVAL', p_notes: 'Inventorizacija — naujas dydis (Prekių valdymas)'
-                        })
-                    ).then(({ error: e }) => e && toast(`${v.sku}: ${e.message}`, 'error'))
+                    sendStagedUnits(v.variant_id, parseInt(storeId), qty,
+                        STAGED_PLUS_GOES_TO === 'shop' ? 'Inventorizacija — naujas dydis (Prekių valdymas)' : 'Naujas modelis (Prekių valdymas)')
+                    .then(({ error: e }) => e && toast(`${v.sku}: ${e.message}`, 'error'))
                 );
             }
         });
