@@ -539,6 +539,8 @@
         .storage-batch-dir.to-storage { background: rgba(181,118,15,0.15); color:#b5760f; }
         .storage-batch-dir.to-display { background: var(--success-tint); color: var(--success-color); }
         .storage-scan-panel.count-mode #storageTabSubmitBtn { flex: 1 1 100%; justify-content: center; }
+        #storageTabReceiveBadge:not(:empty) { margin-left:4px; padding:0 6px; border-radius:8px; background: rgba(36,22,30,0.12); font-size:0.68rem; }
+        .storage-scan-panel .pay-tab.active #storageTabReceiveBadge:not(:empty) { background: rgba(255,255,255,0.25); }
         #storageTabCountBadge:not(:empty) { margin-left:4px; padding:0 6px; border-radius:8px; background: rgba(36,22,30,0.12); font-size:0.68rem; }
         .storage-scan-panel .pay-tab.active #storageTabCountBadge:not(:empty) { background: rgba(255,255,255,0.25); }
         .storage-browse-panel { flex: 1; min-width: 0; }
@@ -1058,6 +1060,12 @@
                             <div class="pay-tab" id="storageTabScanToStorageBtn" onclick="setStorageTabScanDirection('TO_STORAGE')"><i class="fas fa-box-archive"></i> <span data-i18n="storage.mode_to_storage">To storage</span></div>
                             <div class="pay-tab" id="storageTabScanToDisplayBtn" onclick="setStorageTabScanDirection('TO_DISPLAY')"><i class="fas fa-store"></i> <span data-i18n="storage.mode_to_display">To display</span></div>
                             <div class="pay-tab" id="storageTabScanCountBtn" onclick="setStorageTabScanDirection('COUNT')"><i class="fas fa-clipboard-check"></i> <span data-i18n="storage.mode_count">Shop count</span><span id="storageTabCountBadge"></span></div>
+                            <!-- Admin only (hidden for everyone else; the RPC refuses non-admins too). -->
+                            <div class="pay-tab" id="storageTabScanReceiveBtn" style="display:none;" onclick="setStorageTabScanDirection('RECEIVE')"><i class="fas fa-dolly"></i> <span data-i18n="storage.mode_receive">New goods</span><span id="storageTabReceiveBadge"></span></div>
+                        </div>
+                        <div id="storageTabReceiveShopRow" style="display:none; align-items:center; gap:8px; margin-bottom:10px;">
+                            <span style="color:var(--text-secondary); font-size:0.85rem;" data-i18n="storage.receive_shop_label">Into the storage of:</span>
+                            <select id="storageTabReceiveShop" class="location-select" onchange="onReceiveShopChange()"></select>
                         </div>
                         <input type="text" id="storageTabScanManualInput" class="form-input kb-toggle-input" inputmode="none" data-i18n-placeholder="storage.manual_input_placeholder" placeholder="SKU (if the scanner can't read the tag)" onkeydown="if(event.key==='Enter'){event.preventDefault(); handleStorageTabScanManualEnter();}">
                         <p id="storageTabScanStatus" style="font-size:0.85rem; min-height:1.2em; margin:10px 0 6px; font-weight:600;"></p>
@@ -2246,6 +2254,15 @@
             'storage.count_confirm': "{store}: have you scanned ALL available items in the store?\n\nScanned: {units} units ({variants} variants)\nNot scanned, will be set to 0: {zeroed} variants (−{zeroedUnits} units)\n\nPress OK only if every item in the store has been scanned. The system stock will then match your scan.",
             'storage.count_applying': 'Submitting stock count…', 'storage.count_done': 'Stock count submitted to {store} — {changes} variants changed.',
             'storage.count_failed_prefix': 'Stock count NOT saved:',
+            'storage.mode_receive': 'New goods', 'storage.receive_shop_label': 'Into the storage of:',
+            'storage.receive_hint': 'New goods: scan every labelled garment, one scan per unit. Submitting adds the units to the storage of the shop above — the shop floor is not touched.',
+            'storage.receive_apply': 'Add to {store} storage', 'storage.receive_scanned': 'Scanned', 'storage.receive_in_storage': 'in storage now',
+            'storage.receive_applying': 'Adding to storage…', 'storage.receive_done': '{units} units ({variants} variants) added to the {store} storage.',
+            'storage.receive_already': 'Already added earlier — {units} units ({variants} variants) in the {store} storage; nothing was added twice.',
+            'storage.receive_more_left': 'Newer scans are still waiting — press the button again.',
+            'storage.receive_failed_prefix': 'NOT added (nothing was changed):',
+            'storage.receive_unsure': 'No answer from the server — it may or may not have been added. Press the button again: the same batch is resent and cannot be added twice.',
+            'storage.receive_pending': 'Waiting to be sent to {store}: {units} units — press the button again (it cannot be added twice).',
             'storage.scan_hint': 'Scan an item to move it.', 'storage.manual_input_placeholder': "SKU (if the scanner can't read the tag)",
             'storage.nothing_on_display': 'Nothing on display here to move to storage.',
             'storage.nothing_in_storage': 'Nothing in storage here to bring out.',
@@ -2623,6 +2640,15 @@
             'storage.count_confirm': "{store}: ar nuskaitėte VISAS parduotuvėje esančias prekes?\n\nNuskaityta: {units} vnt. ({variants} variantų)\nNenuskaityta, bus nustatyta į 0: {zeroed} variantų (−{zeroedUnits} vnt.)\n\nSpauskite Gerai tik jei nuskaitytas kiekvienas parduotuvės drabužis. Sistemos likutis taps toks, kaip nuskaityta.",
             'storage.count_applying': 'Pateikiamas inventorius…', 'storage.count_done': 'Inventorius pateiktas — {store}, pakeista variantų: {changes}.',
             'storage.count_failed_prefix': 'Inventorius NEIŠSAUGOTAS:',
+            'storage.mode_receive': 'Naujos prekės', 'storage.receive_shop_label': 'Į sandėlį:',
+            'storage.receive_hint': 'Naujos prekės: nuskaitykite kiekvieną paženklintą drabužį — vienas nuskaitymas = vienas vienetas. Pateikus, vienetai pridedami prie viršuje pasirinktos parduotuvės sandėlio — prekybos salė nekeičiama.',
+            'storage.receive_apply': 'Pridėti į {store} sandėlį', 'storage.receive_scanned': 'Nuskaityta', 'storage.receive_in_storage': 'sandėlyje dabar',
+            'storage.receive_applying': 'Dedama į sandėlį…', 'storage.receive_done': 'Į {store} sandėlį pridėta: {units} vnt. ({variants} variantų).',
+            'storage.receive_already': 'Jau buvo pridėta anksčiau — {store} sandėlyje {units} vnt. ({variants} variantų); antrą kartą nepridėta.',
+            'storage.receive_more_left': 'Naujesni nuskaitymai dar laukia — spauskite mygtuką dar kartą.',
+            'storage.receive_failed_prefix': 'NEPRIDĖTA (nieko nepakeista):',
+            'storage.receive_unsure': 'Serveris neatsakė — gali būti, kad pridėta, gali būti, kad ne. Spauskite mygtuką dar kartą: siunčiama ta pati siunta, antrą kartą nepridės.',
+            'storage.receive_pending': 'Laukia išsiuntimo į {store}: {units} vnt. — spauskite mygtuką dar kartą (antrą kartą nepridės).',
             'storage.scan_hint': 'Nuskaitykite prekę, kad ją perkeltumėte.', 'storage.manual_input_placeholder': 'SKU (jei skeneris neperskaito etiketės)',
             'storage.nothing_on_display': 'Šioje parduotuvėje prekyboje nieko nėra — perkelti į sandėlį nėra ko.',
             'storage.nothing_in_storage': 'Šioje parduotuvėje sandėlyje nieko nėra — atnešti į prekybą nėra ko.',
@@ -6325,21 +6351,29 @@
 
     function setStorageTabScanDirection(dir) {
         if (dir === 'COUNT' && !SHOP_COUNT_ENABLED) dir = 'TO_STORAGE';
+        if (dir === 'RECEIVE' && !receiveAllowed()) dir = 'TO_STORAGE';
         document.getElementById('storageTabScanCountBtn').style.display = SHOP_COUNT_ENABLED ? '' : 'none';
+        document.getElementById('storageTabScanReceiveBtn').style.display = receiveAllowed() ? '' : 'none';
         storageTabScanDirection = dir;
         document.getElementById('storageTabScanToStorageBtn').classList.toggle('active', dir === 'TO_STORAGE');
         document.getElementById('storageTabScanToDisplayBtn').classList.toggle('active', dir === 'TO_DISPLAY');
         document.getElementById('storageTabScanCountBtn').classList.toggle('active', dir === 'COUNT');
-        document.getElementById('storageTabScanPanel').classList.toggle('count-mode', dir === 'COUNT');
+        document.getElementById('storageTabScanReceiveBtn').classList.toggle('active', dir === 'RECEIVE');
+        document.getElementById('storageTabScanPanel').classList.toggle('count-mode', dir === 'COUNT' || dir === 'RECEIVE');
+        const receiveRow = document.getElementById('storageTabReceiveShopRow');
+        receiveRow.style.display = dir === 'RECEIVE' ? 'flex' : 'none';
+        if (dir === 'RECEIVE') fillReceiveShopSelect();
         const submitLabel = document.getElementById('storageTabSubmitLabel');
         if (dir === 'COUNT') {
             updateShopCountSubmitLabel();
+        } else if (dir === 'RECEIVE') {
+            updateReceiveSubmitLabel();
         } else {
             submitLabel.setAttribute('data-i18n', 'storage.submit_batch');
             submitLabel.innerText = t('storage.submit_batch');
         }
         const scanStatus = document.getElementById('storageTabScanStatus');
-        scanStatus.innerText = t(dir === 'COUNT' ? 'storage.count_hint' : 'storage.scan_hint');
+        scanStatus.innerText = t(dir === 'COUNT' ? 'storage.count_hint' : (dir === 'RECEIVE' ? 'storage.receive_hint' : 'storage.scan_hint'));
         scanStatus.style.color = '';
         renderStorageTabScanLog();
         // Clicking either direction button steals focus from the manual
@@ -6378,6 +6412,7 @@
 
     function stageStorageTabScan(p, v, direction) {
         if (direction === 'COUNT') { stageShopCountScan(p, v); return; }
+        if (direction === 'RECEIVE') { stageReceiveScan(p, v); return; }
         const status = document.getElementById('storageTabScanStatus');
         const locId = VIEW_LOCATION_ID; // scanning always stages against only the store currently being viewed
         const loc = (v.stockByLocation || {})[locId] || { quantity: 0, storage: 0 };
@@ -6415,7 +6450,9 @@
 
     function renderStorageTabScanLog() {
         updateShopCountBadge();
+        updateReceiveBadge();
         if (storageTabScanDirection === 'COUNT') { renderShopCountLog(); return; }
+        if (storageTabScanDirection === 'RECEIVE') { renderReceiveLog(); return; }
         const rows = document.getElementById('storageTabScanLogRows');
         rows.innerHTML = storageTabPendingBatch.length
             ? storageTabPendingBatch.map((r, i) => `
@@ -6443,6 +6480,7 @@
     // reflects the real committed numbers, not the optimistic staged ones.
     async function submitStorageTabBatch() {
         if (storageTabScanDirection === 'COUNT') { await submitShopCount(); return; }
+        if (storageTabScanDirection === 'RECEIVE') { await submitReceive(); return; }
         if (!storageTabPendingBatch.length) return;
         const btn = document.getElementById('storageTabSubmitBtn');
         const status = document.getElementById('storageTabScanStatus');
@@ -6639,6 +6677,220 @@
             shopCountBatch = {}; saveShopCount();
             await loadInventory();
             status.innerText = fillTemplate(t('storage.count_done'), { store, changes: (data && data.lines_changed) || 0 });
+            status.style.color = 'var(--success-color)';
+            toast(status.innerText, 'success');
+            renderStorageTab();
+        } finally {
+            renderStorageTabScanLog();
+            document.getElementById('storageTabScanManualInput')?.focus();
+        }
+    }
+
+    /* ============================================================
+       NEW GOODS mode (2026-11-18, admin only) — "scan the labelled
+       storeroom goods in".
+       ============================================================
+       Fourth mode of the scan panel. For goods that exist as SKUs (labels are
+       printed from Prekių valdymas) but whose units were never entered: label
+       them, stick them on, then scan every garment here — one scan = one unit
+       — and submit once. The units go straight into the STORAGE zone of the
+       shop picked in the panel (shop-floor quantity is never touched, so a
+       later Inventorius count cannot zero them), through
+       rpc_receive_into_storage_batch: one transaction, admin only.
+
+       Unlike the other modes this ADDS stock, so two things matter:
+       - Scans live only in this browser (localStorage, one slot per shop), like
+         Shop count, so a reload or a dead tablet in the middle of thousands of
+         scans loses nothing; cleared only after the server has accepted them.
+       - A submit is frozen into a "pending" batch with its own id before it is
+         sent. If the answer is lost (Wi-Fi), pressing the button again resends the
+         SAME batch and the server recognises it (already_applied) instead of adding
+         everything twice. A batch the server REJECTED (nothing applied, whole
+         transaction rolled back) goes back among the live scans to be fixed. */
+    const RECEIVE_KEY_PREFIX = 'slebute_receive_storage_';
+    const RECEIVE_PENDING_PREFIX = 'slebute_receive_pending_';
+    let receiveLocId = null;          // shop chosen in the panel (not the POS "Viewing" shop)
+    let receiveBatch = {};            // variantId -> { qty, sku, name, colorName, size, at }
+    let receiveBatchLocId = null;     // shop the in-memory batch belongs to
+    const receivePendingMem = {};     // locId -> pending batch (mirror of localStorage)
+
+    function receiveAllowed() { return !!(PROFILE && PROFILE.role === 'admin'); }
+    function receiveStoreId() {
+        if (receiveLocId == null) receiveLocId = (STORES.find(s => s.id === VIEW_LOCATION_ID) || STORES[0] || {}).id ?? null;
+        return receiveLocId;
+    }
+    function receiveStoreName() {
+        const s = STORES.find(x => x.id === receiveStoreId());
+        return s ? s.name : '';
+    }
+    function fillReceiveShopSelect() {
+        const sel = document.getElementById('storageTabReceiveShop');
+        if (sel.options.length !== STORES.length) sel.innerHTML = STORES.map(s => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
+        sel.value = String(receiveStoreId());
+    }
+    function onReceiveShopChange() {
+        const id = parseInt(document.getElementById('storageTabReceiveShop').value);
+        if (!id) return;
+        receiveLocId = id;
+        updateReceiveSubmitLabel();
+        renderStorageTabScanLog();
+        document.getElementById('storageTabScanManualInput')?.focus();
+    }
+    function ensureReceiveLoaded() {
+        const id = receiveStoreId();
+        if (receiveBatchLocId === id) return;
+        receiveBatchLocId = id;
+        receiveBatch = {};
+        try {
+            const raw = localStorage.getItem(RECEIVE_KEY_PREFIX + id);
+            if (raw) receiveBatch = JSON.parse(raw) || {};
+        } catch (e) { receiveBatch = {}; }
+    }
+    function saveReceive() {
+        try {
+            if (Object.keys(receiveBatch).length) localStorage.setItem(RECEIVE_KEY_PREFIX + receiveBatchLocId, JSON.stringify(receiveBatch));
+            else localStorage.removeItem(RECEIVE_KEY_PREFIX + receiveBatchLocId);
+        } catch (e) {}
+    }
+    function receivePendingGet(locId) {
+        if (receivePendingMem[locId]) return receivePendingMem[locId];
+        try { return JSON.parse(localStorage.getItem(RECEIVE_PENDING_PREFIX + locId)) || null; } catch (e) { return null; }
+    }
+    function receivePendingSet(locId, p) {
+        if (p) receivePendingMem[locId] = p; else delete receivePendingMem[locId];
+        try { p ? localStorage.setItem(RECEIVE_PENDING_PREFIX + locId, JSON.stringify(p)) : localStorage.removeItem(RECEIVE_PENDING_PREFIX + locId); } catch (e) {}
+    }
+    function newReceiveBatchId() {
+        try { if (crypto && crypto.randomUUID) return crypto.randomUUID(); } catch (e) {}
+        const h = n => Array.from({ length: n }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+        return `${h(8)}-${h(4)}-4${h(3)}-a${h(3)}-${h(12)}`;
+    }
+    function receiveCounts() {
+        ensureReceiveLoaded();
+        let units = 0, variants = 0;
+        for (const l of Object.values(receiveBatch)) { units += l.qty; variants++; }
+        const pend = receivePendingGet(receiveBatchLocId);
+        return { units, variants, pending: pend ? pend.units : 0 };
+    }
+    function updateReceiveBadge() {
+        const el = document.getElementById('storageTabReceiveBadge');
+        if (!el) return;
+        if (!receiveAllowed()) { el.innerText = ''; return; }
+        const { units, pending } = receiveCounts();
+        el.innerText = (units + pending) ? String(units + pending) : '';
+    }
+    // The final button names the shop it will add to. Plain text, no data-i18n,
+    // so a language switch cannot replace it with the nameless template.
+    function updateReceiveSubmitLabel() {
+        const label = document.getElementById('storageTabSubmitLabel');
+        label.removeAttribute('data-i18n');
+        label.innerText = fillTemplate(t('storage.receive_apply'), { store: receiveStoreName() });
+    }
+
+    function stageReceiveScan(p, v) {
+        ensureReceiveLoaded();
+        const status = document.getElementById('storageTabScanStatus');
+        const line = receiveBatch[v.id] || (receiveBatch[v.id] = { qty: 0, sku: v.sku, name: p.name, colorName: v.colorName, size: v.size, at: 0 });
+        line.qty++;
+        line.at = Date.now();
+        saveReceive();
+        status.innerText = `${v.sku} → ${line.qty}`;
+        status.style.color = 'var(--success-color)';
+        renderStorageTabScanLog();
+        document.getElementById('storageTabScanManualInput')?.focus();
+    }
+
+    function decrementReceiveLine(variantId) {
+        ensureReceiveLoaded();
+        const line = receiveBatch[variantId];
+        if (!line) return;
+        if (--line.qty <= 0) delete receiveBatch[variantId];
+        saveReceive();
+        renderStorageTabScanLog();
+        document.getElementById('storageTabScanManualInput')?.focus();
+    }
+
+    const RECEIVE_LOG_MAX_ROWS = 80;   // thousands of scans: only the latest rows are drawn, totals cover all
+    function renderReceiveLog() {
+        updateReceiveSubmitLabel();
+        const rows = document.getElementById('storageTabScanLogRows');
+        const { units, variants, pending } = receiveCounts();
+        const locId = receiveBatchLocId;
+        const lines = Object.entries(receiveBatch).map(([id, l]) => ({ id: Number(id), ...l })).sort((a, b) => b.at - a.at);
+        const shown = lines.slice(0, RECEIVE_LOG_MAX_ROWS);
+        // What is already in this shop's storage for the drawn rows (one pass over the catalogue).
+        const want = new Set(shown.map(r => r.id)), storageBy = {};
+        for (const p of products) for (const v of (p.variants || [])) if (want.has(v.id)) storageBy[v.id] = ((v.stockByLocation || {})[locId] || {}).storage || 0;
+        rows.innerHTML = shown.length
+            ? shown.map(r => {
+                const inStorage = storageBy[r.id] || 0;
+                return `
+                <div class="scan-item-row">
+                    <div class="scan-item-info">
+                        <div class="si-name">${escapeHtml(r.name)} — ${escapeHtml(r.colorName)} / ${escapeHtml(r.size)}</div>
+                        <div class="si-sub">${escapeHtml(r.sku)} · ${t('storage.receive_in_storage')}: ${inStorage}</div>
+                    </div>
+                    <div class="scan-item-progress">${r.qty}</div>
+                    <button class="icon-btn" onclick="decrementReceiveLine(${r.id})" title="${t('common.remove')}"><i class="fas fa-minus"></i></button>
+                </div>`;
+            }).join('') + (lines.length > shown.length ? `<p class="muted" style="font-size:0.78rem; padding:4px;">+ ${lines.length - shown.length} …</p>` : '')
+            : `<p class="muted" style="font-size:0.78rem; padding:4px;">${t('storage.session_empty')}</p>`;
+        document.getElementById('storageTabScanSessionTotal').innerHTML =
+            `${t('storage.receive_scanned')}: ${units} (${variants})` +
+            (pending ? `<br><span style="color:var(--danger-color); font-weight:600;">${fillTemplate(t('storage.receive_pending'), { units: pending, store: receiveStoreName() })}</span>` : '');
+        document.getElementById('storageTabSubmitBtn').disabled = lines.length === 0 && !pending;
+    }
+
+    async function submitReceive() {
+        ensureReceiveLoaded();
+        if (!receiveAllowed()) return;
+        const locId = receiveBatchLocId;
+        const store = receiveStoreName();
+        const btn = document.getElementById('storageTabSubmitBtn');
+        const status = document.getElementById('storageTabScanStatus');
+        let pend = receivePendingGet(locId);
+        if (!pend) {
+            const entries = Object.entries(receiveBatch);
+            if (!entries.length) return;
+            const lines = entries.map(([id, l]) => ({ variant_id: Number(id), quantity: l.qty }));
+            const meta = {}; entries.forEach(([id, l]) => { meta[id] = { sku: l.sku, name: l.name, colorName: l.colorName, size: l.size }; });
+            pend = { id: newReceiveBatchId(), lines, meta, units: lines.reduce((s, l) => s + l.quantity, 0), variants: lines.length };
+            receivePendingSet(locId, pend);       // frozen BEFORE sending, so a retry resends exactly this
+            receiveBatch = {}; saveReceive();
+        }
+        btn.disabled = true;
+        status.innerText = t('storage.receive_applying');
+        status.style.color = '';
+        try {
+            const { data, error } = await sb.rpc('rpc_receive_into_storage_batch', {
+                p_location_id: locId, p_lines: pend.lines, p_batch_id: pend.id, p_notes: 'Sandėlio skenavimas'
+            });
+            if (error) {
+                console.error('rpc_receive_into_storage_batch', error);
+                if (error.code) {
+                    // The server answered and refused: the transaction rolled back, nothing was added.
+                    // Put the scans back among the live ones so they can be corrected and sent again.
+                    for (const l of pend.lines) {
+                        const m = (pend.meta || {})[l.variant_id] || {};
+                        const cur = receiveBatch[l.variant_id] || (receiveBatch[l.variant_id] = { qty: 0, sku: m.sku, name: m.name, colorName: m.colorName, size: m.size, at: Date.now() });
+                        cur.qty += l.quantity;
+                    }
+                    receivePendingSet(locId, null); saveReceive();
+                    status.innerText = `${t('storage.receive_failed_prefix')} ${error.message}`;
+                } else {
+                    // No answer (connection): we cannot know whether it was applied. Keep the frozen batch;
+                    // pressing the button again resends it with the same id, which the server de-duplicates.
+                    status.innerText = t('storage.receive_unsure');
+                }
+                status.style.color = 'var(--danger-color)';
+                toast(status.innerText, 'error');
+                return;
+            }
+            receivePendingSet(locId, null);
+            await loadInventory();
+            const units = pend.units, variants = pend.variants || pend.lines.length;
+            status.innerText = fillTemplate(t(data && data.already_applied ? 'storage.receive_already' : 'storage.receive_done'), { store, units, variants })
+                + (Object.keys(receiveBatch).length ? ` ${t('storage.receive_more_left')}` : '');
             status.style.color = 'var(--success-color)';
             toast(status.innerText, 'success');
             renderStorageTab();
