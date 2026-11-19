@@ -13055,7 +13055,11 @@ ${qrBlock}${field(skuT.g, qrColX, skuT.y)}${field(colourT.g, qrColX, colourT.y)}
     // single-variant reprint icon and the per-product bulk print button.
     // Always opened explicitly by a click; nothing calls this automatically.
     function openLabelPrintModal(title, subtitle, items) {
-        labelPrintQueue = items;
+        // The catalogue query returns colours/variants in whatever order Postgres
+        // stores them (no ORDER BY), which drifts after edits — so order the rows
+        // here: colour A–Z, then size small-to-large, same as everywhere else.
+        labelPrintQueue = items.slice().sort((a, b) =>
+            (a.colorName || '').localeCompare(b.colorName || '') || compareSizes(a.size, b.size));
         if (labelPrintQueue.length === 0) { toast(t('toast.no_variants_print'), 'warn'); return; }
 
         document.getElementById('labelPrintTitle').innerText = title;
