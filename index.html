@@ -10659,8 +10659,20 @@
     let realtimeReconnectTimer = null;
 
     function subscribeRealtime() {
-        if (realtimeChannel) { try { sb.removeChannel(realtimeChannel); } catch (e) {} realtimeChannel = null; }
-        realtimeChannel = sb.channel('pos-live')
+        // Reconnect-loop fix (2026-11-21): removing a channel makes it report
+        // CLOSED to its own status callback. That callback used to treat it as
+        // a dropped connection and schedule another subscribeRealtime(), which
+        // removed the new channel, which reported CLOSED... — a leave+rejoin
+        // every 4 s for as long as the page was open, after the first wake or
+        // resync, and "SocketJoinRateLimitReached" in the Realtime logs when
+        // calls overlapped. Now: clear any pending retry, drop the reference
+        // BEFORE removing (so its CLOSED is recognised as ours), and ignore
+        // status from any channel that is no longer the current one.
+        if (realtimeReconnectTimer) { clearTimeout(realtimeReconnectTimer); realtimeReconnectTimer = null; }
+        const oldChannel = realtimeChannel;
+        realtimeChannel = null;
+        if (oldChannel) { try { sb.removeChannel(oldChannel); } catch (e) {} }
+        const ch = sb.channel('pos-live')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'stock_requests' }, () => {
                 playPing();
                 toast(t('toast.stock_request_updated'), 'info');
@@ -10677,8 +10689,11 @@
                 if (document.getElementById('view-dashboard').classList.contains('active')) {
                     renderDashboardView(true);
                 }
-            })
-            .subscribe((status) => {
+            });
+        realtimeChannel = ch;
+        ch.subscribe((status) => {
+                // A channel we replaced or removed on purpose — not a drop.
+                if (ch !== realtimeChannel) return;
                 // Self-healing: reconnect with a short backoff instead of
                 // sitting on a dead socket for the rest of the shift. A
                 // till running all day is exactly the device most likely
