@@ -10700,19 +10700,40 @@
     // half-dead socket to recover on its own, and refreshes whatever's
     // currently on screen. Wired to `visibilitychange` (screen woken /
     // window refocused) and `online` (network came back).
-    async function forceResync() {
+    //
+    // Short wake (2026-11-20): a till screen dims / the window is switched away
+    // from many times an hour, and each wake used to rebuild the channel AND
+    // reload the whole catalogue (~1.1 MB, two API pages). When the screen was
+    // off for under a minute and the realtime channel is still joined, nothing
+    // was missed — live inventory patches kept arriving — so only the cheap
+    // parts run. Anything longer, a channel that isn't joined, or the `online`
+    // event (opts is then an Event, no hiddenMs) still gets the full resync.
+    const QUICK_WAKE_MS = 60 * 1000;
+    let pageHiddenAt = null;
+    async function forceResync(opts) {
         if (!PROFILE) return;
         try {
             const { data } = await sb.auth.getSession();
             if (data && data.session) sb.realtime.setAuth(data.session.access_token);
         } catch (e) {}
-        subscribeRealtime();
-        if (document.getElementById('view-pos').classList.contains('active')) loadInventory();
+        const hiddenMs = opts && typeof opts.hiddenMs === 'number' ? opts.hiddenMs : null;
+        const quickWake = hiddenMs !== null && hiddenMs < QUICK_WAKE_MS
+            && realtimeChannel && realtimeChannel.state === 'joined';
+        if (!quickWake) {
+            subscribeRealtime();
+            if (document.getElementById('view-pos').classList.contains('active')) loadInventory();
+        }
         refreshRequestBadge();
         if (document.getElementById('view-requests').classList.contains('active')) loadRequests();
         if (document.getElementById('view-dailysales').classList.contains('active')) loadDailySalesDay(dailySalesCurrentDate || todayDateStr(), true);
     }
-    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') forceResync(); });
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') { pageHiddenAt = Date.now(); return; }
+        if (document.visibilityState !== 'visible') return;
+        const hiddenMs = pageHiddenAt === null ? null : Date.now() - pageHiddenAt;
+        pageHiddenAt = null;
+        forceResync({ hiddenMs });
+    });
     window.addEventListener('online', forceResync);
 
     /* ============================================================
