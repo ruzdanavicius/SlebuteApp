@@ -2254,6 +2254,12 @@
             'storage.count_confirm': "{store}: have you scanned ALL available items in the store?\n\nScanned: {units} units ({variants} variants)\nNot scanned, will be set to 0: {zeroed} variants (−{zeroedUnits} units)\n\nPress OK only if every item in the store has been scanned. The system stock will then match your scan.",
             'storage.count_applying': 'Submitting stock count…', 'storage.count_done': 'Stock count submitted to {store} — {changes} variants changed.',
             'storage.count_failed_prefix': 'Stock count NOT saved:',
+            'storage.count_sync_ok': 'Scans saved to server {time}', 'storage.count_sync_pending': 'Saving scans to server…',
+            'storage.count_sync_error': 'Scans NOT saved to server (kept on this device, retrying). Check internet.',
+            'storage.count_restored': 'Shop count scans restored from server.',
+            'storage.count_remove_start': 'Remove scans', 'storage.count_remove_stop': 'Stop removing',
+            'storage.count_remove_on': 'REMOVE mode: each scan takes ONE unit off the count. Press "Stop removing" when done.',
+            'storage.count_remove_none': 'not in this count',
             'storage.mode_receive': 'New goods', 'storage.receive_shop_label': 'Into the storage of:',
             'storage.receive_hint': 'New goods: scan every labelled garment, one scan per unit. Submitting adds the units to the storage of the shop above — the shop floor is not touched.',
             'storage.receive_apply': 'Add to {store} storage', 'storage.receive_scanned': 'Scanned', 'storage.receive_in_storage': 'in storage now',
@@ -2640,6 +2646,12 @@
             'storage.count_confirm': "{store}: ar nuskaitėte VISAS parduotuvėje esančias prekes?\n\nNuskaityta: {units} vnt. ({variants} variantų)\nNenuskaityta, bus nustatyta į 0: {zeroed} variantų (−{zeroedUnits} vnt.)\n\nSpauskite Gerai tik jei nuskaitytas kiekvienas parduotuvės drabužis. Sistemos likutis taps toks, kaip nuskaityta.",
             'storage.count_applying': 'Pateikiamas inventorius…', 'storage.count_done': 'Inventorius pateiktas — {store}, pakeista variantų: {changes}.',
             'storage.count_failed_prefix': 'Inventorius NEIŠSAUGOTAS:',
+            'storage.count_sync_ok': 'Nuskaitymai išsaugoti serveryje {time}', 'storage.count_sync_pending': 'Saugoma serveryje…',
+            'storage.count_sync_error': 'Nuskaitymai NEIŠSAUGOTI serveryje (laikomi šiame įrenginyje, bandoma iš naujo). Patikrinkite internetą.',
+            'storage.count_restored': 'Inventoriaus nuskaitymai atkurti iš serverio.',
+            'storage.count_remove_start': 'Šalinti nuskaitymus', 'storage.count_remove_stop': 'Baigti šalinti',
+            'storage.count_remove_on': 'ŠALINIMO režimas: kiekvienas nuskaitymas atima VIENĄ vienetą. Baigę spauskite „Baigti šalinti“.',
+            'storage.count_remove_none': 'nėra šiame inventoriuje',
             'storage.mode_receive': 'Naujos prekės', 'storage.receive_shop_label': 'Į sandėlį:',
             'storage.receive_hint': 'Naujos prekės: nuskaitykite kiekvieną paženklintą drabužį — vienas nuskaitymas = vienas vienetas. Pateikus, vienetai pridedami prie viršuje pasirinktos parduotuvės sandėlio — prekybos salė nekeičiama.',
             'storage.receive_apply': 'Pridėti į {store} sandėlį', 'storage.receive_scanned': 'Nuskaityta', 'storage.receive_in_storage': 'sandėlyje dabar',
@@ -6355,6 +6367,7 @@
         document.getElementById('storageTabScanCountBtn').style.display = SHOP_COUNT_ENABLED ? '' : 'none';
         document.getElementById('storageTabScanReceiveBtn').style.display = receiveAllowed() ? '' : 'none';
         storageTabScanDirection = dir;
+        if (dir !== 'COUNT') shopCountRemoveMode = false;
         document.getElementById('storageTabScanToStorageBtn').classList.toggle('active', dir === 'TO_STORAGE');
         document.getElementById('storageTabScanToDisplayBtn').classList.toggle('active', dir === 'TO_DISPLAY');
         document.getElementById('storageTabScanCountBtn').classList.toggle('active', dir === 'COUNT');
@@ -6533,21 +6546,115 @@
     const SHOP_COUNT_KEY_PREFIX = 'slebute_shop_count_';
     let shopCountBatch = {};      // variantId -> { qty, sku, name, colorName, size, at }
     let shopCountLocId = null;    // store the in-memory batch belongs to
+    let shopCountRemoveMode = false;  // scan subtracts one instead of adding (fix double scans)
+
+    /* Server autosave (2026-11-21). The shop PC runs the POS in a kiosk INCOGNITO
+       window, whose localStorage dies with the browser. So every change is also
+       sent (debounced) to rpc_save_shop_count_draft — one draft per store, never
+       touches stock — and on load the newer of device copy / server copy wins
+       (compared by the device timestamp of the last change). */
+    const SHOP_COUNT_TS_SUFFIX = '_ts';
+    let shopCountSavedAt = 0;         // Date.now() of the last local change
+    let shopCountSync = { state: 'idle', at: 0, timer: null, inFlight: false, dirty: false };
 
     function ensureShopCountLoaded() {
         if (shopCountLocId === VIEW_LOCATION_ID) return;
         shopCountLocId = VIEW_LOCATION_ID;
         shopCountBatch = {};
+        shopCountSavedAt = 0;
         try {
             const raw = localStorage.getItem(SHOP_COUNT_KEY_PREFIX + VIEW_LOCATION_ID);
             if (raw) shopCountBatch = JSON.parse(raw) || {};
+            shopCountSavedAt = Number(localStorage.getItem(SHOP_COUNT_KEY_PREFIX + VIEW_LOCATION_ID + SHOP_COUNT_TS_SUFFIX)) || 0;
         } catch (e) { shopCountBatch = {}; }
+        if (!shopCountSavedAt) for (const l of Object.values(shopCountBatch)) shopCountSavedAt = Math.max(shopCountSavedAt, l.at || 0);
+        shopCountSync = { state: 'idle', at: 0, timer: null, inFlight: false, dirty: false };
+        pullShopCountDraft(VIEW_LOCATION_ID);
     }
-    function saveShopCount() {
+    function writeShopCountLocal() {
         try {
-            if (Object.keys(shopCountBatch).length) localStorage.setItem(SHOP_COUNT_KEY_PREFIX + shopCountLocId, JSON.stringify(shopCountBatch));
-            else localStorage.removeItem(SHOP_COUNT_KEY_PREFIX + shopCountLocId);
+            const k = SHOP_COUNT_KEY_PREFIX + shopCountLocId;
+            if (Object.keys(shopCountBatch).length) {
+                localStorage.setItem(k, JSON.stringify(shopCountBatch));
+                localStorage.setItem(k + SHOP_COUNT_TS_SUFFIX, String(shopCountSavedAt));
+            } else { localStorage.removeItem(k); localStorage.removeItem(k + SHOP_COUNT_TS_SUFFIX); }
         } catch (e) {}
+    }
+    function saveShopCount(opts) {
+        shopCountSavedAt = Date.now();
+        writeShopCountLocal();
+        if (!(opts && opts.localOnly)) scheduleShopCountPush();
+    }
+    function scheduleShopCountPush() {
+        shopCountSync.dirty = true;
+        shopCountSync.state = 'pending';
+        clearTimeout(shopCountSync.timer);
+        shopCountSync.timer = setTimeout(pushShopCountDraft, 1200);
+    }
+    async function pushShopCountDraft() {
+        if (shopCountSync.inFlight) { shopCountSync.timer = setTimeout(pushShopCountDraft, 800); return; }
+        const locId = shopCountLocId;
+        if (locId == null || !shopCountSync.dirty) return;
+        shopCountSync.inFlight = true; shopCountSync.dirty = false;
+        try {
+            const { error } = await sb.rpc('rpc_save_shop_count_draft', {
+                p_location_id: locId, p_lines: shopCountBatch, p_client_saved_at: shopCountSavedAt
+            });
+            if (locId !== shopCountLocId) return;
+            if (error) throw error;
+            shopCountSync.state = shopCountSync.dirty ? 'pending' : 'ok';
+            shopCountSync.at = Date.now();
+        } catch (e) {
+            console.error('rpc_save_shop_count_draft', e);
+            shopCountSync.dirty = true;
+            shopCountSync.state = 'error';
+            clearTimeout(shopCountSync.timer);
+            shopCountSync.timer = setTimeout(pushShopCountDraft, 15000);   // keep retrying
+        } finally {
+            shopCountSync.inFlight = false;
+            if (storageTabScanDirection === 'COUNT') renderShopCountSyncLine();
+        }
+    }
+    async function pullShopCountDraft(locId) {
+        try {
+            const { data, error } = await sb.rpc('rpc_get_shop_count_draft', { p_location_id: locId });
+            if (error) throw error;
+            if (locId !== shopCountLocId) return;
+            const serverTs = data ? Number(data.client_saved_at) || 0 : 0;
+            if (data && data.lines && serverTs > shopCountSavedAt) {
+                shopCountBatch = data.lines; shopCountSavedAt = serverTs;
+                writeShopCountLocal();
+                shopCountSync.state = 'ok'; shopCountSync.at = Date.now();
+                if (Object.keys(shopCountBatch).length) toast(t('storage.count_restored'), 'success');
+            } else if (Object.keys(shopCountBatch).length && serverTs !== shopCountSavedAt) {
+                scheduleShopCountPush();        // device copy is newer (or server has none)
+            } else if (data) {
+                shopCountSync.state = 'ok'; shopCountSync.at = Date.now();
+            }
+        } catch (e) {
+            console.error('rpc_get_shop_count_draft', e);
+            if (locId === shopCountLocId && Object.keys(shopCountBatch).length) scheduleShopCountPush();
+        }
+        if (storageTabScanDirection === 'COUNT') renderStorageTabScanLog();
+        updateShopCountBadge();
+    }
+    function renderShopCountSyncLine() {
+        const el = document.getElementById('storageTabCountSync');
+        if (!el) return;
+        const s = shopCountSync.state;
+        if (!Object.keys(shopCountBatch).length && s !== 'error') { el.innerHTML = ''; return; }
+        const time = shopCountSync.at ? new Date(shopCountSync.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+        if (s === 'ok') el.innerHTML = `<span style="color:var(--success-color)"><i class="fas fa-cloud"></i> ${fillTemplate(t('storage.count_sync_ok'), { time })}</span>`;
+        else if (s === 'error') el.innerHTML = `<span style="color:var(--danger-color)"><i class="fas fa-triangle-exclamation"></i> ${t('storage.count_sync_error')}</span>`;
+        else el.innerHTML = `<span class="muted"><i class="fas fa-spinner fa-spin"></i> ${t('storage.count_sync_pending')}</span>`;
+    }
+    function toggleShopCountRemoveMode() {
+        shopCountRemoveMode = !shopCountRemoveMode;
+        const status = document.getElementById('storageTabScanStatus');
+        status.innerText = t(shopCountRemoveMode ? 'storage.count_remove_on' : 'storage.count_hint');
+        status.style.color = shopCountRemoveMode ? 'var(--danger-color)' : '';
+        renderStorageTabScanLog();
+        document.getElementById('storageTabScanManualInput')?.focus();
     }
 
     // variantId -> { qty, sku } for every variant of the viewed store (shop floor only).
@@ -6577,6 +6684,21 @@
     function stageShopCountScan(p, v) {
         ensureShopCountLoaded();
         const status = document.getElementById('storageTabScanStatus');
+        if (shopCountRemoveMode) {
+            const cur = shopCountBatch[v.id];
+            if (!cur) {
+                status.innerText = `${v.sku}: ${t('storage.count_remove_none')}`;
+                status.style.color = 'var(--danger-color)';
+            } else {
+                if (--cur.qty <= 0) delete shopCountBatch[v.id];
+                saveShopCount();
+                status.innerText = `− ${v.sku} → ${cur.qty > 0 ? cur.qty : 0}`;
+                status.style.color = 'var(--danger-color)';
+            }
+            renderStorageTabScanLog();
+            document.getElementById('storageTabScanManualInput')?.focus();
+            return;
+        }
         const line = shopCountBatch[v.id] || (shopCountBatch[v.id] = { qty: 0, sku: v.sku, name: p.name, colorName: v.colorName, size: v.size, at: 0 });
         line.qty++;
         line.at = Date.now();
@@ -6613,9 +6735,12 @@
                     <button class="icon-btn" onclick="decrementShopCountLine(${r.id})" title="${t('common.remove')}"><i class="fas fa-minus"></i></button>
                 </div>`).join('')
             : `<p class="muted" style="font-size:0.78rem; padding:4px;">${t('storage.session_empty')}</p>`;
+        const rmBtn = `<button class="btn ${shopCountRemoveMode ? 'btn-danger' : 'btn-ghost'}" style="margin-top:6px;" onclick="toggleShopCountRemoveMode()"><i class="fas fa-minus-circle"></i> ${t(shopCountRemoveMode ? 'storage.count_remove_stop' : 'storage.count_remove_start')}</button>`;
         document.getElementById('storageTabScanSessionTotal').innerHTML =
             `${t('storage.count_scanned')}: ${units} (${variants})` +
-            (zeroed ? `<br><span class="muted" style="font-weight:600;">${t('storage.count_unscanned')}: ${zeroed} (−${zeroedUnits})</span>` : '');
+            (zeroed ? `<br><span class="muted" style="font-weight:600;">${t('storage.count_unscanned')}: ${zeroed} (−${zeroedUnits})</span>` : '') +
+            `<div id="storageTabCountSync" style="font-weight:600; margin-top:4px;"></div>` + rmBtn;
+        renderShopCountSyncLine();
         document.getElementById('storageTabSubmitBtn').disabled = lines.length === 0;
     }
 
@@ -6674,7 +6799,7 @@
                 toast(status.innerText, 'error');
                 return;
             }
-            shopCountBatch = {}; saveShopCount();
+            shopCountBatch = {}; shopCountRemoveMode = false; saveShopCount();   // empty push deletes the server draft
             await loadInventory();
             status.innerText = fillTemplate(t('storage.count_done'), { store, changes: (data && data.lines_changed) || 0 });
             status.style.color = 'var(--success-color)';
