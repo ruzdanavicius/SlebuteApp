@@ -434,16 +434,14 @@
         .special-disc-toggle { display:inline-flex; align-items:center; gap:6px; position:relative; text-transform:none; letter-spacing:0; font-size:0.72rem; font-weight:500; color:#6b6470; cursor:pointer; user-select:none; padding:4px 0; }
         .special-disc-toggle::before { content:''; position:absolute; inset:-12px -8px; } /* ~44px touch area */
         .special-disc-toggle input { width:16px; height:16px; margin:0; accent-color: var(--accent-color); cursor:pointer; }
-        .disc-slot { min-height:52px; margin-bottom: 4px; }
+        .disc-slot { min-height:44px; margin-bottom: 4px; }
         .disc-choices { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
-        .disc-choice { height:52px; border-radius:12px; border:1.5px solid #d9cfd4; background: var(--input-bg); color: var(--text-primary); font: 600 0.88rem 'Inter', sans-serif; white-space:nowrap; cursor:pointer; position:relative; display:flex; align-items:center; justify-content:center; padding:0 4px; transition: transform .06s; }
-        .disc-choice i { display:none; position:absolute; top:5px; left:7px; font-size:0.62rem; }
+        .disc-choice { height:44px; border-radius:10px; border:1.5px solid #d9cfd4; background: var(--input-bg); color: var(--text-secondary); font: 600 0.78rem 'Inter', sans-serif; white-space:nowrap; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0 4px; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
         .disc-choice.active { border:2px solid var(--accent-color); background: rgba(107,37,69,0.10); color: var(--accent-color); }
-        .disc-choice.active i { display:inline; }
         .disc-choice:active { transform: scale(.98); }
         .disc-choice:focus-visible { outline: 3px solid rgba(107,37,69,0.4); outline-offset: 1px; }
         .special-disc-row { display:none; }
-        .special-disc-row input { width:100%; height:52px; box-sizing:border-box; background: var(--input-bg); border:2px solid var(--accent-color); border-radius:12px; color: var(--text-primary); padding: 0 14px; font: 600 1.05rem 'Inter', sans-serif; outline:none; }
+        .special-disc-row input { width:100%; height:44px; box-sizing:border-box; background: var(--input-bg); border:2px solid var(--accent-color); border-radius:10px; color: var(--text-primary); padding: 0 14px; font: 600 1.05rem 'Inter', sans-serif; outline:none; }
         .special-disc-hint { font-size:0.75rem; color: var(--text-secondary); margin: 6px 0 2px; min-height: 1em; }
         .special-disc-hint.warn { display:inline-block; color:#8a4b00; background:#fff4e0; border-radius:6px; padding:3px 8px; }
         .special-disc-hint.err { color: var(--danger-color); font-weight:600; }
@@ -1450,9 +1448,9 @@
                     </div>
                     <div class="disc-slot">
                         <div class="disc-choices" id="discChoices" role="group">
-                            <button type="button" class="disc-choice active" data-mode="NONE" aria-pressed="true" onclick="setBasketDiscMode('NONE')"><i class="fas fa-check"></i><span data-i18n="cart.no_basket_disc">No discount</span></button>
-                            <button type="button" class="disc-choice" data-mode="P5" aria-pressed="false" onclick="setBasketDiscMode('P5')"><i class="fas fa-check"></i><span data-i18n="cart.disc_5">5% off</span></button>
-                            <button type="button" class="disc-choice" data-mode="P10" aria-pressed="false" onclick="setBasketDiscMode('P10')"><i class="fas fa-check"></i><span data-i18n="cart.disc_10">10% off</span></button>
+                            <button type="button" class="disc-choice active" data-mode="NONE" aria-pressed="true" onclick="setBasketDiscMode('NONE')"><span data-i18n="cart.no_basket_disc">No discount</span></button>
+                            <button type="button" class="disc-choice" data-mode="P5" aria-pressed="false" onclick="setBasketDiscMode('P5')"><span data-i18n="cart.disc_5">5% off</span></button>
+                            <button type="button" class="disc-choice" data-mode="P10" aria-pressed="false" onclick="setBasketDiscMode('P10')"><span data-i18n="cart.disc_10">10% off</span></button>
                         </div>
                         <div class="special-disc-row" id="specialDiscRow">
                             <input type="text" inputmode="decimal" id="basketDiscValue" placeholder="0,00" autocomplete="off" oninput="updateCartTotals()" onkeydown="if(event.key==='Escape'){toggleSpecialDiscount(false);}">
@@ -5074,7 +5072,10 @@
         document.getElementById('discRowLabel').innerText = t(special ? 'cart.disc_row_eur' : 'cart.disc_row');
         if (!special) document.getElementById('basketDiscValue').value = '';
         if (leavingSpecial) discountOverridePin = null; // unticking drops the PIN approval
-        onBasketDiscountChange();
+        // Totals only — rebuilding the cart rows (photos) on every tap made
+        // the buttons feel slow. The rows don't depend on the basket discount.
+        updateCartTotals();
+        enforceDiscountCap();
     }
     function toggleSpecialDiscount(on) {
         setBasketDiscMode(on ? 'SPECIAL' : 'NONE');
@@ -5133,7 +5134,7 @@
         updateCartUI();
         return true;
     }
-    function onBasketDiscountChange() { updateCartUI(); enforceDiscountCap(); }
+    function onBasketDiscountChange() { updateCartTotals(); enforceDiscountCap(); }
 
     let _discountOverrideResolver = null;
     function requestDiscountOverride() {
