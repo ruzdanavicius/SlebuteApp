@@ -144,6 +144,12 @@
             color: var(--text-primary); font-size: 1rem; outline: none; transition: 0.2s;
         }
         .login-input:focus { border-color: var(--accent-color); box-shadow: 0 0 0 3px var(--accent-tint); }
+        .login-emails { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 15px; }
+        .login-emails:empty { display: none; }
+        .login-email-chip { display: inline-flex; align-items: center; border: 1px solid rgba(36,22,30,0.14); border-radius: 999px; background: var(--input-bg); color: var(--text-primary); font-size: 0.9rem; overflow: hidden; }
+        .login-email-chip button { border: 0; background: none; color: inherit; font: inherit; cursor: pointer; padding: 10px 6px 10px 14px; min-height: 40px; }
+        .login-email-chip button.forget { padding: 10px 12px 10px 6px; color: var(--text-secondary); }
+        .login-email-chip.active { border-color: var(--accent-color); box-shadow: 0 0 0 2px var(--accent-tint); }
         .login-btn {
             width: 100%; padding: 15px; background: var(--accent-color); color: white;
             border: none; border-radius: 8px; font-weight: 600; cursor: pointer;
@@ -932,6 +938,7 @@
             <img id="loginMark" class="login-mark" alt="Šlebutė">
             <div class="login-logo">Šlebutė <span>POS</span></div>
             <p style="color:var(--text-secondary); margin-bottom: 24px; font-size:0.85rem;" data-i18n="login.subtitle">Sign in to continue</p>
+            <div id="loginEmails" class="login-emails"></div>
             <form id="loginForm" onsubmit="event.preventDefault(); login(); return false;">
                 <input type="email" id="email" class="login-input" placeholder="Email" data-i18n-placeholder="common.email_placeholder" autocomplete="username" name="email">
                 <input type="password" id="password" class="login-input" placeholder="Password" data-i18n-placeholder="common.password_placeholder" autocomplete="current-password" name="password">
@@ -2143,7 +2150,7 @@
     const I18N = {
         en: {
             'login.subtitle': 'Sign in to continue',
-            'login.signin': 'Sign In',
+            'login.signin': 'Sign In', 'login.forget_email': 'Remove from this device',
             'login.signing_in': 'Signing in...',
             'nav.pos': 'POS', 'nav.inventory': 'Inventory', 'nav.requests': 'Transfers',
             'nav.register': 'Cash Register', 'nav.dailysales': 'Daily Sales', 'nav.dashboard': 'Dashboard',
@@ -2535,7 +2542,7 @@
         },
         lt: {
             'login.subtitle': 'Prisijunkite, kad tęstumėte',
-            'login.signin': 'Prisijungti',
+            'login.signin': 'Prisijungti', 'login.forget_email': 'Pašalinti iš šio įrenginio',
             'login.signing_in': 'Jungiamasi...',
             'nav.pos': 'Kasa', 'nav.inventory': 'Prekės', 'nav.requests': 'Pervežimai',
             'nav.register': 'Kasos aparatas', 'nav.dailysales': 'Dienos pardavimai', 'nav.dashboard': 'Suvestinė',
@@ -3386,8 +3393,54 @@
         }
         const ok = await loadProfile(data.user.id);
         btn.disabled = false; btn.innerText = t('login.signin');
-        if (ok) showApp(); else await sb.auth.signOut();
+        if (ok) { rememberLoginEmail(email); showApp(); } else await sb.auth.signOut();
     }
+
+    // LOGIN EMAIL QUICK-PICK — emails that signed in successfully on THIS
+    // device, shown as tap-to-fill chips. Stored only in this browser's
+    // localStorage; never in the (public) repo and never fetched pre-login.
+    const LOGIN_EMAILS_KEY = 'slebute.loginEmails';
+    const LOGIN_EMAILS_MAX = 12;
+    function getLoginEmails() {
+        try { const v = JSON.parse(localStorage.getItem(LOGIN_EMAILS_KEY) || '[]'); return Array.isArray(v) ? v.filter(e => typeof e === 'string') : []; }
+        catch (e) { return []; }
+    }
+    function setLoginEmails(list) {
+        try { localStorage.setItem(LOGIN_EMAILS_KEY, JSON.stringify(list.slice(0, LOGIN_EMAILS_MAX))); } catch (e) {}
+    }
+    function rememberLoginEmail(email) {
+        const e = (email || '').trim().toLowerCase();
+        if (!e) return;
+        setLoginEmails([e].concat(getLoginEmails().filter(x => x !== e)));
+    }
+    function forgetLoginEmail(email) {
+        setLoginEmails(getLoginEmails().filter(x => x !== email));
+        renderLoginEmails();
+    }
+    function renderLoginEmails() {
+        const box = document.getElementById('loginEmails');
+        if (!box) return;
+        const current = document.getElementById('email').value.trim().toLowerCase();
+        box.innerHTML = '';
+        getLoginEmails().slice().sort((a, b) => a.localeCompare(b)).forEach(e => {
+            const chip = document.createElement('span');
+            chip.className = 'login-email-chip' + (e === current ? ' active' : '');
+            const pick = document.createElement('button');
+            pick.type = 'button'; pick.textContent = e.split('@')[0]; pick.title = e;
+            pick.onclick = () => {
+                document.getElementById('email').value = e;
+                const pw = document.getElementById('password'); pw.value = ''; pw.focus();
+                renderLoginEmails();
+            };
+            const x = document.createElement('button');
+            x.type = 'button'; x.className = 'forget'; x.innerHTML = '&times;';
+            x.title = t('login.forget_email'); x.setAttribute('aria-label', t('login.forget_email') + ': ' + e);
+            x.onclick = () => forgetLoginEmail(e);
+            chip.append(pick, x);
+            box.appendChild(chip);
+        });
+    }
+    renderLoginEmails();
 
     async function logout() {
         if (realtimeReconnectTimer) { clearTimeout(realtimeReconnectTimer); realtimeReconnectTimer = null; }
