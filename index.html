@@ -6364,7 +6364,7 @@
     function setStorageTabScanDirection(dir) {
         if (dir === 'COUNT' && !SHOP_COUNT_ENABLED) dir = 'TO_STORAGE';
         if (dir === 'RECEIVE' && !receiveAllowed()) dir = 'TO_STORAGE';
-        document.getElementById('storageTabScanCountBtn').style.display = SHOP_COUNT_ENABLED ? '' : 'none';
+        document.getElementById('storageTabScanCountBtn').style.display = (SHOP_COUNT_ENABLED && (SHOP_COUNT_TAB_VISIBLE || dir === 'COUNT')) ? '' : 'none';
         document.getElementById('storageTabScanReceiveBtn').style.display = receiveAllowed() ? '' : 'none';
         storageTabScanDirection = dir;
         if (dir !== 'COUNT') shopCountRemoveMode = false;
@@ -6543,6 +6543,13 @@
     // true (and deploy) for a future stocktake. Applying zeroes unscanned
     // stock, so it should not sit open to everyone between counts.
     const SHOP_COUNT_ENABLED = true;
+    // Visibility only (2026-11-22): Pašilaičiai is counted, Šeškinė follows
+    // in mid-December. Until then the tab is hidden from every user but the
+    // whole flow still works: set this to true (and deploy) to show it again,
+    // or run setStorageTabScanDirection('COUNT') from the console. While hidden
+    // the badge stops loading/syncing drafts in the background, so a stale
+    // device copy can't silently re-upload itself to the server.
+    const SHOP_COUNT_TAB_VISIBLE = false;
     const SHOP_COUNT_KEY_PREFIX = 'slebute_shop_count_';
     let shopCountBatch = {};      // variantId -> { qty, sku, name, colorName, size, at }
     let shopCountLocId = null;    // store the in-memory batch belongs to
@@ -6676,6 +6683,7 @@
     }
 
     function updateShopCountBadge() {
+        if (!SHOP_COUNT_TAB_VISIBLE && storageTabScanDirection !== 'COUNT') return;
         ensureShopCountLoaded();
         const units = Object.values(shopCountBatch).reduce((s, l) => s + l.qty, 0);
         document.getElementById('storageTabCountBadge').innerText = units ? String(units) : '';
