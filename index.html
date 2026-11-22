@@ -1444,7 +1444,7 @@
 
                 <div id="cashPaySection">
                     <div class="pay-field-label" data-i18n="cart.cash_tendered">Cash tendered (€)</div>
-                    <input type="number" class="form-input" id="cashTenderedInput" placeholder="0.00" oninput="onCashTenderedChange()" style="margin-bottom:6px;" onkeydown="if(event.key==='Enter'){event.preventDefault(); confirmCashTenderedEnter();}">
+                    <input type="number" class="form-input" id="cashTenderedInput" placeholder="0.00" oninput="onCashTenderedChange()" style="margin-bottom:6px;" onkeydown="if(event.key==='Enter' && !event.defaultPrevented){event.preventDefault(); confirmCashTenderedEnter();}">
                 </div>
                 <div id="splitPaySection" class="hidden">
                     <div class="split-inputs">
@@ -3585,14 +3585,31 @@
         return e.shiftKey ? entry.s : entry.n;
     }
 
-    // Snapshot of cashTenderedInput's value from just before the CURRENT
-    // scan burst started (see the char-buffering below) — restored if the
-    // burst turns out to be a hardware scan, so a scanned code's digits can
-    // never leak into a typed cash amount (see the Enter handler's isScan
-    // branch). Stays null whenever there's nothing to roll back.
-    let cashPreScanValue = null;
+    // Checkout amount fields a cashier may be sitting in when they scan one
+    // more item: cash tendered, basket discount, and both split-payment
+    // fields. A scan typed into any of them is caught and rolled back (see
+    // the char-buffering below and the Enter handler's isScan branch).
+    const SCAN_SAFE_AMOUNT_IDS = ['cashTenderedInput', 'basketDiscValue', 'splitCashInput', 'splitCardInput'];
+    function isScanSafeAmountField(el) { return !!(el && SCAN_SAFE_AMOUNT_IDS.includes(el.id)); }
 
-    function resetScanBuffer() { scanBuffer = ''; scanKeyTimes = []; cashPreScanValue = null; }
+    // Values of ALL the fields above from just before the CURRENT scan burst
+    // started — restored if the burst turns out to be a hardware scan, so a
+    // scanned code's digits never leak into a typed amount. All of them, not
+    // just the focused one: typing in one split field auto-fills the other
+    // (onSplitChange). Stays null whenever there's nothing to roll back.
+    let amountPreScanSnapshot = null;
+
+    function snapshotAmountFields() {
+        const snap = {};
+        SCAN_SAFE_AMOUNT_IDS.forEach(id => { const el = document.getElementById(id); if (el) snap[id] = el.value; });
+        return snap;
+    }
+    function restoreAmountFields(snap) {
+        Object.keys(snap).forEach(id => { const el = document.getElementById(id); if (el) el.value = snap[id]; });
+        updateCartTotals();
+    }
+
+    function resetScanBuffer() { scanBuffer = ''; scanKeyTimes = []; amountPreScanSnapshot = null; }
 
     function looksLikeHardwareScan() {
         if (scanBuffer.length < 3 || scanKeyTimes.length < 3) return false;
@@ -3611,7 +3628,7 @@
     // scanned code's digits from ever landing in the typed amount.
     function scanCouldOwnFocus() {
         const el = document.activeElement;
-        return el === barcodeInput || el === cashTenderedInputEl || !el || el === document.body;
+        return el === barcodeInput || isScanSafeAmountField(el) || !el || el === document.body;
     }
 
     function setupScanner() {
@@ -3636,8 +3653,8 @@
                     // started so none of that leaks into the amount. See the
                     // snapshot taken below where scanBuffer starts a new
                     // burst.
-                    if (active === cashTenderedInputEl && cashPreScanValue !== null) {
-                        cashTenderedInputEl.value = cashPreScanValue;
+                    if (isScanSafeAmountField(active) && amountPreScanSnapshot) {
+                        restoreAmountFields(amountPreScanSnapshot);
                     }
                     resetScanBuffer();
                     resolveScan(code, true);
@@ -3687,12 +3704,12 @@
             }
             const ch = usLayoutChar(e);
             if (ch !== null) {
-                if (scanBuffer.length === 0 && document.activeElement === cashTenderedInputEl) {
+                if (scanBuffer.length === 0 && isScanSafeAmountField(document.activeElement)) {
                     // First char of a fresh burst while the amount field is
                     // focused — snapshot now, before this keystroke's native
                     // insertion happens (this listener runs in the capture
                     // phase, ahead of the browser's default action).
-                    cashPreScanValue = cashTenderedInputEl.value;
+                    amountPreScanSnapshot = snapshotAmountFields();
                 }
                 scanBuffer += ch;
                 scanKeyTimes.push(t);
