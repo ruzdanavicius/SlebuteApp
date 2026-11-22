@@ -1927,13 +1927,13 @@
         </div>
     </div>
 
-    <!-- DISCOUNT OVERRIDE MODAL — admin/manager PIN to allow a >20% discount -->
+    <!-- DISCOUNT OVERRIDE MODAL — admin/manager PIN to allow a >25% discount -->
     <div class="modal-overlay" id="discountOverrideModal">
         <div class="modal-box narrow">
             <div class="close-modal" onclick="cancelDiscountOverride()"><i class="fas fa-times"></i></div>
             <div class="vm-content">
                 <h2><i class="fas fa-user-shield"></i> <span data-i18n="discount.override_title">Manager approval needed</span></h2>
-                <p class="muted" style="font-size:0.85rem; margin: 8px 0 4px;" data-i18n="discount.override_hint">A discount over 20% needs an admin or manager PIN.</p>
+                <p class="muted" style="font-size:0.85rem; margin: 8px 0 4px;" data-i18n="discount.override_hint">A discount over 25% needs an admin or manager PIN.</p>
                 <div class="form-group mt-14">
                     <label data-i18n="discount.override_pin_label">Admin / manager PIN</label>
                     <input type="password" inputmode="numeric" autocomplete="off" maxlength="6" class="form-input" id="discountOverridePinInput" placeholder="••••" onkeydown="if(event.key==='Enter')submitDiscountOverride()">
@@ -2199,15 +2199,15 @@
             'cart.title': 'Shopping Bag', 'cart.session': 'Current Session',
             'cart.no_basket_disc': 'No discount', 'cart.disc_5': '5% off', 'cart.disc_10': '10% off',
             'cart.disc_row': 'Discount', 'cart.disc_row_eur': 'Discount (€)', 'cart.pay_row': 'Payment', 'cart.special_disc': 'Special discount',
-            'cart.special_hint': '= {pct} % off. To pay: {total}', 'cart.special_pin': 'Over 20 % – admin PIN will be needed', 'cart.special_over': 'Discount cannot exceed the total',
+            'cart.special_hint': '= {pct} % off. To pay: {total}', 'cart.special_pin': 'Over 25 % – admin PIN will be needed', 'cart.special_over': 'Discount cannot exceed the total',
             'cart.cash': 'Cash', 'cart.card': 'Card', 'cart.split': 'Split', 'cart.gift_card': 'Gift Card',
             'cart.cash_tendered': 'Cash tendered (€)', 'cart.subtotal': 'Subtotal', 'cart.discount': 'Discount',
-            'discount.cap_toast': 'Discounts over 20% need manager approval — reverted to 20%.',
-            'discount.override_title': 'Manager approval needed', 'discount.override_hint': 'A discount over 20% needs an admin or manager PIN.',
+            'discount.cap_toast': 'Discounts over 25% need manager approval — reverted to 25%.',
+            'discount.override_title': 'Manager approval needed', 'discount.override_hint': 'A discount over 25% needs an admin or manager PIN.',
             'discount.override_pin_label': 'Admin / manager PIN', 'discount.override_ok': 'Approve',
             'discount.override_bad_pin': "That PIN wasn't accepted.", 'discount.override_pin_bad_format': 'Enter the 4–6 digit PIN.',
             'discount.override_approved': 'Discount approved.', 'discount.override_needed': 'This discount needs admin/manager approval.',
-            'discount.override_offline': 'Discounts over 20% need a connection so a manager can approve.',
+            'discount.override_offline': 'Discounts over 25% need a connection so a manager can approve.',
             'setpin.title': 'My PIN', 'setpin.hint': "Your personal 4–6 digit PIN. You'll be able to log in with it.",
             'setpin.new_label': 'New PIN (4–6 digits)', 'setpin.save': 'Save PIN', 'setpin.saved': 'PIN saved.', 'setpin.bad_format': 'PIN must be 4–6 digits.',
             'setpin.already_set': 'You already have a PIN — enter a new one to change it.', 'setpin.not_set': "You don't have a PIN set yet.",
@@ -2593,15 +2593,15 @@
             'cart.title': 'Krepšelis', 'cart.session': 'Dabartinė sesija',
             'cart.no_basket_disc': 'Be nuolaidos', 'cart.disc_5': '5% nuolaida', 'cart.disc_10': '10% nuolaida',
             'cart.disc_row': 'Nuolaida', 'cart.disc_row_eur': 'Nuolaida (€)', 'cart.pay_row': 'Apmokėjimas', 'cart.special_disc': 'Speciali nuolaida',
-            'cart.special_hint': '= {pct} % nuolaida. Mokėtina: {total}', 'cart.special_pin': 'Virš 20 % – reikės administratoriaus PIN', 'cart.special_over': 'Nuolaida negali viršyti sumos',
+            'cart.special_hint': '= {pct} % nuolaida. Mokėtina: {total}', 'cart.special_pin': 'Virš 25 % – reikės administratoriaus PIN', 'cart.special_over': 'Nuolaida negali viršyti sumos',
             'cart.cash': 'Grynieji', 'cart.card': 'Kortelė', 'cart.split': 'Mišrus', 'cart.gift_card': 'Dovanų kortelė',
             'cart.cash_tendered': 'Gauta grynaisiais (€)', 'cart.subtotal': 'Tarpinė suma', 'cart.discount': 'Nuolaida',
-            'discount.cap_toast': 'Nuolaidoms virš 20% reikia vadovo patvirtinimo — grąžinta iki 20%.',
-            'discount.override_title': 'Reikia vadovo patvirtinimo', 'discount.override_hint': 'Nuolaidai virš 20% reikia administratoriaus ar vadovo PIN.',
+            'discount.cap_toast': 'Nuolaidoms virš 25% reikia vadovo patvirtinimo — grąžinta iki 25%.',
+            'discount.override_title': 'Reikia vadovo patvirtinimo', 'discount.override_hint': 'Nuolaidai virš 25% reikia administratoriaus ar vadovo PIN.',
             'discount.override_pin_label': 'Administratoriaus / vadovo PIN', 'discount.override_ok': 'Patvirtinti',
             'discount.override_bad_pin': 'PIN nepriimtas.', 'discount.override_pin_bad_format': 'Įveskite 4–6 skaitmenų PIN.',
             'discount.override_approved': 'Nuolaida patvirtinta.', 'discount.override_needed': 'Šiai nuolaidai reikia administratoriaus/vadovo patvirtinimo.',
-            'discount.override_offline': 'Nuolaidoms virš 20% reikia ryšio, kad vadovas galėtų patvirtinti.',
+            'discount.override_offline': 'Nuolaidoms virš 25% reikia ryšio, kad vadovas galėtų patvirtinti.',
             'setpin.title': 'Mano PIN', 'setpin.hint': 'Jūsų asmeninis 4–6 skaitmenų PIN. Jį galėsite naudoti savo prisijungimui.',
             'setpin.new_label': 'Naujas PIN (4–6 skaitmenys)', 'setpin.save': 'Išsaugoti PIN', 'setpin.saved': 'PIN išsaugotas.', 'setpin.bad_format': 'PIN turi būti 4–6 skaitmenys.',
             'setpin.already_set': 'PIN jau nustatytas — įveskite naują, jei norite pakeisti.', 'setpin.not_set': 'PIN dar nenustatytas.',
@@ -3148,7 +3148,7 @@
     // over CASHIER_DISCOUNT_CAP % without an admin/manager PIN. discountOverridePin
     // holds an accepted PIN for the CURRENT sale only — cleared on startNewSale().
     // The server (rpc_process_pos_sale) re-verifies; this is the till-side gate.
-    const CASHIER_DISCOUNT_CAP = 20;
+    const CASHIER_DISCOUNT_CAP = 25;
     // Basket discount: 3 fixed choices + a rarely used special € amount.
     // 'NONE' | 'P5' | 'P10' | 'SPECIAL'. Reset on startNewSale().
     let basketDiscMode = 'NONE';
@@ -5524,7 +5524,7 @@
         if (checkoutInFlight) return;
         if (isRemoteView() || cart.length === 0) return;
 
-        // Discount cap (CLAUDE.md §11): over 20% needs an admin/manager PIN.
+        // Discount cap (CLAUDE.md §11): over 25% needs an admin/manager PIN.
         // Prompt for it before doing anything else; abort the sale if declined
         // (the server rejects it too, but this keeps the flow clean).
         if (basketDiscMode === 'SPECIAL' && specialDiscountValue() > cartSubtotal() + 0.001) {
