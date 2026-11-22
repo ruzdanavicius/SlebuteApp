@@ -969,7 +969,7 @@
                 <span class="conn-dot" id="connDot"></span>
                 <span class="nav-badge hidden" id="offlineBadge">0</span>
             </div>
-            <div class="nav-btn" id="navOverridePin" onclick="openSetOverridePinModal()" data-i18n-title="setpin.title" title="My PIN"><i class="fas fa-key"></i></div>
+            <div class="nav-btn" id="navOverridePin" style="display:none" onclick="openSetOverridePinModal()" data-i18n-title="setpin.title" title="My PIN"><i class="fas fa-key"></i></div>
             <div class="nav-btn" id="navDevices" onclick="openDevicesModal()" data-i18n-title="dev.title" title="Devices">
                 <i class="fas fa-tablet-screen-button"></i>
                 <span class="nav-badge hidden" id="deviceNavBadge">!</span>
@@ -3359,6 +3359,7 @@
         document.getElementById('navInventory').style.display = (PROFILE.role === 'admin' || PROFILE.role === 'manager') ? 'flex' : 'none';
         document.getElementById('navDashboard').style.display = (PROFILE.role === 'admin' || PROFILE.role === 'manager') ? 'flex' : 'none';
         document.getElementById('navSuppliers').style.display = (PROFILE.role === 'admin' || PROFILE.role === 'manager') ? 'flex' : 'none';
+        document.getElementById('navOverridePin').style.display = (PROFILE.role === 'admin' || PROFILE.role === 'manager') ? 'flex' : 'none';
         updateCachedLoginBanner();
         toast(t('offline.profile_reverified_toast'), 'success');
     }
@@ -3464,6 +3465,7 @@
         document.getElementById('navInventory').style.display = (PROFILE.role === 'admin' || PROFILE.role === 'manager') ? 'flex' : 'none';
         document.getElementById('navDashboard').style.display = (PROFILE.role === 'admin' || PROFILE.role === 'manager') ? 'flex' : 'none';
         document.getElementById('navSuppliers').style.display = (PROFILE.role === 'admin' || PROFILE.role === 'manager') ? 'flex' : 'none';
+        document.getElementById('navOverridePin').style.display = (PROFILE.role === 'admin' || PROFILE.role === 'manager') ? 'flex' : 'none';
         updateCachedLoginBanner();
         initWeatherWidget(); // fire-and-forget, never blocks app boot
         deviceCheckIn();     // fire-and-forget, observe-only (see DEVICES section)
