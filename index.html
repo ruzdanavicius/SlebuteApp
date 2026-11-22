@@ -4520,7 +4520,7 @@
             : '';
         return `
         <div class="variant-chip ${trulyUnavailable ? 'disabled' : ''}" onclick="posScanOrSelectVariant(${p.id}, ${v.id})">
-            <div class="adj-icon" onclick="event.stopPropagation(); openAdjustModal(${v.id}, '${escapeHtml(p.name)} — ${v.colorName} / ${v.size}')"><i class="fas fa-sliders"></i></div>
+            ${PROFILE && PROFILE.role === 'admin' ? `<div class="adj-icon" onclick="event.stopPropagation(); openAdjustModal(${v.id}, '${escapeHtml(p.name)} — ${v.colorName} / ${v.size}')"><i class="fas fa-sliders"></i></div>` : ''}
             ${reorderIconHtml}
             <div style="width:14px; height:14px; border-radius:50%; background:${v.colorHex}; margin:0 auto 4px auto; border:1px solid #fff;"></div>
             ${v.isClearance ? `<div class="sale-badge" title="${t('clearance.final_sale_title')}">${t('pos.sale_badge')}</div>` : ''}
