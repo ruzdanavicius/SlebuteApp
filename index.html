@@ -611,6 +611,31 @@
         .img-hover-preview .hover-thumb { width: 220px; height: 220px; object-fit: contain; border-radius: 8px; background: var(--card-bg-raised); }
         .img-hover-preview img.hover-thumb { display: block; background: #fff; }
         .ds-hoverable { cursor: zoom-in; }
+        /* Daily Sales stock popup (option C1): big photo left, then each store's
+           colours stacked, one fixed size slot per size so rows line up. */
+        .stock-hover-preview { position: fixed; z-index: 999; display: none; pointer-events: none; background: var(--card-bg); border: var(--glass-border); border-radius: 12px; padding: 14px; box-shadow: 0 12px 32px var(--shadow-color); max-height: calc(100vh - 16px); overflow: hidden; }
+        .stock-hover-preview.open { display: flex; gap: 16px; align-items: flex-start; }
+        .stock-hover-preview .shp-photo { width: 180px; height: 225px; flex: none; object-fit: contain; border-radius: 10px; background: var(--card-bg-raised); }
+        .stock-hover-preview img.shp-photo { display: block; background: #fff; }
+        .shp-body { min-width: 0; }
+        .shp-name { font-size: 0.95rem; font-weight: 600; color: var(--text-primary); margin: 0; max-width: 300px; }
+        .shp-code { font-size: 0.75rem; color: var(--text-secondary); margin: 2px 0 10px; }
+        .shp-store { margin-bottom: 10px; }
+        .shp-store:last-child { margin-bottom: 0; }
+        .shp-store-head { display: flex; justify-content: space-between; gap: 16px; font-size: 0.78rem; font-weight: 600; color: var(--text-primary); padding-bottom: 4px; border-bottom: var(--glass-border); margin-bottom: 6px; }
+        .shp-store-head span { font-weight: 400; color: var(--text-secondary); }
+        .shp-row { display: flex; align-items: center; gap: 6px; min-height: 26px; font-size: 0.78rem; color: var(--text-primary); }
+        .shp-color { width: 96px; flex: none; display: flex; align-items: center; white-space: nowrap; overflow: hidden; }
+        .shp-color.sold { font-weight: 600; }
+        .shp-color-name { overflow: hidden; text-overflow: ellipsis; }
+        .shp-dot { width: 10px; height: 10px; flex: none; border-radius: 50%; border: 1px solid rgba(0,0,0,0.2); margin-right: 6px; }
+        .shp-chips { display: flex; gap: 3px; }
+        .shp-chip { min-width: 40px; height: 22px; padding: 0 4px; box-sizing: border-box; border-radius: 6px; background: var(--input-bg); display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 0.7rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+        .shp-chip b { font-weight: 700; }
+        .shp-chip.low b { color: var(--warning-text); }
+        .shp-chip.empty { background: transparent; border: 1px dashed rgba(36,22,30,0.16); color: var(--text-secondary); }
+        .shp-chip.sold { box-shadow: 0 0 0 1.5px var(--text-primary); }
+        .shp-none { font-size: 0.78rem; color: var(--danger-color); font-weight: 600; }
         .bulk-price-bar { display:flex; align-items:center; gap:8px; background: var(--input-bg); border-radius: 9px; padding: 8px 10px; margin-bottom: 10px; flex-wrap:wrap; }
         .bulk-price-bar label { font-size: 0.72rem; color: var(--text-secondary); }
         .bulk-price-bar input { width: 70px; background: var(--card-bg); border: 1px solid rgba(36,22,30,0.14); border-radius: 6px; padding: 5px 7px; font-size: 0.78rem; color: var(--text-primary); outline:none; }
@@ -957,6 +982,7 @@
          Single reusable node, positioned in JS to follow the cursor; fixed positioning
          so it's never clipped by a scrolling table wrapper. -->
     <div id="imgHoverPreview" class="img-hover-preview"><img id="imgHoverPreviewImg" class="hover-thumb" alt=""></div>
+    <div id="stockHoverPreview" class="stock-hover-preview" role="tooltip"></div>
 
     <!-- LOGIN SCREEN -->
     <div id="loginOverlay">
@@ -2387,7 +2413,7 @@
             'ds.discounts_given': 'Discounts Given', 'ds.items_sold': 'Items Sold', 'ds.voided_excluded': 'voided/refunded, excluded from totals',
             'ds.no_items_sold': 'No items sold.', 'ds.col_time': 'Time', 'ds.col_item': 'Item', 'ds.col_color': 'Color',
             'ds.col_size': 'Size', 'ds.col_qty': 'Qty', 'ds.col_price': 'Price', 'ds.col_discount': 'Discount',
-            'ds.col_total': 'Total', 'ds.col_order': 'Order', 'ds.col_stock': 'Stock', 'ds.order_disc_tag': 'order disc.', 'ds.col_barcode': 'Barcode',
+            'ds.col_total': 'Total', 'ds.col_order': 'Order', 'ds.col_stock': 'Stock', 'ds.hover_sold': 'sold', 'ds.hover_pcs': 'pcs', 'ds.order_disc_tag': 'order disc.', 'ds.col_barcode': 'Barcode',
             'ds.returns_today': 'Returns Today', 'ds.no_returns_today': 'No returns processed this day.',
             'ds.col_reason': 'Reason', 'ds.col_processed_by': 'Processed by',
             'orderdetail.title_prefix': 'Order', 'orderdetail.not_found_prefix': 'Order not found:',
@@ -2781,7 +2807,7 @@
             'ds.discounts_given': 'Suteiktos nuolaidos', 'ds.items_sold': 'Parduota prekių', 'ds.voided_excluded': 'anuliuota/grąžinta, neįtraukta į sumas',
             'ds.no_items_sold': 'Prekių neparduota.', 'ds.col_time': 'Laikas', 'ds.col_item': 'Prekė', 'ds.col_color': 'Spalva',
             'ds.col_size': 'Dydis', 'ds.col_qty': 'Kiekis', 'ds.col_price': 'Kaina', 'ds.col_discount': 'Nuolaida',
-            'ds.col_total': 'Suma', 'ds.col_order': 'Užsakymas', 'ds.col_stock': 'Likutis', 'ds.order_disc_tag': 'krepš. nuolaida', 'ds.col_barcode': 'Kodas',
+            'ds.col_total': 'Suma', 'ds.col_order': 'Užsakymas', 'ds.col_stock': 'Likutis', 'ds.hover_sold': 'parduota', 'ds.hover_pcs': 'vnt.', 'ds.order_disc_tag': 'krepš. nuolaida', 'ds.col_barcode': 'Kodas',
             'ds.returns_today': 'Šios dienos grąžinimai', 'ds.no_returns_today': 'Šią dieną grąžinimų neužfiksuota.',
             'ds.col_reason': 'Priežastis', 'ds.col_processed_by': 'Apdorojo',
             'orderdetail.title_prefix': 'Užsakymas', 'orderdetail.not_found_prefix': 'Užsakymas nerastas:',
@@ -11333,6 +11359,107 @@
         document.getElementById('imgHoverPreview').style.display = 'none';
     }
 
+    /* ============================================================
+       DAILY SALES STOCK POPUP: hover (tap on tablet) over a sold line's
+       code/name shows a big photo + every colour/size of the whole style,
+       both stores stacked. Built from the in-memory `products` (same numbers
+       as the Likutis column), so no extra queries. Same "in stock" rule as
+       the website: quantity > 0. Size order copied from slebute-site.
+       ============================================================ */
+    const SIZE_ORDER = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '2XL', 'XXXL', '3XL', '4XL', '5XL', '6XL'];
+    function compareSizes(a, b) {
+        const na = parseFloat(a), nb = parseFloat(b);
+        if (!isNaN(na) && !isNaN(nb)) return na - nb;
+        const ia = SIZE_ORDER.indexOf(String(a).toUpperCase()), ib = SIZE_ORDER.indexOf(String(b).toUpperCase());
+        if (ia > -1 && ib > -1) return ia - ib;
+        if (ia > -1) return -1;
+        if (ib > -1) return 1;
+        return String(a).localeCompare(String(b), 'lt');
+    }
+    const canHover = () => window.matchMedia('(hover: hover)').matches;
+    let stockPreviewTimer = null;
+    let stockPreviewAnchor = null;
+
+    function stockPreviewHTML(productId, variantId) {
+        const p = products.find(x => x.id === productId);
+        if (!p) return '';
+        const soldV = p.variants.find(v => v.id === variantId) || null;
+        const qty = (v, st) => (v.stockByLocation[st.id] ? v.stockByLocation[st.id].quantity : 0);
+        const colors = [];
+        const byColor = new Map();
+        for (const v of p.variants) {
+            if (!byColor.has(v.colorId)) {
+                const c = { id: v.colorId, name: v.colorName, hex: v.colorHex, bySize: new Map() };
+                byColor.set(v.colorId, c);
+                colors.push(c);
+            }
+            byColor.get(v.colorId).bySize.set(v.size, v);
+        }
+        // Size slots = every size in stock at either store, so both blocks line up.
+        const sizes = [...new Set(p.variants.filter(v => STORES.some(st => qty(v, st) > 0)).map(v => v.size))].sort(compareSizes);
+        const imgUrl = (soldV && soldV.colorImage) || p.image_url || '';
+        const stores = STORES.map(st => {
+            const total = p.variants.reduce((a, v) => a + Math.max(0, qty(v, st)), 0);
+            const rows = colors.filter(c => [...c.bySize.values()].some(v => qty(v, st) > 0)).map(c => {
+                const isSoldColor = !!soldV && c.id === soldV.colorId;
+                const chips = sizes.map(sz => {
+                    const v = c.bySize.get(sz);
+                    const n = v ? qty(v, st) : 0;
+                    const sold = isSoldColor && soldV.size === sz ? ' sold' : '';
+                    return n > 0
+                        ? `<span class="shp-chip${n <= 2 ? ' low' : ''}${sold}">${escapeHtml(sz)} <b>${n}</b></span>`
+                        : `<span class="shp-chip empty${sold}">${escapeHtml(sz)}</span>`;
+                }).join('');
+                return `<div class="shp-row"><span class="shp-color${isSoldColor ? ' sold' : ''}" title="${escapeHtml(c.name)}"><span class="shp-dot" style="background:${escapeHtml(c.hex || 'transparent')}"></span><span class="shp-color-name">${escapeHtml(c.name)}</span></span><span class="shp-chips">${chips}</span></div>`;
+            }).join('');
+            return `<div class="shp-store"><div class="shp-store-head">${escapeHtml(st.name)}<span>${total} ${t('ds.hover_pcs')}</span></div>${rows || `<div class="shp-none">${t('common.none')}</div>`}</div>`;
+        }).join('');
+        const soldTxt = soldV ? ` · ${t('ds.hover_sold')}: ${escapeHtml(soldV.colorName)} ${escapeHtml(soldV.size)}` : '';
+        return `${photoTagHTML(imgUrl, 'shp-photo', true, null, true)}<div class="shp-body"><p class="shp-name">${escapeHtml(p.name)}</p><div class="shp-code">${escapeHtml(p.base_barcode || '—')}${soldTxt}</div>${stores}</div>`;
+    }
+
+    function openStockPreview(anchor, productId, variantId) {
+        const el = document.getElementById('stockHoverPreview');
+        const html = stockPreviewHTML(productId, variantId);
+        if (!html) return;
+        el.innerHTML = html;
+        el.classList.add('open');
+        stockPreviewAnchor = anchor;
+        // Anchored to the hovered cell (not the mouse): below it, flipped above
+        // when it doesn't fit, clamped inside the window either way.
+        const r = anchor.getBoundingClientRect();
+        const w = el.offsetWidth, h = el.offsetHeight, m = 8;
+        const x = Math.max(m, Math.min(r.left, window.innerWidth - w - m));
+        let y = r.bottom + 6;
+        if (y + h > window.innerHeight - m) y = r.top - h - 6;
+        if (y < m) y = Math.max(m, window.innerHeight - h - m);
+        el.style.left = x + 'px';
+        el.style.top = y + 'px';
+    }
+
+    function showStockPreview(evt, productId, variantId) {
+        if (!canHover()) return; // touch goes through tapStockPreview()
+        const anchor = evt.currentTarget;
+        clearTimeout(stockPreviewTimer);
+        stockPreviewTimer = setTimeout(() => openStockPreview(anchor, productId, variantId), 150);
+    }
+
+    function hideStockPreview(delay) {
+        clearTimeout(stockPreviewTimer);
+        const close = () => { document.getElementById('stockHoverPreview').classList.remove('open'); stockPreviewAnchor = null; };
+        if (delay) stockPreviewTimer = setTimeout(close, delay); else close();
+    }
+
+    function tapStockPreview(evt, productId, variantId) {
+        if (canHover()) return;
+        evt.stopPropagation();
+        if (stockPreviewAnchor === evt.currentTarget) { hideStockPreview(); return; }
+        openStockPreview(evt.currentTarget, productId, variantId);
+    }
+    document.addEventListener('click', () => { if (stockPreviewAnchor) hideStockPreview(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && stockPreviewAnchor) hideStockPreview(); });
+    window.addEventListener('scroll', () => { if (stockPreviewAnchor) hideStockPreview(); }, true);
+
     let dailySalesCurrentDate = null;
     // Cached so the click handler on the out-of-stock flag icon (see
     // showOversoldNoteFromRow()) can look a line back up by order_item_id
@@ -11483,6 +11610,7 @@
 
     function renderDailySalesContent(summary, lines, returns) {
         const wrap = document.getElementById('dailySalesWrap');
+        hideStockPreview(); // a silent live refresh replaces the hovered row
         dailySalesLinesCache = lines;
         const itemsSold = lines.filter(l => l.status === 'COMPLETED' && !l.is_refunded).reduce((a,l) => a + l.quantity, 0);
         const voided = lines.filter(l => l.status !== 'COMPLETED').length;
@@ -11531,11 +11659,10 @@
                             const displayTotal = round2(Number(l.total_price) - basketShare);
                             const v = variantById.get(l.variant_id);
                             const p = productById.get(l.product_id);
-                            const imgUrl = (v && v.colorImage) || (p && p.image_url) || '';
-                            const hoverAttr = imgUrl
-                                ? `onmouseenter="showImgPreview(event, '${escapeHtml(imgUrl)}')" onmousemove="positionImgPreview(event)" onmouseleave="hideImgPreview()"`
+                            const hoverAttr = p
+                                ? `onmouseenter="showStockPreview(event, ${p.id}, ${l.variant_id})" onmouseleave="hideStockPreview(100)" onclick="tapStockPreview(event, ${p.id}, ${l.variant_id})"`
                                 : '';
-                            const hoverCls = imgUrl ? ' ds-hoverable' : '';
+                            const hoverCls = p ? ' ds-hoverable' : '';
                             return `
                             <tr class="${basketCls}" style="${l.status!=='COMPLETED'||l.is_refunded ? 'opacity:0.5; text-decoration:line-through;' : ''}">
                                 <td>${new Date(l.created_at).toLocaleTimeString(currentLocale(), {hour:'2-digit',minute:'2-digit'})}</td>
