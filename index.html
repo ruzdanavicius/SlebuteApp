@@ -1277,6 +1277,8 @@
                 <div class="header-row">
                     <h1 data-i18n="ds.title">Daily Sales</h1>
                     <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
+                        <!-- Admin-only store picker: admins can read every store's sales (RLS is_admin()), but the view used to be pinned to the device's own store. -->
+                        <select id="dailySalesLocation" class="form-input hidden" style="width:auto;" onchange="loadDailySalesDay(document.getElementById('dailySalesDate').value)"></select>
                         <div class="day-nav">
                             <button class="btn btn-ghost btn-sm" onclick="shiftDailySalesDay(-1)"><i class="fas fa-chevron-left"></i></button>
                             <input type="date" id="dailySalesDate" class="form-input" style="width:170px;" onchange="loadDailySalesDay(this.value)">
@@ -11361,7 +11363,23 @@
         return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     }
 
+    // Store whose day is shown. Non-admins are always their device's store
+    // (the RPCs enforce that server-side too); admins pick from the dropdown.
+    function dailySalesLocationId() {
+        const sel = document.getElementById('dailySalesLocation');
+        if (PROFILE && PROFILE.role === 'admin' && sel && sel.value) return Number(sel.value);
+        return DEVICE_LOCATION_ID;
+    }
+
     function renderDailySalesView() {
+        const sel = document.getElementById('dailySalesLocation');
+        const isAdmin = PROFILE && PROFILE.role === 'admin';
+        sel.classList.toggle('hidden', !isAdmin || STORES.length < 2);
+        if (isAdmin && sel.options.length !== STORES.length) {
+            const keep = sel.value || String(DEVICE_LOCATION_ID);
+            sel.innerHTML = STORES.map(s => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
+            sel.value = STORES.some(s => String(s.id) === keep) ? keep : String(STORES[0]?.id ?? '');
+        }
         const input = document.getElementById('dailySalesDate');
         if (!input.value) input.value = todayDateStr();
         loadDailySalesDay(input.value);
@@ -11404,14 +11422,15 @@
         // store server-side regardless of what location_id is passed.
         // v_daily_sales was already correctly RLS-scoped (security_invoker),
         // so it's untouched. See migration: security_lockdown_anon_access.
+        const locId = dailySalesLocationId();
         const [{ data: summary }, { data: lines }, { data: returns }] = await Promise.all([
-            sb.from('v_daily_sales').select('*').eq('location_id', DEVICE_LOCATION_ID).eq('sale_date', dateStr).maybeSingle(),
-            sb.rpc('rpc_get_sales_by_variant', { p_location_id: DEVICE_LOCATION_ID, p_date_from: dayStart, p_date_to: dayEnd })
+            sb.from('v_daily_sales').select('*').eq('location_id', locId).eq('sale_date', dateStr).maybeSingle(),
+            sb.rpc('rpc_get_sales_by_variant', { p_location_id: locId, p_date_from: dayStart, p_date_to: dayEnd })
                 .then(({ data, error }) => ({ data: error ? [] : (data || []).sort((a, b) => new Date(b.created_at) - new Date(a.created_at)), error })),
             // Keyed to when the RETURN happened, not the original sale's date —
             // a return of last week's purchase shows up here today, unlike the
             // voided/refunded lines above (which stay pinned to the sale date).
-            sb.rpc('rpc_get_returns_detail', { p_location_id: DEVICE_LOCATION_ID, p_date_from: dayStart, p_date_to: dayEnd })
+            sb.rpc('rpc_get_returns_detail', { p_location_id: locId, p_date_from: dayStart, p_date_to: dayEnd })
                 .then(({ data, error }) => ({ data: error ? [] : (data || []), error })),
             loadInventory() // keeps the stock-per-location column (below) accurate, since this view doesn't otherwise trigger a catalog refresh
         ]);
