@@ -1,7 +1,8 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="lt" translate="no">
 <head>
     <meta charset="UTF-8">
+    <meta name="google" content="notranslate">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Šlebutė POS</title>
 
@@ -144,6 +145,12 @@
             color: var(--text-primary); font-size: 1rem; outline: none; transition: 0.2s;
         }
         .login-input:focus { border-color: var(--accent-color); box-shadow: 0 0 0 3px var(--accent-tint); }
+        .login-emails { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 15px; }
+        .login-emails:empty { display: none; }
+        .login-email-chip { display: inline-flex; align-items: center; border: 1px solid rgba(36,22,30,0.14); border-radius: 999px; background: var(--input-bg); color: var(--text-primary); font-size: 0.9rem; overflow: hidden; }
+        .login-email-chip button { border: 0; background: none; color: inherit; font: inherit; cursor: pointer; padding: 10px 6px 10px 14px; min-height: 40px; }
+        .login-email-chip button.forget { padding: 10px 12px 10px 6px; color: var(--text-secondary); }
+        .login-email-chip.active { border-color: var(--accent-color); box-shadow: 0 0 0 2px var(--accent-tint); }
         .login-btn {
             width: 100%; padding: 15px; background: var(--accent-color); color: white;
             border: none; border-radius: 8px; font-weight: 600; cursor: pointer;
@@ -422,10 +429,23 @@
         .line-disc { display:flex; align-items:center; gap:5px; font-size: 0.7rem; color: var(--text-secondary); }
         .line-disc input { width: 40px; background: var(--input-bg); border: 1px solid rgba(36,22,30,0.14); border-radius: 5px; color: var(--text-primary); padding: 2px 4px; font-size: 0.72rem; text-align:center; }
 
-        .discount-row { display:flex; gap: 8px; margin-bottom: 10px; }
-        .discount-row select, .discount-row input { background: var(--input-bg); border: 1px solid rgba(36,22,30,0.14); border-radius: 8px; color: var(--text-primary); padding: 8px 10px; font-size: 0.8rem; outline:none; }
-        .discount-row select { flex: 0 0 90px; }
-        .discount-row input { flex: 1; min-width: 0; }
+        /* Basket discount: outline/tint cards (payment tabs below stay filled) */
+        .row-label { display:flex; align-items:center; justify-content:space-between; font-size:0.7rem; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; color:#6b6470; margin-bottom:4px; }
+        .special-disc-toggle { display:inline-flex; align-items:center; gap:6px; position:relative; text-transform:none; letter-spacing:0; font-size:0.72rem; font-weight:500; color:#6b6470; cursor:pointer; user-select:none; padding:4px 0; }
+        .special-disc-toggle::before { content:''; position:absolute; inset:-12px -8px; } /* ~44px touch area */
+        .special-disc-toggle input { width:16px; height:16px; margin:0; accent-color: var(--accent-color); cursor:pointer; }
+        .disc-slot { min-height:44px; margin-bottom: 4px; }
+        .disc-choices { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+        .disc-choice { height:44px; border-radius:10px; border:1.5px solid #d9cfd4; background: var(--input-bg); color: var(--text-secondary); font: 600 0.78rem 'Inter', sans-serif; white-space:nowrap; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0 4px; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+        .disc-choice.active { border:2px solid var(--accent-color); background: rgba(107,37,69,0.10); color: var(--accent-color); }
+        .disc-choice:active { transform: scale(.98); }
+        .disc-choice:focus-visible { outline: 3px solid rgba(107,37,69,0.4); outline-offset: 1px; }
+        .special-disc-row { display:none; }
+        .special-disc-row input { width:100%; height:44px; box-sizing:border-box; background: var(--input-bg); border:2px solid var(--accent-color); border-radius:10px; color: var(--text-primary); padding: 0 14px; font: 600 1.05rem 'Inter', sans-serif; outline:none; }
+        .special-disc-hint { font-size:0.75rem; color: var(--text-secondary); margin: 6px 0 2px; min-height: 1em; }
+        .special-disc-hint.warn { display:inline-block; color:#8a4b00; background:#fff4e0; border-radius:6px; padding:3px 8px; }
+        .special-disc-hint.err { color: var(--danger-color); font-weight:600; }
+        .disc-block { margin-bottom: 10px; }
 
         .totals-block { border-top: 1px solid rgba(36,22,30,0.10); padding-top: 14px; margin-top: 6px; }
         .totals-row { display:flex; justify-content:space-between; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 6px; }
@@ -750,6 +770,14 @@
            modal's behavior or layout changes. */
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(36,20,28,0.55); backdrop-filter: blur(4px); display: flex; justify-content: center; align-items: center; opacity: 0; pointer-events: none; transition: 0.2s; z-index: 100; padding: 20px; transform: translateZ(0); will-change: opacity; }
         .modal-overlay.active { opacity: 1; pointer-events: all; }
+        /* There are ~27 of these overlays in the DOM at all times. With
+           backdrop-filter + will-change kept on the closed ones, Chrome keeps
+           every one as a live full-screen blur layer — even at opacity 0 — and
+           re-blurs the whole screen on every repaint (each keystroke, the caret
+           blinking). On a modest POS PC that made typing into the cash /
+           discount fields lag 1–2 s. Closed overlays drop both; an open one
+           keeps the blur and the compositing fix described above. */
+        .modal-overlay:not(.active) { backdrop-filter: none; will-change: auto; }
         .modal-box { background: var(--sidebar-color); border-radius: 20px; width: 100%; max-width: 620px; max-height: 88vh; max-height: 88dvh; overflow-y: auto; position: relative; border: var(--glass-border); box-shadow: 0 30px 80px rgba(36,22,30,0.20); }
         .modal-box.wide { max-width: 900px; }
         .modal-box.narrow { max-width: 420px; }
@@ -937,6 +965,7 @@
             <img id="loginMark" class="login-mark" alt="Šlebutė">
             <div class="login-logo">Šlebutė <span>POS</span></div>
             <p style="color:var(--text-secondary); margin-bottom: 24px; font-size:0.85rem;" data-i18n="login.subtitle">Sign in to continue</p>
+            <div id="loginEmails" class="login-emails"></div>
             <form id="loginForm" onsubmit="event.preventDefault(); login(); return false;">
                 <input type="email" id="email" class="login-input" placeholder="Email" data-i18n-placeholder="common.email_placeholder" autocomplete="username" name="email">
                 <input type="password" id="password" class="login-input" placeholder="Password" data-i18n-placeholder="common.password_placeholder" autocomplete="current-password" name="password">
@@ -974,7 +1003,7 @@
                 <span class="conn-dot" id="connDot"></span>
                 <span class="nav-badge hidden" id="offlineBadge">0</span>
             </div>
-            <div class="nav-btn" id="navOverridePin" onclick="openSetOverridePinModal()" data-i18n-title="setpin.title" title="My PIN"><i class="fas fa-key"></i></div>
+            <div class="nav-btn" id="navOverridePin" style="display:none" onclick="openSetOverridePinModal()" data-i18n-title="setpin.title" title="My PIN"><i class="fas fa-key"></i></div>
             <div class="nav-btn" id="navDevices" onclick="openDevicesModal()" data-i18n-title="dev.title" title="Devices">
                 <i class="fas fa-tablet-screen-button"></i>
                 <span class="nav-badge hidden" id="deviceNavBadge">!</span>
@@ -1253,6 +1282,8 @@
                 <div class="header-row">
                     <h1 data-i18n="ds.title">Daily Sales</h1>
                     <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
+                        <!-- Admin-only store picker: admins can read every store's sales (RLS is_admin()), but the view used to be pinned to the device's own store. -->
+                        <select id="dailySalesLocation" class="form-input hidden" style="width:auto;" onchange="loadDailySalesDay(document.getElementById('dailySalesDate').value)"></select>
                         <div class="day-nav">
                             <button class="btn btn-ghost btn-sm" onclick="shiftDailySalesDay(-1)"><i class="fas fa-chevron-left"></i></button>
                             <input type="date" id="dailySalesDate" class="form-input" style="width:170px;" onchange="loadDailySalesDay(this.value)">
@@ -1417,14 +1448,24 @@
             <div class="cart-items" id="cartItems"></div>
 
             <div id="cartControls">
-                <div class="discount-row">
-                    <select id="basketDiscType" onchange="onBasketDiscountChange()">
-                        <option value="NONE" data-i18n="cart.no_basket_disc">No basket disc.</option>
-                        <option value="PERCENT" data-i18n="cart.percent_off">% off</option>
-                        <option value="FIXED" data-i18n="cart.euro_off">€ off</option>
-                    </select>
-                    <input type="number" id="basketDiscValue" placeholder="0" min="0" oninput="updateCartUI()" onchange="onBasketDiscountChange()">
+                <div class="disc-block">
+                    <div class="row-label">
+                        <span id="discRowLabel" data-i18n="cart.disc_row">Discount</span>
+                        <label class="special-disc-toggle"><input type="checkbox" id="specialDiscToggle" onchange="toggleSpecialDiscount(this.checked)"> <span data-i18n="cart.special_disc">Special discount</span></label>
+                    </div>
+                    <div class="disc-slot">
+                        <div class="disc-choices" id="discChoices" role="group">
+                            <button type="button" class="disc-choice active" data-mode="NONE" aria-pressed="true" onclick="setBasketDiscMode('NONE')"><span data-i18n="cart.no_basket_disc">No discount</span></button>
+                            <button type="button" class="disc-choice" data-mode="P5" aria-pressed="false" onclick="setBasketDiscMode('P5')"><span data-i18n="cart.disc_5">5% off</span></button>
+                            <button type="button" class="disc-choice" data-mode="P10" aria-pressed="false" onclick="setBasketDiscMode('P10')"><span data-i18n="cart.disc_10">10% off</span></button>
+                        </div>
+                        <div class="special-disc-row" id="specialDiscRow">
+                            <input type="text" inputmode="decimal" id="basketDiscValue" placeholder="0,00" autocomplete="off" oninput="updateCartTotals()" onkeydown="if(event.key==='Escape'){toggleSpecialDiscount(false);}">
+                        </div>
+                    </div>
+                    <div class="special-disc-hint" id="specialDiscHint" style="display:none;"></div>
                 </div>
+                <div class="row-label"><span data-i18n="cart.pay_row">Payment</span></div>
 
                 <div class="payment-tabs" id="paymentTabs">
                     <div class="pay-tab active" data-method="CASH" onclick="setPaymentMethod('CASH')" data-i18n="cart.cash">Cash</div>
@@ -1441,7 +1482,7 @@
 
                 <div id="cashPaySection">
                     <div class="pay-field-label" data-i18n="cart.cash_tendered">Cash tendered (€)</div>
-                    <input type="number" class="form-input" id="cashTenderedInput" placeholder="0.00" oninput="onCashTenderedChange()" style="margin-bottom:6px;" onkeydown="if(event.key==='Enter'){event.preventDefault(); confirmCashTenderedEnter();}">
+                    <input type="number" class="form-input" id="cashTenderedInput" placeholder="0.00" oninput="onCashTenderedChange()" style="margin-bottom:6px;" onkeydown="if(event.key==='Enter' && !event.defaultPrevented){event.preventDefault(); confirmCashTenderedEnter();}">
                 </div>
                 <div id="splitPaySection" class="hidden">
                     <div class="split-inputs">
@@ -2148,7 +2189,7 @@
     const I18N = {
         en: {
             'login.subtitle': 'Sign in to continue',
-            'login.signin': 'Sign In',
+            'login.signin': 'Sign In', 'login.forget_email': 'Remove from this device',
             'login.signing_in': 'Signing in...',
             'nav.pos': 'POS', 'nav.inventory': 'Inventory', 'nav.requests': 'Transfers',
             'nav.register': 'Cash Register', 'nav.dailysales': 'Daily Sales', 'nav.dashboard': 'Dashboard',
@@ -2161,7 +2202,9 @@
             'pos.title': 'Clothing Catalog', 'pos.viewing': 'Viewing:', 'pos.search_placeholder': 'Scan barcode or search style...',
             'pos.returns': 'Returns',
             'cart.title': 'Shopping Bag', 'cart.session': 'Current Session',
-            'cart.no_basket_disc': 'No basket disc.', 'cart.percent_off': '% off', 'cart.euro_off': '€ off',
+            'cart.no_basket_disc': 'No discount', 'cart.disc_5': '5% off', 'cart.disc_10': '10% off',
+            'cart.disc_row': 'Discount', 'cart.disc_row_eur': 'Discount (€)', 'cart.pay_row': 'Payment', 'cart.special_disc': 'Special discount',
+            'cart.special_hint': '= {pct} % off. To pay: {total}', 'cart.special_pin': 'Over 25 % – admin PIN will be needed', 'cart.special_over': 'Discount cannot exceed the total',
             'cart.cash': 'Cash', 'cart.card': 'Card', 'cart.split': 'Split', 'cart.gift_card': 'Gift Card',
             'cart.cash_tendered': 'Cash tendered (€)', 'cart.subtotal': 'Subtotal', 'cart.discount': 'Discount',
             'discount.cap_toast': 'Discounts over 25% need manager approval — reverted to 25%.',
@@ -2259,6 +2302,12 @@
             'storage.count_confirm': "{store}: have you scanned ALL available items in the store?\n\nScanned: {units} units ({variants} variants)\nNot scanned, will be set to 0: {zeroed} variants (−{zeroedUnits} units)\n\nPress OK only if every item in the store has been scanned. The system stock will then match your scan.",
             'storage.count_applying': 'Submitting stock count…', 'storage.count_done': 'Stock count submitted to {store} — {changes} variants changed.',
             'storage.count_failed_prefix': 'Stock count NOT saved:',
+            'storage.count_sync_ok': 'Scans saved to server {time}', 'storage.count_sync_pending': 'Saving scans to server…',
+            'storage.count_sync_error': 'Scans NOT saved to server (kept on this device, retrying). Check internet.',
+            'storage.count_restored': 'Shop count scans restored from server.',
+            'storage.count_remove_start': 'Remove scans', 'storage.count_remove_stop': 'Stop removing',
+            'storage.count_remove_on': 'REMOVE mode: each scan takes ONE unit off the count. Press "Stop removing" when done.',
+            'storage.count_remove_none': 'not in this count',
             'storage.mode_receive': 'New goods', 'storage.receive_shop_label': 'Into the storage of:',
             'storage.receive_hint': 'New goods: scan every labelled garment, one scan per unit. Submitting adds the units to the storage of the shop above — the shop floor is not touched.',
             'storage.receive_apply': 'Add to {store} storage', 'storage.receive_scanned': 'Scanned', 'storage.receive_in_storage': 'in storage now',
@@ -2534,7 +2583,7 @@
         },
         lt: {
             'login.subtitle': 'Prisijunkite, kad tęstumėte',
-            'login.signin': 'Prisijungti',
+            'login.signin': 'Prisijungti', 'login.forget_email': 'Pašalinti iš šio įrenginio',
             'login.signing_in': 'Jungiamasi...',
             'nav.pos': 'Kasa', 'nav.inventory': 'Prekės', 'nav.requests': 'Pervežimai',
             'nav.register': 'Kasos aparatas', 'nav.dailysales': 'Dienos pardavimai', 'nav.dashboard': 'Suvestinė',
@@ -2547,7 +2596,9 @@
             'pos.title': 'Prekių katalogas', 'pos.viewing': 'Peržiūrima:', 'pos.search_placeholder': 'Nuskaitykite brūkšninį kodą arba ieškokite modelio...',
             'pos.returns': 'Grąžinimai',
             'cart.title': 'Krepšelis', 'cart.session': 'Dabartinė sesija',
-            'cart.no_basket_disc': 'Be nuolaidos', 'cart.percent_off': '% nuolaida', 'cart.euro_off': '€ nuolaida',
+            'cart.no_basket_disc': 'Be nuolaidos', 'cart.disc_5': '5% nuolaida', 'cart.disc_10': '10% nuolaida',
+            'cart.disc_row': 'Nuolaida', 'cart.disc_row_eur': 'Nuolaida (€)', 'cart.pay_row': 'Apmokėjimas', 'cart.special_disc': 'Speciali nuolaida',
+            'cart.special_hint': '= {pct} % nuolaida. Mokėtina: {total}', 'cart.special_pin': 'Virš 25 % – reikės administratoriaus PIN', 'cart.special_over': 'Nuolaida negali viršyti sumos',
             'cart.cash': 'Grynieji', 'cart.card': 'Kortelė', 'cart.split': 'Mišrus', 'cart.gift_card': 'Dovanų kortelė',
             'cart.cash_tendered': 'Gauta grynaisiais (€)', 'cart.subtotal': 'Tarpinė suma', 'cart.discount': 'Nuolaida',
             'discount.cap_toast': 'Nuolaidoms virš 25% reikia vadovo patvirtinimo — grąžinta iki 25%.',
@@ -2645,6 +2696,12 @@
             'storage.count_confirm': "{store}: ar nuskaitėte VISAS parduotuvėje esančias prekes?\n\nNuskaityta: {units} vnt. ({variants} variantų)\nNenuskaityta, bus nustatyta į 0: {zeroed} variantų (−{zeroedUnits} vnt.)\n\nSpauskite Gerai tik jei nuskaitytas kiekvienas parduotuvės drabužis. Sistemos likutis taps toks, kaip nuskaityta.",
             'storage.count_applying': 'Pateikiamas inventorius…', 'storage.count_done': 'Inventorius pateiktas — {store}, pakeista variantų: {changes}.',
             'storage.count_failed_prefix': 'Inventorius NEIŠSAUGOTAS:',
+            'storage.count_sync_ok': 'Nuskaitymai išsaugoti serveryje {time}', 'storage.count_sync_pending': 'Saugoma serveryje…',
+            'storage.count_sync_error': 'Nuskaitymai NEIŠSAUGOTI serveryje (laikomi šiame įrenginyje, bandoma iš naujo). Patikrinkite internetą.',
+            'storage.count_restored': 'Inventoriaus nuskaitymai atkurti iš serverio.',
+            'storage.count_remove_start': 'Šalinti nuskaitymus', 'storage.count_remove_stop': 'Baigti šalinti',
+            'storage.count_remove_on': 'ŠALINIMO režimas: kiekvienas nuskaitymas atima VIENĄ vienetą. Baigę spauskite „Baigti šalinti“.',
+            'storage.count_remove_none': 'nėra šiame inventoriuje',
             'storage.mode_receive': 'Naujos prekės', 'storage.receive_shop_label': 'Į sandėlį:',
             'storage.receive_hint': 'Naujos prekės: nuskaitykite kiekvieną paženklintą drabužį — vienas nuskaitymas = vienas vienetas. Pateikus, vienetai pridedami prie viršuje pasirinktos parduotuvės sandėlio — prekybos salė nekeičiama.',
             'storage.receive_apply': 'Pridėti į {store} sandėlį', 'storage.receive_scanned': 'Nuskaityta', 'storage.receive_in_storage': 'sandėlyje dabar',
@@ -3097,6 +3154,9 @@
     // holds an accepted PIN for the CURRENT sale only — cleared on startNewSale().
     // The server (rpc_process_pos_sale) re-verifies; this is the till-side gate.
     const CASHIER_DISCOUNT_CAP = 25;
+    // Basket discount: 3 fixed choices + a rarely used special € amount.
+    // 'NONE' | 'P5' | 'P10' | 'SPECIAL'. Reset on startNewSale().
+    let basketDiscMode = 'NONE';
     let discountOverridePin = null;
     let paymentMethod = 'CASH';
     let pickupMethod = 'CARD';
@@ -3352,6 +3412,7 @@
         document.getElementById('navInventory').style.display = (PROFILE.role === 'admin' || PROFILE.role === 'manager') ? 'flex' : 'none';
         document.getElementById('navDashboard').style.display = (PROFILE.role === 'admin' || PROFILE.role === 'manager') ? 'flex' : 'none';
         document.getElementById('navSuppliers').style.display = (PROFILE.role === 'admin' || PROFILE.role === 'manager') ? 'flex' : 'none';
+        document.getElementById('navOverridePin').style.display = (PROFILE.role === 'admin' || PROFILE.role === 'manager') ? 'flex' : 'none';
         updateCachedLoginBanner();
         toast(t('offline.profile_reverified_toast'), 'success');
     }
@@ -3378,8 +3439,54 @@
         }
         const ok = await loadProfile(data.user.id);
         btn.disabled = false; btn.innerText = t('login.signin');
-        if (ok) showApp(); else await sb.auth.signOut();
+        if (ok) { rememberLoginEmail(email); showApp(); } else await sb.auth.signOut();
     }
+
+    // LOGIN EMAIL QUICK-PICK — emails that signed in successfully on THIS
+    // device, shown as tap-to-fill chips. Stored only in this browser's
+    // localStorage; never in the (public) repo and never fetched pre-login.
+    const LOGIN_EMAILS_KEY = 'slebute.loginEmails';
+    const LOGIN_EMAILS_MAX = 12;
+    function getLoginEmails() {
+        try { const v = JSON.parse(localStorage.getItem(LOGIN_EMAILS_KEY) || '[]'); return Array.isArray(v) ? v.filter(e => typeof e === 'string') : []; }
+        catch (e) { return []; }
+    }
+    function setLoginEmails(list) {
+        try { localStorage.setItem(LOGIN_EMAILS_KEY, JSON.stringify(list.slice(0, LOGIN_EMAILS_MAX))); } catch (e) {}
+    }
+    function rememberLoginEmail(email) {
+        const e = (email || '').trim().toLowerCase();
+        if (!e) return;
+        setLoginEmails([e].concat(getLoginEmails().filter(x => x !== e)));
+    }
+    function forgetLoginEmail(email) {
+        setLoginEmails(getLoginEmails().filter(x => x !== email));
+        renderLoginEmails();
+    }
+    function renderLoginEmails() {
+        const box = document.getElementById('loginEmails');
+        if (!box) return;
+        const current = document.getElementById('email').value.trim().toLowerCase();
+        box.innerHTML = '';
+        getLoginEmails().slice().sort((a, b) => a.localeCompare(b)).forEach(e => {
+            const chip = document.createElement('span');
+            chip.className = 'login-email-chip' + (e === current ? ' active' : '');
+            const pick = document.createElement('button');
+            pick.type = 'button'; pick.textContent = e.split('@')[0]; pick.title = e;
+            pick.onclick = () => {
+                document.getElementById('email').value = e;
+                const pw = document.getElementById('password'); pw.value = ''; pw.focus();
+                renderLoginEmails();
+            };
+            const x = document.createElement('button');
+            x.type = 'button'; x.className = 'forget'; x.innerHTML = '&times;';
+            x.title = t('login.forget_email'); x.setAttribute('aria-label', t('login.forget_email') + ': ' + e);
+            x.onclick = () => forgetLoginEmail(e);
+            chip.append(pick, x);
+            box.appendChild(chip);
+        });
+    }
+    renderLoginEmails();
 
     async function logout() {
         if (realtimeReconnectTimer) { clearTimeout(realtimeReconnectTimer); realtimeReconnectTimer = null; }
@@ -3457,6 +3564,7 @@
         document.getElementById('navInventory').style.display = (PROFILE.role === 'admin' || PROFILE.role === 'manager') ? 'flex' : 'none';
         document.getElementById('navDashboard').style.display = (PROFILE.role === 'admin' || PROFILE.role === 'manager') ? 'flex' : 'none';
         document.getElementById('navSuppliers').style.display = (PROFILE.role === 'admin' || PROFILE.role === 'manager') ? 'flex' : 'none';
+        document.getElementById('navOverridePin').style.display = (PROFILE.role === 'admin' || PROFILE.role === 'manager') ? 'flex' : 'none';
         updateCachedLoginBanner();
         initWeatherWidget(); // fire-and-forget, never blocks app boot
         deviceCheckIn();     // fire-and-forget, observe-only (see DEVICES section)
@@ -3570,14 +3678,31 @@
         return e.shiftKey ? entry.s : entry.n;
     }
 
-    // Snapshot of cashTenderedInput's value from just before the CURRENT
-    // scan burst started (see the char-buffering below) — restored if the
-    // burst turns out to be a hardware scan, so a scanned code's digits can
-    // never leak into a typed cash amount (see the Enter handler's isScan
-    // branch). Stays null whenever there's nothing to roll back.
-    let cashPreScanValue = null;
+    // Checkout amount fields a cashier may be sitting in when they scan one
+    // more item: cash tendered, basket discount, and both split-payment
+    // fields. A scan typed into any of them is caught and rolled back (see
+    // the char-buffering below and the Enter handler's isScan branch).
+    const SCAN_SAFE_AMOUNT_IDS = ['cashTenderedInput', 'basketDiscValue', 'splitCashInput', 'splitCardInput'];
+    function isScanSafeAmountField(el) { return !!(el && SCAN_SAFE_AMOUNT_IDS.includes(el.id)); }
 
-    function resetScanBuffer() { scanBuffer = ''; scanKeyTimes = []; cashPreScanValue = null; }
+    // Values of ALL the fields above from just before the CURRENT scan burst
+    // started — restored if the burst turns out to be a hardware scan, so a
+    // scanned code's digits never leak into a typed amount. All of them, not
+    // just the focused one: typing in one split field auto-fills the other
+    // (onSplitChange). Stays null whenever there's nothing to roll back.
+    let amountPreScanSnapshot = null;
+
+    function snapshotAmountFields() {
+        const snap = {};
+        SCAN_SAFE_AMOUNT_IDS.forEach(id => { const el = document.getElementById(id); if (el) snap[id] = el.value; });
+        return snap;
+    }
+    function restoreAmountFields(snap) {
+        Object.keys(snap).forEach(id => { const el = document.getElementById(id); if (el) el.value = snap[id]; });
+        updateCartTotals();
+    }
+
+    function resetScanBuffer() { scanBuffer = ''; scanKeyTimes = []; amountPreScanSnapshot = null; }
 
     function looksLikeHardwareScan() {
         if (scanBuffer.length < 3 || scanKeyTimes.length < 3) return false;
@@ -3596,7 +3721,7 @@
     // scanned code's digits from ever landing in the typed amount.
     function scanCouldOwnFocus() {
         const el = document.activeElement;
-        return el === barcodeInput || el === cashTenderedInputEl || !el || el === document.body;
+        return el === barcodeInput || isScanSafeAmountField(el) || !el || el === document.body;
     }
 
     function setupScanner() {
@@ -3621,8 +3746,8 @@
                     // started so none of that leaks into the amount. See the
                     // snapshot taken below where scanBuffer starts a new
                     // burst.
-                    if (active === cashTenderedInputEl && cashPreScanValue !== null) {
-                        cashTenderedInputEl.value = cashPreScanValue;
+                    if (isScanSafeAmountField(active) && amountPreScanSnapshot) {
+                        restoreAmountFields(amountPreScanSnapshot);
                     }
                     resetScanBuffer();
                     resolveScan(code, true);
@@ -3672,12 +3797,12 @@
             }
             const ch = usLayoutChar(e);
             if (ch !== null) {
-                if (scanBuffer.length === 0 && document.activeElement === cashTenderedInputEl) {
+                if (scanBuffer.length === 0 && isScanSafeAmountField(document.activeElement)) {
                     // First char of a fresh burst while the amount field is
                     // focused — snapshot now, before this keystroke's native
                     // insertion happens (this listener runs in the capture
                     // phase, ahead of the browser's default action).
-                    cashPreScanValue = cashTenderedInputEl.value;
+                    amountPreScanSnapshot = snapshotAmountFields();
                 }
                 scanBuffer += ch;
                 scanKeyTimes.push(t);
@@ -4513,7 +4638,7 @@
             : '';
         return `
         <div class="variant-chip ${trulyUnavailable ? 'disabled' : ''}" onclick="posScanOrSelectVariant(${p.id}, ${v.id})">
-            <div class="adj-icon" onclick="event.stopPropagation(); openAdjustModal(${v.id}, '${escapeHtml(p.name)} — ${v.colorName} / ${v.size}')"><i class="fas fa-sliders"></i></div>
+            ${PROFILE && PROFILE.role === 'admin' ? `<div class="adj-icon" onclick="event.stopPropagation(); openAdjustModal(${v.id}, '${escapeHtml(p.name)} — ${v.colorName} / ${v.size}')"><i class="fas fa-sliders"></i></div>` : ''}
             ${reorderIconHtml}
             <div style="width:14px; height:14px; border-radius:50%; background:${v.colorHex}; margin:0 auto 4px auto; border:1px solid #fff;"></div>
             ${v.isClearance ? `<div class="sale-badge" title="${t('clearance.final_sale_title')}">${t('pos.sale_badge')}</div>` : ''}
@@ -4923,12 +5048,64 @@
 
     function cartSubtotal() { return round2(cart.reduce((s,i) => s + cartLineTotal(i), 0)); }
 
+    // 5% / 10%: the payable total is rounded UP to whole euros (no cents),
+    // so the discount is the subtotal minus that whole-euro total.
+    function presetDiscountAmount(subtotal, pct) {
+        const payable = Math.ceil(round2(subtotal * (100 - pct) / 100) - 1e-9);
+        return Math.max(0, round2(subtotal - payable));
+    }
+    function specialDiscountValue() {
+        const v = parseFloat((document.getElementById('basketDiscValue').value || '').replace(',', '.'));
+        return isNaN(v) || v < 0 ? 0 : v;
+    }
     function basketDiscountAmount(subtotal) {
-        const type = document.getElementById('basketDiscType').value;
-        const val = parseFloat(document.getElementById('basketDiscValue').value) || 0;
-        if (type === 'PERCENT') return round2(subtotal * val / 100);
-        if (type === 'FIXED') return round2(Math.min(val, subtotal));
+        if (basketDiscMode === 'P5') return presetDiscountAmount(subtotal, 5);
+        if (basketDiscMode === 'P10') return presetDiscountAmount(subtotal, 10);
+        if (basketDiscMode === 'SPECIAL') return round2(Math.min(specialDiscountValue(), subtotal));
         return 0;
+    }
+    function setBasketDiscMode(mode) {
+        const leavingSpecial = basketDiscMode === 'SPECIAL' && mode !== 'SPECIAL';
+        basketDiscMode = mode;
+        const special = mode === 'SPECIAL';
+        document.querySelectorAll('#discChoices .disc-choice').forEach(b => {
+            const on = b.dataset.mode === mode;
+            b.classList.toggle('active', on);
+            b.setAttribute('aria-pressed', on ? 'true' : 'false');
+        });
+        document.getElementById('discChoices').style.display = special ? 'none' : 'grid';
+        document.getElementById('specialDiscRow').style.display = special ? 'block' : 'none';
+        document.getElementById('specialDiscToggle').checked = special;
+        document.getElementById('discRowLabel').innerText = t(special ? 'cart.disc_row_eur' : 'cart.disc_row');
+        if (!special) document.getElementById('basketDiscValue').value = '';
+        if (leavingSpecial) discountOverridePin = null; // unticking drops the PIN approval
+        // Totals only — rebuilding the cart rows (photos) on every tap made
+        // the buttons feel slow. The rows don't depend on the basket discount.
+        updateCartTotals();
+        enforceDiscountCap();
+    }
+    function toggleSpecialDiscount(on) {
+        setBasketDiscMode(on ? 'SPECIAL' : 'NONE');
+        if (on) setTimeout(() => document.getElementById('basketDiscValue').focus(), 30);
+    }
+    // Live hint under the special € input: resulting %, payable, PIN warning.
+    function updateSpecialDiscHint() {
+        const el = document.getElementById('specialDiscHint');
+        if (basketDiscMode !== 'SPECIAL') { el.style.display = 'none'; return; }
+        const sub = cartSubtotal(), val = specialDiscountValue();
+        el.className = 'special-disc-hint';
+        el.style.display = 'block';
+        if (!val || sub <= 0) { el.textContent = ''; return; }
+        if (val > sub + 0.001) { el.classList.add('err'); el.textContent = t('cart.special_over'); return; }
+        const pct = val / sub * 100;
+        if (pct > CASHIER_DISCOUNT_CAP + 0.001 && !isManagerOrAdmin() && !discountOverridePin) {
+            el.classList.add('warn');
+            el.innerHTML = '<i class="fas fa-lock"></i> ' + escapeHtml(t('cart.special_pin'));
+            return;
+        }
+        el.textContent = t('cart.special_hint')
+            .replace('{pct}', pct.toFixed(1).replace('.', ','))
+            .replace('{total}', money(round2(sub - val)));
     }
 
     /* ---- Discount cap (CLAUDE.md §11) -------------------------------------
@@ -4937,11 +5114,8 @@
        manager PIN, which unlocks it for the rest of this sale only. The
        server (rpc_process_pos_sale) re-checks and records the approver. */
     function effectiveBasketDiscPct() {
-        const type = document.getElementById('basketDiscType').value;
-        const val = parseFloat(document.getElementById('basketDiscValue').value) || 0;
-        if (type === 'PERCENT') return Math.max(0, val);
-        if (type === 'FIXED') { const sub = cartSubtotal(); return sub > 0 ? Math.min(val, sub) / sub * 100 : 0; }
-        return 0;
+        const sub = cartSubtotal();
+        return sub > 0 ? basketDiscountAmount(sub) / sub * 100 : 0;
     }
     function effectiveDiscountPct() {
         return Math.max(effectiveBasketDiscPct(), cart.reduce((m, i) => Math.max(m, i.linePct || 0), 0));
@@ -4951,11 +5125,11 @@
     }
     function clampDiscountsToCap() {
         cart.forEach(i => { if ((i.linePct || 0) > CASHIER_DISCOUNT_CAP) i.linePct = CASHIER_DISCOUNT_CAP; });
-        const type = document.getElementById('basketDiscType').value;
         const el = document.getElementById('basketDiscValue');
-        const cur = parseFloat(el.value) || 0;
-        if (type === 'PERCENT' && cur > CASHIER_DISCOUNT_CAP) el.value = CASHIER_DISCOUNT_CAP;
-        if (type === 'FIXED') { const capEur = round2(cartSubtotal() * CASHIER_DISCOUNT_CAP / 100); if (cur > capEur) el.value = capEur; }
+        if (basketDiscMode === 'SPECIAL') {
+            const capEur = Math.floor(cartSubtotal() * CASHIER_DISCOUNT_CAP) / 100;
+            if (specialDiscountValue() > capEur) el.value = capEur.toFixed(2).replace('.', ',');
+        }
         updateCartUI();
     }
     // After a discount change: if it now needs approval, prompt. On cancel,
@@ -4967,7 +5141,7 @@
         updateCartUI();
         return true;
     }
-    function onBasketDiscountChange() { updateCartUI(); enforceDiscountCap(); }
+    function onBasketDiscountChange() { updateCartTotals(); enforceDiscountCap(); }
 
     let _discountOverrideResolver = null;
     function requestDiscountOverride() {
@@ -5253,6 +5427,15 @@
             }).join('');
         }
 
+        updateCartTotals();
+    }
+
+    // Totals, change due and the pay button only — no cart-list rebuild. The
+    // basket-discount, cash-tendered and split-payment fields call this on
+    // every keystroke; re-rendering every cart row (photos included) each time
+    // made the POS PC lag behind the cashier's typing.
+    function updateCartTotals() {
+        const remote = isRemoteView();
         const sub = cartSubtotal();
         const discAmt = basketDiscountAmount(sub);
         const total = cartGrandTotal();
@@ -5261,6 +5444,7 @@
         document.getElementById('discountRow').style.display = discAmt > 0 ? 'flex' : 'none';
         document.getElementById('discountDisplay').innerText = '-' + money(discAmt);
         document.getElementById('totalDisplay').innerText = money(total);
+        updateSpecialDiscHint();
 
         document.getElementById('cartControls').style.display = remote ? 'none' : 'block';
         document.getElementById('changeRow').style.display = 'none';
@@ -5297,7 +5481,7 @@
         payBtn.innerText = `${t('cart.charge_prefix')} ${money(total)}`;
     }
 
-    function onCashTenderedChange() { updateCartUI(); }
+    function onCashTenderedChange() { updateCartTotals(); }
 
     // Enter in "cash tendered" completes the sale — same action the Charge
     // button already performs, gated the same way (disabled until the
@@ -5318,7 +5502,7 @@
             const v = parseFloat(cardEl.value) || 0;
             cashEl.value = Math.max(0, round2(total - v)).toFixed(2);
         }
-        updateCartUI();
+        updateCartTotals();
     }
 
     function setPaymentMethod(method) {
@@ -5351,9 +5535,19 @@
         // Discount cap (CLAUDE.md §11): over 25% needs an admin/manager PIN.
         // Prompt for it before doing anything else; abort the sale if declined
         // (the server rejects it too, but this keeps the flow clean).
+        if (basketDiscMode === 'SPECIAL' && specialDiscountValue() > cartSubtotal() + 0.001) {
+            toast(t('cart.special_over'), 'warn');
+            document.getElementById('basketDiscValue').focus();
+            return;
+        }
         if (discountNeedsApproval()) {
             const ok = await requestDiscountOverride();
-            if (!ok) { toast(t('discount.override_needed'), 'warn'); return; }
+            if (!ok) {
+                toast(t('discount.override_needed'), 'warn');
+                if (basketDiscMode === 'SPECIAL') document.getElementById('basketDiscValue').focus();
+                return;
+            }
+            updateSpecialDiscHint();
         }
 
         // Check fresh (not relying on possibly-stale cached state) so a
@@ -5379,8 +5573,9 @@
 
         const items = cart.map(i => ({ variant_id: i.variantId, quantity: i.qty, discount_pct: i.linePct, oversold: !!i.oversold }));
         const total = cartGrandTotal();
-        const discType = document.getElementById('basketDiscType').value;
-        const discVal = discType === 'NONE' ? 0 : (parseFloat(document.getElementById('basketDiscValue').value) || 0);
+        // Every basket discount goes to the server as a € amount (FIXED), so
+        // the whole-euro rounding of 5% / 10% is stored exactly.
+        const discEur = basketDiscountAmount(cartSubtotal());
 
         let cashTendered = 0, cardAmount = 0;
         if (paymentMethod === 'CASH') cashTendered = parseFloat(document.getElementById('cashTenderedInput').value) || 0;
@@ -5396,8 +5591,8 @@
             p_payment_method: paymentMethod,
             p_cash_tendered: cashTendered,
             p_card_amount: cardAmount,
-            p_discount_total: discType === 'NONE' ? 0 : discVal,
-            p_discount_type: discType === 'NONE' ? null : discType,
+            p_discount_total: discEur > 0 ? discEur : 0,
+            p_discount_type: discEur > 0 ? 'FIXED' : null,
             p_customer: null,
             p_override_pin: discountOverridePin || null
         };
@@ -5437,9 +5632,8 @@
     function startNewSale() {
         cart = [];
         discountOverridePin = null; // approval doesn't carry to the next sale
-        document.getElementById('basketDiscType').value = 'NONE';
-        document.getElementById('basketDiscValue').value = '';
         document.getElementById('cashTenderedInput').value = '';
+        setBasketDiscMode('NONE');
         setPaymentMethod('CASH'); // also refocuses the barcode field, cart is empty at this point
         updateCartUI();
     }
@@ -6357,9 +6551,10 @@
     function setStorageTabScanDirection(dir) {
         if (dir === 'COUNT' && !SHOP_COUNT_ENABLED) dir = 'TO_STORAGE';
         if (dir === 'RECEIVE' && !receiveAllowed()) dir = 'TO_STORAGE';
-        document.getElementById('storageTabScanCountBtn').style.display = SHOP_COUNT_ENABLED ? '' : 'none';
+        document.getElementById('storageTabScanCountBtn').style.display = (SHOP_COUNT_ENABLED && (SHOP_COUNT_TAB_VISIBLE || dir === 'COUNT')) ? '' : 'none';
         document.getElementById('storageTabScanReceiveBtn').style.display = receiveAllowed() ? '' : 'none';
         storageTabScanDirection = dir;
+        if (dir !== 'COUNT') shopCountRemoveMode = false;
         document.getElementById('storageTabScanToStorageBtn').classList.toggle('active', dir === 'TO_STORAGE');
         document.getElementById('storageTabScanToDisplayBtn').classList.toggle('active', dir === 'TO_DISPLAY');
         document.getElementById('storageTabScanCountBtn').classList.toggle('active', dir === 'COUNT');
@@ -6535,24 +6730,125 @@
     // true (and deploy) for a future stocktake. Applying zeroes unscanned
     // stock, so it should not sit open to everyone between counts.
     const SHOP_COUNT_ENABLED = true;
+    // Visibility only (2026-11-22): Pašilaičiai is counted, Šeškinė follows
+    // in mid-December. Until then the tab is hidden from every user but the
+    // whole flow still works: set this to true (and deploy) to show it again,
+    // or run setStorageTabScanDirection('COUNT') from the console. While hidden
+    // the badge stops loading/syncing drafts in the background, so a stale
+    // device copy can't silently re-upload itself to the server.
+    const SHOP_COUNT_TAB_VISIBLE = false;
     const SHOP_COUNT_KEY_PREFIX = 'slebute_shop_count_';
     let shopCountBatch = {};      // variantId -> { qty, sku, name, colorName, size, at }
     let shopCountLocId = null;    // store the in-memory batch belongs to
+    let shopCountRemoveMode = false;  // scan subtracts one instead of adding (fix double scans)
+
+    /* Server autosave (2026-11-21). The shop PC runs the POS in a kiosk INCOGNITO
+       window, whose localStorage dies with the browser. So every change is also
+       sent (debounced) to rpc_save_shop_count_draft — one draft per store, never
+       touches stock — and on load the newer of device copy / server copy wins
+       (compared by the device timestamp of the last change). */
+    const SHOP_COUNT_TS_SUFFIX = '_ts';
+    let shopCountSavedAt = 0;         // Date.now() of the last local change
+    let shopCountSync = { state: 'idle', at: 0, timer: null, inFlight: false, dirty: false };
 
     function ensureShopCountLoaded() {
         if (shopCountLocId === VIEW_LOCATION_ID) return;
         shopCountLocId = VIEW_LOCATION_ID;
         shopCountBatch = {};
+        shopCountSavedAt = 0;
         try {
             const raw = localStorage.getItem(SHOP_COUNT_KEY_PREFIX + VIEW_LOCATION_ID);
             if (raw) shopCountBatch = JSON.parse(raw) || {};
+            shopCountSavedAt = Number(localStorage.getItem(SHOP_COUNT_KEY_PREFIX + VIEW_LOCATION_ID + SHOP_COUNT_TS_SUFFIX)) || 0;
         } catch (e) { shopCountBatch = {}; }
+        if (!shopCountSavedAt) for (const l of Object.values(shopCountBatch)) shopCountSavedAt = Math.max(shopCountSavedAt, l.at || 0);
+        shopCountSync = { state: 'idle', at: 0, timer: null, inFlight: false, dirty: false };
+        pullShopCountDraft(VIEW_LOCATION_ID);
     }
-    function saveShopCount() {
+    function writeShopCountLocal() {
         try {
-            if (Object.keys(shopCountBatch).length) localStorage.setItem(SHOP_COUNT_KEY_PREFIX + shopCountLocId, JSON.stringify(shopCountBatch));
-            else localStorage.removeItem(SHOP_COUNT_KEY_PREFIX + shopCountLocId);
+            const k = SHOP_COUNT_KEY_PREFIX + shopCountLocId;
+            if (Object.keys(shopCountBatch).length) {
+                localStorage.setItem(k, JSON.stringify(shopCountBatch));
+                localStorage.setItem(k + SHOP_COUNT_TS_SUFFIX, String(shopCountSavedAt));
+            } else { localStorage.removeItem(k); localStorage.removeItem(k + SHOP_COUNT_TS_SUFFIX); }
         } catch (e) {}
+    }
+    function saveShopCount(opts) {
+        shopCountSavedAt = Date.now();
+        writeShopCountLocal();
+        if (!(opts && opts.localOnly)) scheduleShopCountPush();
+    }
+    function scheduleShopCountPush() {
+        shopCountSync.dirty = true;
+        shopCountSync.state = 'pending';
+        clearTimeout(shopCountSync.timer);
+        shopCountSync.timer = setTimeout(pushShopCountDraft, 1200);
+    }
+    async function pushShopCountDraft() {
+        if (shopCountSync.inFlight) { shopCountSync.timer = setTimeout(pushShopCountDraft, 800); return; }
+        const locId = shopCountLocId;
+        if (locId == null || !shopCountSync.dirty) return;
+        shopCountSync.inFlight = true; shopCountSync.dirty = false;
+        try {
+            const { error } = await sb.rpc('rpc_save_shop_count_draft', {
+                p_location_id: locId, p_lines: shopCountBatch, p_client_saved_at: shopCountSavedAt
+            });
+            if (locId !== shopCountLocId) return;
+            if (error) throw error;
+            shopCountSync.state = shopCountSync.dirty ? 'pending' : 'ok';
+            shopCountSync.at = Date.now();
+        } catch (e) {
+            console.error('rpc_save_shop_count_draft', e);
+            shopCountSync.dirty = true;
+            shopCountSync.state = 'error';
+            clearTimeout(shopCountSync.timer);
+            shopCountSync.timer = setTimeout(pushShopCountDraft, 15000);   // keep retrying
+        } finally {
+            shopCountSync.inFlight = false;
+            if (storageTabScanDirection === 'COUNT') renderShopCountSyncLine();
+        }
+    }
+    async function pullShopCountDraft(locId) {
+        try {
+            const { data, error } = await sb.rpc('rpc_get_shop_count_draft', { p_location_id: locId });
+            if (error) throw error;
+            if (locId !== shopCountLocId) return;
+            const serverTs = data ? Number(data.client_saved_at) || 0 : 0;
+            if (data && data.lines && serverTs > shopCountSavedAt) {
+                shopCountBatch = data.lines; shopCountSavedAt = serverTs;
+                writeShopCountLocal();
+                shopCountSync.state = 'ok'; shopCountSync.at = Date.now();
+                if (Object.keys(shopCountBatch).length) toast(t('storage.count_restored'), 'success');
+            } else if (Object.keys(shopCountBatch).length && serverTs !== shopCountSavedAt) {
+                scheduleShopCountPush();        // device copy is newer (or server has none)
+            } else if (data) {
+                shopCountSync.state = 'ok'; shopCountSync.at = Date.now();
+            }
+        } catch (e) {
+            console.error('rpc_get_shop_count_draft', e);
+            if (locId === shopCountLocId && Object.keys(shopCountBatch).length) scheduleShopCountPush();
+        }
+        if (storageTabScanDirection === 'COUNT') renderStorageTabScanLog();
+        updateShopCountBadge();
+    }
+    function renderShopCountSyncLine() {
+        const el = document.getElementById('storageTabCountSync');
+        if (!el) return;
+        const s = shopCountSync.state;
+        if (!Object.keys(shopCountBatch).length && s !== 'error') { el.innerHTML = ''; return; }
+        const time = shopCountSync.at ? new Date(shopCountSync.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+        if (s === 'ok') el.innerHTML = `<span style="color:var(--success-color)"><i class="fas fa-cloud"></i> ${fillTemplate(t('storage.count_sync_ok'), { time })}</span>`;
+        else if (s === 'error') el.innerHTML = `<span style="color:var(--danger-color)"><i class="fas fa-triangle-exclamation"></i> ${t('storage.count_sync_error')}</span>`;
+        else el.innerHTML = `<span class="muted"><i class="fas fa-spinner fa-spin"></i> ${t('storage.count_sync_pending')}</span>`;
+    }
+    function toggleShopCountRemoveMode() {
+        shopCountRemoveMode = !shopCountRemoveMode;
+        const status = document.getElementById('storageTabScanStatus');
+        status.innerText = t(shopCountRemoveMode ? 'storage.count_remove_on' : 'storage.count_hint');
+        status.style.color = shopCountRemoveMode ? 'var(--danger-color)' : '';
+        renderStorageTabScanLog();
+        document.getElementById('storageTabScanManualInput')?.focus();
     }
 
     // variantId -> { qty, sku } for every variant of the viewed store (shop floor only).
@@ -6574,6 +6870,7 @@
     }
 
     function updateShopCountBadge() {
+        if (!SHOP_COUNT_TAB_VISIBLE && storageTabScanDirection !== 'COUNT') return;
         ensureShopCountLoaded();
         const units = Object.values(shopCountBatch).reduce((s, l) => s + l.qty, 0);
         document.getElementById('storageTabCountBadge').innerText = units ? String(units) : '';
@@ -6582,6 +6879,21 @@
     function stageShopCountScan(p, v) {
         ensureShopCountLoaded();
         const status = document.getElementById('storageTabScanStatus');
+        if (shopCountRemoveMode) {
+            const cur = shopCountBatch[v.id];
+            if (!cur) {
+                status.innerText = `${v.sku}: ${t('storage.count_remove_none')}`;
+                status.style.color = 'var(--danger-color)';
+            } else {
+                if (--cur.qty <= 0) delete shopCountBatch[v.id];
+                saveShopCount();
+                status.innerText = `− ${v.sku} → ${cur.qty > 0 ? cur.qty : 0}`;
+                status.style.color = 'var(--danger-color)';
+            }
+            renderStorageTabScanLog();
+            document.getElementById('storageTabScanManualInput')?.focus();
+            return;
+        }
         const line = shopCountBatch[v.id] || (shopCountBatch[v.id] = { qty: 0, sku: v.sku, name: p.name, colorName: v.colorName, size: v.size, at: 0 });
         line.qty++;
         line.at = Date.now();
@@ -6618,9 +6930,12 @@
                     <button class="icon-btn" onclick="decrementShopCountLine(${r.id})" title="${t('common.remove')}"><i class="fas fa-minus"></i></button>
                 </div>`).join('')
             : `<p class="muted" style="font-size:0.78rem; padding:4px;">${t('storage.session_empty')}</p>`;
+        const rmBtn = `<button class="btn ${shopCountRemoveMode ? 'btn-danger' : 'btn-ghost'}" style="margin-top:6px;" onclick="toggleShopCountRemoveMode()"><i class="fas fa-minus-circle"></i> ${t(shopCountRemoveMode ? 'storage.count_remove_stop' : 'storage.count_remove_start')}</button>`;
         document.getElementById('storageTabScanSessionTotal').innerHTML =
             `${t('storage.count_scanned')}: ${units} (${variants})` +
-            (zeroed ? `<br><span class="muted" style="font-weight:600;">${t('storage.count_unscanned')}: ${zeroed} (−${zeroedUnits})</span>` : '');
+            (zeroed ? `<br><span class="muted" style="font-weight:600;">${t('storage.count_unscanned')}: ${zeroed} (−${zeroedUnits})</span>` : '') +
+            `<div id="storageTabCountSync" style="font-weight:600; margin-top:4px;"></div>` + rmBtn;
+        renderShopCountSyncLine();
         document.getElementById('storageTabSubmitBtn').disabled = lines.length === 0;
     }
 
@@ -6679,7 +6994,7 @@
                 toast(status.innerText, 'error');
                 return;
             }
-            shopCountBatch = {}; saveShopCount();
+            shopCountBatch = {}; shopCountRemoveMode = false; saveShopCount();   // empty push deletes the server draft
             await loadInventory();
             status.innerText = fillTemplate(t('storage.count_done'), { store, changes: (data && data.lines_changed) || 0 });
             status.style.color = 'var(--success-color)';
@@ -11053,7 +11368,23 @@
         return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     }
 
+    // Store whose day is shown. Non-admins are always their device's store
+    // (the RPCs enforce that server-side too); admins pick from the dropdown.
+    function dailySalesLocationId() {
+        const sel = document.getElementById('dailySalesLocation');
+        if (PROFILE && PROFILE.role === 'admin' && sel && sel.value) return Number(sel.value);
+        return DEVICE_LOCATION_ID;
+    }
+
     function renderDailySalesView() {
+        const sel = document.getElementById('dailySalesLocation');
+        const isAdmin = PROFILE && PROFILE.role === 'admin';
+        sel.classList.toggle('hidden', !isAdmin || STORES.length < 2);
+        if (isAdmin && sel.options.length !== STORES.length) {
+            const keep = sel.value || String(DEVICE_LOCATION_ID);
+            sel.innerHTML = STORES.map(s => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
+            sel.value = STORES.some(s => String(s.id) === keep) ? keep : String(STORES[0]?.id ?? '');
+        }
         const input = document.getElementById('dailySalesDate');
         if (!input.value) input.value = todayDateStr();
         loadDailySalesDay(input.value);
@@ -11096,14 +11427,15 @@
         // store server-side regardless of what location_id is passed.
         // v_daily_sales was already correctly RLS-scoped (security_invoker),
         // so it's untouched. See migration: security_lockdown_anon_access.
+        const locId = dailySalesLocationId();
         const [{ data: summary }, { data: lines }, { data: returns }] = await Promise.all([
-            sb.from('v_daily_sales').select('*').eq('location_id', DEVICE_LOCATION_ID).eq('sale_date', dateStr).maybeSingle(),
-            sb.rpc('rpc_get_sales_by_variant', { p_location_id: DEVICE_LOCATION_ID, p_date_from: dayStart, p_date_to: dayEnd })
+            sb.from('v_daily_sales').select('*').eq('location_id', locId).eq('sale_date', dateStr).maybeSingle(),
+            sb.rpc('rpc_get_sales_by_variant', { p_location_id: locId, p_date_from: dayStart, p_date_to: dayEnd })
                 .then(({ data, error }) => ({ data: error ? [] : (data || []).sort((a, b) => new Date(b.created_at) - new Date(a.created_at)), error })),
             // Keyed to when the RETURN happened, not the original sale's date —
             // a return of last week's purchase shows up here today, unlike the
             // voided/refunded lines above (which stay pinned to the sale date).
-            sb.rpc('rpc_get_returns_detail', { p_location_id: DEVICE_LOCATION_ID, p_date_from: dayStart, p_date_to: dayEnd })
+            sb.rpc('rpc_get_returns_detail', { p_location_id: locId, p_date_from: dayStart, p_date_to: dayEnd })
                 .then(({ data, error }) => ({ data: error ? [] : (data || []), error })),
             loadInventory() // keeps the stock-per-location column (below) accurate, since this view doesn't otherwise trigger a catalog refresh
         ]);
