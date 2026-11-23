@@ -674,6 +674,11 @@
         .sale-line-table th { text-align:left; font-size: 0.68rem; text-transform:uppercase; letter-spacing:0.03em; color: var(--text-secondary); padding: 8px 10px; border-bottom: 1px solid rgba(36,22,30,0.1); }
         .sale-line-table td { padding: 9px 10px; border-bottom: 1px solid rgba(36,22,30,0.06); vertical-align: middle; }
         .sale-line-table tr:last-child td { border-bottom: none; }
+        /* Daily Sales: alternate baskets (orders) get a soft tint and a firmer
+           separator line, so a multi-item sale reads as one group. */
+        .sale-line-table tr.ds-basket-alt td { background: #F7EEF2; }
+        .sale-line-table tr.ds-basket-alt td:first-child { box-shadow: inset 3px 0 0 rgba(120,52,82,0.28); }
+        .sale-line-table tr.ds-basket-alt .ds-stock-badge { background: #FFFFFF; }
         .sale-line-table .discount-tag { font-size: 0.7rem; color: var(--warning-text); background: var(--warning-bg); padding: 2px 6px; border-radius: 4px; }
         .section-card { background: var(--card-bg); border: var(--glass-border); border-radius: 16px; padding: 20px; margin-bottom: 18px; }
         .section-card h3 { font-size: 0.95rem; font-weight:700; margin-bottom: 14px; }
@@ -2543,7 +2548,7 @@
             'register.open_shift': 'Open Shift', 'register.open_shift_btn': 'Open Shift',
             'register.no_shift_open': 'No shift is open yet. Enter the starting cash float to open one.',
             'register.opened': 'Opened', 'register.opening_float': 'Opening float', 'register.orders_today': 'Orders today',
-            'register.cash_sales': 'Cash sales', 'register.card_sales': 'Card sales', 'register.split_sales': 'Split sales',
+            'register.cash_sales': 'Cash sales', 'register.card_sales': 'Card sales', 'register.split_sales': 'Of which split (included above)',
             'register.cash_in': 'Cash In', 'register.cash_out': 'Cash Out', 'register.close_shift': 'Close Shift',
             'register.stale_shift_title': 'This shift is still open from a previous day',
             'register.stale_shift_body': "Sales are still reported correctly by their own date, but for clean cash-up, close this till and open a fresh one for today.",
@@ -2937,7 +2942,7 @@
             'register.open_shift': 'Pamainos atidarymas', 'register.open_shift_btn': 'Atidaryti pamainą',
             'register.no_shift_open': 'Pamaina dar neatidaryta. Įveskite pradinę kasos sumą, kad ją atidarytumėte.',
             'register.opened': 'Atidaryta', 'register.opening_float': 'Pradinė suma', 'register.orders_today': 'Šiandienos užsakymai',
-            'register.cash_sales': 'Grynųjų pardavimai', 'register.card_sales': 'Kortelės pardavimai', 'register.split_sales': 'Mišrūs pardavimai',
+            'register.cash_sales': 'Grynųjų pardavimai', 'register.card_sales': 'Kortelės pardavimai', 'register.split_sales': 'Iš jų mišrūs (įskaičiuota aukščiau)',
             'register.cash_in': 'Grynųjų įnešimas', 'register.cash_out': 'Grynųjų išėmimas', 'register.close_shift': 'Uždaryti pamainą',
             'register.stale_shift_title': 'Ši pamaina vis dar atidaryta nuo ankstesnės dienos',
             'register.stale_shift_body': 'Pardavimai vis tiek teisingai priskiriami savo dienai, bet dėl tvarkingo kasos uždarymo uždarykite šią kasą ir atidarykite naują šiandienai.',
@@ -11517,7 +11522,10 @@
                 <table class="sale-line-table">
                     <thead><tr><th>${t('ds.col_time')}</th><th>${t('ds.col_barcode')}</th><th>${t('ds.col_item')}</th><th>${t('ds.col_color')}</th><th>${t('ds.col_size')}</th><th>${t('ds.col_qty')}</th><th>${t('ds.col_price')}</th><th>${t('ds.col_discount')}</th><th>${t('ds.col_total')}</th><th>${t('ds.col_stock')}</th></tr></thead>
                     <tbody>
-                        ${lines.map(l => {
+                        ${(() => { let prevOrder = null, basketIdx = -1; return lines.map(l => {
+                            const basketStart = l.order_id !== prevOrder;
+                            if (basketStart) { basketIdx++; prevOrder = l.order_id; }
+                            const basketCls = (basketStart ? 'ds-basket-start' : '') + (basketIdx % 2 ? ' ds-basket-alt' : '');
                             const basketShare = basketDiscountShare(l, orderSubtotals);
                             const lineDiscount = Math.max(0, Number(l.unit_price) * l.quantity - Number(l.total_price)) + basketShare;
                             const displayTotal = round2(Number(l.total_price) - basketShare);
@@ -11529,7 +11537,7 @@
                                 : '';
                             const hoverCls = imgUrl ? ' ds-hoverable' : '';
                             return `
-                            <tr style="${l.status!=='COMPLETED'||l.is_refunded ? 'opacity:0.5; text-decoration:line-through;' : ''}">
+                            <tr class="${basketCls}" style="${l.status!=='COMPLETED'||l.is_refunded ? 'opacity:0.5; text-decoration:line-through;' : ''}">
                                 <td>${new Date(l.created_at).toLocaleTimeString(currentLocale(), {hour:'2-digit',minute:'2-digit'})}</td>
                                 <td class="muted${hoverCls}" ${hoverAttr}>${escapeHtml(l.base_barcode || '—')}</td>
                                 <td class="${hoverCls.trim()}" ${hoverAttr}>${escapeHtml(l.product_name)}${l.oversold_note_id ? `<i class="fas fa-triangle-exclamation ds-oos-flag" title="${escapeHtml(l.oversold_note_body || '')}" onclick="showOversoldNoteFromRow(event, ${l.order_item_id})"></i>` : ''}</td>
@@ -11555,7 +11563,7 @@
                                     ${v ? `<i class="fas fa-right-left ds-stock-transfer-icon" title="${t('ds.rebalance_action_title')}" onclick="openStockRebalanceModal(${l.variant_id})"></i>` : ''}
                                 </td>
                             </tr>`;
-                        }).join('')}
+                        }).join(''); })()}
                     </tbody>
                 </table>
                 </div>`}
