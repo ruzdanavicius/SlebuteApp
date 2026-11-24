@@ -4110,6 +4110,7 @@
         const isPriv = PROFILE && (PROFILE.role === 'admin' || PROFILE.role === 'manager');
         let data, error;
         const stylePricesP = isPriv ? loadStylePrices() : Promise.resolve({});
+        const salesRankP = loadProductSalesRank();
         if (isPriv) {
             // The API hands back at most 1000 rows per request. Once the catalogue
             // grew past 1000 styles, everything after the 1000th name (T…, V…, Ž…)
@@ -4151,6 +4152,7 @@
         }
 
         const stylePrices = await stylePricesP;
+        productSalesRank = await salesRankP;
         products = (data || []).map(prod => {
             const variants = [];
             // Colours saved ahead of their sizes (no size row at all yet) — shown
@@ -4287,7 +4289,25 @@
     // keepOutOfStock: a style the cashier just scanned stays on screen even
     // with nothing here (focusGridOnProduct) — hiding what they're holding
     // would read as "the scan failed".
+    // Total units sold per product, all stores (product_id -> units). Only
+    // used to order the POS grid best-sellers first while browsing; a
+    // failed load just leaves the old by-name order.
+    var productSalesRank = new Map(); // var: safe even if loadInventory() ran before this line
+    async function loadProductSalesRank() {
+        const { data, error } = await sb.rpc('rpc_get_product_sales_rank');
+        if (error) { console.warn('sales rank', error.message); return productSalesRank; }
+        return new Map((data || []).map(r => [Number(r.product_id), Number(r.units_sold)]));
+    }
+    // Best-sellers first; ties (incl. never sold) keep the catalogue's
+    // by-name order since Array.sort is stable. Search results are left in
+    // their own order — only browsing the full catalogue is re-sorted.
+    function sortBySales(items) {
+        if (!productSalesRank.size) return items;
+        return items.slice().sort((a, b) => (productSalesRank.get(b.id) || 0) - (productSalesRank.get(a.id) || 0));
+    }
+
     function applyPosFilters(items, keepOutOfStock) {
+        if (items === products) items = sortBySales(items);
         const sellable = filterBySale(filterByCategory(items.filter(hasSizes)));
         if (keepOutOfStock) { lastHiddenOutOfStock = 0; return sellable; }
         return filterInStockHere(sellable);
