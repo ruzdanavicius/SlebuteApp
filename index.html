@@ -682,6 +682,23 @@
         .cat-c.q5 { background: var(--accent-tint); color: var(--accent-color); box-shadow: inset 0 0 0 1px rgba(107,37,69,0.18); }
         .cat-c i { font-style: normal; font-weight: 600; font-size: 0.6rem; color: var(--text-secondary); letter-spacing: 0.02em; }
         .cat-c.q5 i { color: var(--accent-color); opacity: 0.75; }
+        /* Whole catalogue block centred on the page and as wide as its table, so the
+           header and legend line up with the table edges. */
+        .cat-page { display: flex; flex-direction: column; flex: 1; min-height: 0; width: fit-content; max-width: 100%; margin: 0 auto; }
+        .cat-table td.cat-szh { cursor: pointer; }
+        /* Small popup over one size cell: which colours of that size each shop has. */
+        .cat-sp { position: fixed; z-index: 999; display: none; pointer-events: none; min-width: 190px; max-width: 280px; background: var(--card-bg); border: var(--glass-border); border-radius: 10px; padding: 10px 12px; box-shadow: 0 10px 28px var(--shadow-color); font-size: 0.78rem; color: var(--text-primary); }
+        .cat-sp.open { display: block; }
+        .cat-sp-head { font-weight: 700; font-size: 0.84rem; margin-bottom: 6px; }
+        .cat-sp-head span { font-weight: 400; color: var(--text-secondary); font-size: 0.74rem; }
+        .cat-sp-store { display: flex; justify-content: space-between; gap: 12px; font-weight: 600; font-size: 0.74rem; padding: 6px 0 3px; border-bottom: var(--glass-border); margin-bottom: 3px; }
+        .cat-sp-store span { font-weight: 400; color: var(--text-secondary); }
+        .cat-sp-line { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 22px; }
+        .cat-sp-line > span:first-child { display: flex; align-items: center; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+        .cat-sp-line i { font-style: normal; color: var(--text-secondary); margin-left: 5px; font-size: 0.7rem; }
+        .cat-sp-line b { font-weight: 700; font-variant-numeric: tabular-nums; }
+        .cat-sp-line b.low { color: var(--warning-text); }
+        .cat-sp-none { color: var(--text-secondary); font-size: 0.74rem; padding: 2px 0; }
         .cat-c.e { background: transparent; border: 1px dashed rgba(36,22,30,0.26); color: rgba(36,22,30,0.38); font-weight: 400; }
         .cat-empty { padding: 48px 16px; text-align: center; color: var(--text-secondary); }
         .cat-pv-zero { font-size: 0.76rem; color: var(--text-secondary); margin-bottom: 10px; }
@@ -1049,6 +1066,7 @@
     <div id="imgHoverPreview" class="img-hover-preview"><img id="imgHoverPreviewImg" class="hover-thumb" alt=""></div>
     <div id="stockHoverPreview" class="stock-hover-preview" role="tooltip"></div>
     <div id="catPreview" class="stock-hover-preview" role="tooltip"></div>
+    <div id="catSizePop" class="cat-sp" role="tooltip"></div>
 
     <!-- LOGIN SCREEN -->
     <div id="loginOverlay">
@@ -1415,6 +1433,7 @@
             <!-- SUPPLIERS VIEW (admin/manager only) -->
             <!-- PREKIŲ KATALOGAS (admin only) — stock matrix, one row per style -->
             <div id="view-catalog" class="view-section">
+              <div class="cat-page">
                 <div class="header-row">
                     <div>
                         <h1 data-i18n="cat.title">Product Catalogue</h1>
@@ -1441,6 +1460,7 @@
                     </table>
                     <div class="cat-empty hidden" id="catEmpty" data-i18n="cat.empty">Nothing found. Try a shorter word or clear the search.</div>
                 </div>
+              </div>
             </div>
 
             <div id="view-suppliers" class="view-section">
@@ -13993,7 +14013,7 @@ ${qrBlock}${field(skuT.g, qrColX, skuT.y)}${field(colourT.g, qrColX, colourT.y)}
                 <td class="cat-l cat-code cat-s1 cat-hz">${catHighlight(r.p.base_barcode || '—', terms)}</td>
                 <td class="cat-l cat-name cat-s2 cat-hz"><span class="cat-nm">${catHighlight(r.p.name, terms)}</span><span class="cat-sub">${catHighlight(sub, terms)}</span></td>
                 <td class="cat-tot cat-hz">${r.total}</td>
-                ${CAT_COLS.map((c, k) => `<td class="cat-sz${k >= 13 ? ' cat-div' : ''}${k === 14 ? ' cat-wide' : ''}">${catCellHTML(r.cells[c], c)}</td>`).join('')}
+                ${CAT_COLS.map((c, k) => `<td class="cat-sz${k >= 13 ? ' cat-div' : ''}${k === 14 ? ' cat-wide' : ''}${r.cells[c] && r.cells[c].q > 0 ? ' cat-szh' : ''}" data-c="${k}">${catCellHTML(r.cells[c], c)}</td>`).join('')}
             </tr>`;
         }).join('');
     }
@@ -14124,7 +14144,49 @@ ${qrBlock}${field(skuT.g, qrColX, skuT.y)}${field(colourT.g, qrColX, colourT.y)}
         el.style.top = y + 'px';
     }
 
+    // ---- Size-cell popup: colours of that one size column, per shop ----
+    let catSizeTimer = null, catSizeCell = null;
+    function catSizePopHTML(r, col) {
+        const vs = r.p.variants.filter(v => catSizeCol(v.size).col === col);
+        const inStock = vs.filter(v => STORES.some(st => catQty(v, st) > 0));
+        const sizes = [...new Set(inStock.map(v => v.size))].sort(catCmpSize);
+        const multi = sizes.length > 1; // grouped columns (≤38, 62+, Kita) can hold several sizes
+        const stores = STORES.map(st => {
+            const lines = inStock.filter(v => catQty(v, st) > 0)
+                .sort((a, b) => String(a.colorName).localeCompare(String(b.colorName), 'lt') || catCmpSize(a.size, b.size));
+            const total = lines.reduce((a, v) => a + catQty(v, st), 0);
+            const body = lines.length ? lines.map(v => {
+                const n = catQty(v, st);
+                return `<div class="cat-sp-line"><span><span class="shp-dot" style="background:${escapeHtml(v.colorHex || 'transparent')}"></span>${escapeHtml(v.colorName)}${multi ? `<i>${escapeHtml(v.size)}</i>` : ''}</span><b class="${n <= 2 ? 'low' : ''}">${n}</b></div>`;
+            }).join('') : `<div class="cat-sp-none">${t('cat.none_here')}</div>`;
+            return `<div class="cat-sp-store">${escapeHtml(st.name)}<span>${total} ${t('cat.pcs')}</span></div>${body}`;
+        }).join('');
+        return `<div class="cat-sp-head">${t('ds.col_size')} ${escapeHtml(sizes.join(', '))} <span>· ${escapeHtml(r.p.base_barcode || '—')}</span></div>${stores}`;
+    }
+    function catOpenSizePop(td) {
+        const r = catView[Number(td.parentElement.dataset.i)];
+        const col = CAT_COLS[Number(td.dataset.c)];
+        if (!r || !col) return;
+        const el = document.getElementById('catSizePop');
+        el.innerHTML = catSizePopHTML(r, col);
+        el.classList.add('open');
+        catSizeCell = td;
+        const box = td.getBoundingClientRect(), w = el.offsetWidth, h = el.offsetHeight, m = 8;
+        const x = Math.max(m, Math.min(box.left + box.width / 2 - w / 2, window.innerWidth - w - m));
+        let y = box.bottom + 4;
+        if (y + h > window.innerHeight - m) y = box.top - h - 4;
+        el.style.left = x + 'px';
+        el.style.top = Math.max(m, y) + 'px';
+    }
+    function catCloseSizePop() {
+        clearTimeout(catSizeTimer);
+        const el = document.getElementById('catSizePop');
+        if (el) el.classList.remove('open');
+        catSizeCell = null;
+    }
+
     function catClosePreview() {
+        catCloseSizePop();
         clearTimeout(catHoverTimer);
         const el = document.getElementById('catPreview');
         if (el) el.classList.remove('open');
@@ -14139,6 +14201,12 @@ ${qrBlock}${field(skuT.g, qrColX, skuT.y)}${field(colourT.g, qrColX, colourT.y)}
         const body = document.getElementById('catBody');
         body.addEventListener('mouseover', e => {
             if (!canHover() || catPinned) return;
+            const szc = e.target.closest('td.cat-szh');
+            if (szc !== catSizeCell) {
+                clearTimeout(catSizeTimer);
+                if (szc) catSizeTimer = setTimeout(() => catOpenSizePop(szc), catSizeCell ? 40 : 120);
+                else if (catSizeCell) catSizeTimer = setTimeout(catCloseSizePop, 80);
+            }
             const hz = e.target.closest('td.cat-hz');
             clearTimeout(catHoverTimer);
             if (!hz) { if (catOpenRow) catHoverTimer = setTimeout(catClosePreview, 120); return; }
@@ -14147,11 +14215,19 @@ ${qrBlock}${field(skuT.g, qrColX, skuT.y)}${field(colourT.g, qrColX, colourT.y)}
             if (tr === catOpenRow) return;
             catHoverTimer = setTimeout(() => catOpenPreview(tr), catOpenRow ? 60 : 150);
         });
-        body.addEventListener('mouseleave', () => { if (!catPinned) { clearTimeout(catHoverTimer); catHoverTimer = setTimeout(catClosePreview, 120); } });
+        body.addEventListener('mouseleave', () => { clearTimeout(catSizeTimer); catSizeTimer = setTimeout(catCloseSizePop, 80); if (!catPinned) { clearTimeout(catHoverTimer); catHoverTimer = setTimeout(catClosePreview, 120); } });
         // Tap (tablet) or click pins it; tapping the same row again closes it.
         body.addEventListener('click', e => {
+            const szc = e.target.closest('td.cat-szh');
+            if (szc) {
+                e.stopPropagation();
+                if (catOpenRow) catClosePreview();
+                if (catSizeCell === szc) catCloseSizePop(); else catOpenSizePop(szc);
+                return;
+            }
             const hz = e.target.closest('td.cat-hz');
             if (!hz) return;
+            catCloseSizePop();
             e.stopPropagation();
             const tr = hz.parentElement;
             catXY = [e.clientX, e.clientY];
@@ -14167,9 +14243,9 @@ ${qrBlock}${field(skuT.g, qrColX, skuT.y)}${field(colourT.g, qrColX, colourT.y)}
             renderCatalogHead();
             renderCatalog();
         });
-        document.getElementById('catWrap').addEventListener('scroll', () => { if (catOpenRow) catClosePreview(); }, { passive: true });
-        document.addEventListener('click', () => { if (catOpenRow) catClosePreview(); });
-        document.addEventListener('keydown', e => { if (e.key === 'Escape' && catOpenRow) catClosePreview(); });
+        document.getElementById('catWrap').addEventListener('scroll', () => { if (catOpenRow || catSizeCell) catClosePreview(); }, { passive: true });
+        document.addEventListener('click', () => { if (catOpenRow || catSizeCell) catClosePreview(); });
+        document.addEventListener('keydown', e => { if (e.key === 'Escape' && (catOpenRow || catSizeCell)) catClosePreview(); });
     }
 
     function switchView(view) {
