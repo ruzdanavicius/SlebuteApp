@@ -500,6 +500,9 @@
         input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
         input[type="color"]::-webkit-color-swatch { border: 1px solid rgba(36,22,30,0.14); border-radius: 8px; }
         .helper-text { font-size: 0.75rem; color: var(--success-color); display: none; margin-top:4px; }
+        .barcode-field-row { display: flex; gap: 8px; align-items: center; }
+        .barcode-field-row .form-input { flex: 1; min-width: 0; }
+        .barcode-field-row .form-input[readonly] { background: var(--bg-secondary, #f4f1f2); color: var(--text-secondary, #6b5b63); cursor: default; }
         .delisted-msg { color: var(--text-primary); background: var(--warning-bg); border-radius: 8px; padding: 8px 10px; align-items: center; gap: 10px; flex-wrap: wrap; }
 
         .color-block { background: var(--card-bg-raised); border: var(--glass-border); border-radius: 14px; padding: 16px; margin-bottom: 14px; }
@@ -1291,7 +1294,10 @@
                             </div>
                             <div class="form-group">
                                 <label data-i18n="inv.base_barcode">Base Barcode (scan tag)</label>
-                                <input type="text" class="form-input kb-toggle-input" inputmode="none" id="new_base_barcode" placeholder="e.g. H-2026-01" onblur="autoFillProduct()" onkeydown="if(event.key === 'Enter'){event.preventDefault(); this.blur();}">
+                                <div class="barcode-field-row">
+                                    <input type="text" class="form-input kb-toggle-input" inputmode="none" id="new_base_barcode" placeholder="e.g. H-2026-01" onblur="autoFillProduct()" onkeydown="if(event.key === 'Enter'){event.preventDefault(); this.blur();}">
+                                    <button type="button" class="btn btn-ghost btn-sm hidden" id="baseBarcodeChangeBtn" onclick="unlockBaseBarcode()" data-i18n-title="inv.barcode_change_title" title="Change the main code"><i class="fas fa-lock"></i> <span data-i18n="inv.barcode_change">Change</span></button>
+                                </div>
                                 <div class="helper-text" style="display:block;" data-i18n="inv.base_barcode_hint">No barcode on the garment? Leave this blank — a reference like "keln-001" (from the category) is assigned automatically. It won't match future scans the way a real tag barcode would.</div>
                                 <span id="foundMsg" class="helper-text"><i class="fas fa-check-circle"></i> <span data-i18n="inv.loaded_existing">Loaded existing style — editing.</span></span>
                                 <div id="delistedMsg" class="helper-text delisted-msg"></div>
@@ -2495,7 +2501,9 @@
             'inv.select_or_new': 'Select a style from the list, or start a new one.',
             'inv.search_styles': 'Search styles...', 'inv.style_reference': 'Style Reference',
             'inv.base_barcode': 'Base Barcode (scan tag)', 'inv.base_barcode_hint': 'No barcode on the garment? Leave this blank — a reference like "keln-001" (from the category) is assigned automatically. It won\u2019t match future scans the way a real tag barcode would.', 'inv.loaded_existing': 'Loaded existing style — editing.',
-            'inv.delisted_code_prefix': 'This code belongs to the removed style', 'inv.restore_style': 'Restore style', 'toast.style_restored': 'Style restored — add the new stock.', 'toast.barcode_taken': 'This barcode is already in use by another style.', 'inv.barcode_clash_active': 'This code is already used by the style', 'inv.open_style': 'Open style', 'toast.style_open_failed': 'Could not open that style — reload the page and try again.', 'inv.barcode_clash_revert': 'Restore previous code', 'inv.draft_save_confirm': 'This style has unsaved sizes. Save them before leaving?', 'inv.draft_discard_confirm': 'Leave without saving? The unsaved sizes will be lost.', 'toast.price_required': 'Enter a price for every new size — it cannot be €0.',
+            'inv.barcode_change': 'Change', 'inv.barcode_change_title': 'Change the main code',
+            'inv.barcode_change_confirm': 'Change the main code "{code}"?\n\nThis style has {sizes} sizes and {stock} pcs in stock.\n• Labels already printed show the old code as text (their QR codes keep working).\n• Scanning the garment\'s own tag will find this style only under the new code.\n• Size SKUs do not change.\n\nOnly continue if the current code is wrong.',
+            'inv.delisted_code_prefix': 'This code belongs to the removed style','inv.restore_style': 'Restore style', 'toast.style_restored': 'Style restored — add the new stock.', 'toast.barcode_taken': 'This barcode is already in use by another style.', 'inv.barcode_clash_active': 'This code is already used by the style', 'inv.open_style': 'Open style', 'toast.style_open_failed': 'Could not open that style — reload the page and try again.', 'inv.barcode_clash_revert': 'Restore previous code', 'inv.draft_save_confirm': 'This style has unsaved sizes. Save them before leaving?', 'inv.draft_discard_confirm': 'Leave without saving? The unsaved sizes will be lost.', 'toast.price_required': 'Enter a price for every new size — it cannot be €0.',
             'inv.delist_blocked_prefix': 'Can’t delete — there are still', 'inv.delist_blocked_suffix': 'units (on display, in storage or incoming). Write them off or move them first.', 'inv.delist_blocked_server': 'Can’t delete — there is still stock, or an open transfer / pickup reservation. Write off or move the stock first.',
             'inv.product_name': 'Product Name', 'inv.category': 'Category',
             'inv.size_range': 'Size Range', 'inv.size_range_hint': '(printed on labels, e.g. "XS-XL")',
@@ -2896,7 +2904,9 @@
             'inv.select_or_new': 'Pasirinkite modelį iš sąrašo arba pridėkite naują',
             'inv.search_styles': 'Ieškoti modelių...', 'inv.style_reference': 'Modelio informacija',
             'inv.base_barcode': 'Pagrindinis brūkšninis kodas', 'inv.base_barcode_hint': 'Ant drabužio nėra brūkšninio kodo? Palikite tuščią — nuoroda, pvz. „keln-001“ (iš kategorijos), bus priskirta automatiškai. Ji neatpažins būsimų skenavimų taip, kaip tikras kodas ant etiketės.', 'inv.loaded_existing': 'Įkeltas esamas modelis — redaguojama.',
-            'inv.delisted_code_prefix': 'Šis kodas priklauso išimtam modeliui', 'inv.restore_style': 'Atkurti modelį', 'toast.style_restored': 'Modelis atkurtas — pridėkite naujas prekes.', 'toast.barcode_taken': 'Šis brūkšninis kodas jau naudojamas kitam modeliui.', 'inv.barcode_clash_active': 'Šį kodą jau naudoja modelis', 'inv.open_style': 'Atidaryti modelį', 'toast.style_open_failed': 'Modelio atidaryti nepavyko — perkraukite puslapį ir bandykite dar kartą.', 'inv.barcode_clash_revert': 'Grąžinti ankstesnį kodą', 'inv.draft_save_confirm': 'Šiame modelyje yra neišsaugotų dydžių. Išsaugoti prieš išeinant?', 'inv.draft_discard_confirm': 'Išeiti neišsaugojus? Neišsaugoti dydžiai bus prarasti.', 'toast.price_required': 'Įveskite kiekvieno naujo dydžio kainą — ji negali būti 0 €.',
+            'inv.barcode_change': 'Keisti', 'inv.barcode_change_title': 'Keisti pagrindinį kodą',
+            'inv.barcode_change_confirm': 'Keisti pagrindinį kodą „{code}“?\n\nŠis modelis turi {sizes} dydž. ir {stock} vnt. likutyje.\n• Jau atspausdintose etiketėse liks senas kodas (tekstas); jų QR kodai veiks toliau.\n• Skenuojant gamintojo etiketę, modelis bus randamas tik pagal naują kodą.\n• Dydžių SKU nesikeis.\n\nTęskite tik jei dabartinis kodas klaidingas.',
+            'inv.delisted_code_prefix': 'Šis kodas priklauso išimtam modeliui','inv.restore_style': 'Atkurti modelį', 'toast.style_restored': 'Modelis atkurtas — pridėkite naujas prekes.', 'toast.barcode_taken': 'Šis brūkšninis kodas jau naudojamas kitam modeliui.', 'inv.barcode_clash_active': 'Šį kodą jau naudoja modelis', 'inv.open_style': 'Atidaryti modelį', 'toast.style_open_failed': 'Modelio atidaryti nepavyko — perkraukite puslapį ir bandykite dar kartą.', 'inv.barcode_clash_revert': 'Grąžinti ankstesnį kodą', 'inv.draft_save_confirm': 'Šiame modelyje yra neišsaugotų dydžių. Išsaugoti prieš išeinant?', 'inv.draft_discard_confirm': 'Išeiti neišsaugojus? Neišsaugoti dydžiai bus prarasti.', 'toast.price_required': 'Įveskite kiekvieno naujo dydžio kainą — ji negali būti 0 €.',
             'inv.delist_blocked_prefix': 'Negalima ištrinti — dar yra', 'inv.delist_blocked_suffix': 'vnt. (vitrinoje, sandėlyje arba atvyksta). Pirmiausia nurašykite arba perkelkite juos.', 'inv.delist_blocked_server': 'Negalima ištrinti — dar yra prekių arba neužbaigtas pervežimas / rezervacija. Pirmiausia nurašykite arba perkelkite prekes.',
             'inv.product_name': 'Prekės pavadinimas', 'inv.category': 'Kategorija',
             'inv.size_range': 'Dydžių intervalas', 'inv.size_range_hint': '(spausdinama etiketėse, pvz. „XS-XL“)',
@@ -3913,7 +3923,7 @@
                 } else if (activeIsBarcodeField) {
                     resetScanBuffer();
                     resolveScan(barcodeInput.value, false);
-                } else if (active && active.matches && active.matches('.kb-toggle-input') && looksLikeHardwareScan()) {
+                } else if (active && active.matches && active.matches('.kb-toggle-input') && !active.readOnly && looksLikeHardwareScan()) {
                     // Same layout-independence fix as the POS barcode field
                     // above, extended to every other field a hardware
                     // scanner can type into (storage's manual/scan input,
@@ -7871,6 +7881,7 @@
         editingProductId = null;
         blockedBarcode = null;
         ['new_base_barcode','new_name','new_category','new_size_range','new_composition','new_description'].forEach(id => document.getElementById(id).value = '');
+        setBaseBarcodeLock(false);
         document.getElementById('new_supplier').value = '';
         document.getElementById('new_supplier_id').value = '';
         currentPhotoUrls = [];
@@ -7920,6 +7931,7 @@
         syncFeaturedTitleField(p);
         exitStyleDeleteMode();
         document.getElementById('new_base_barcode').value = p.base_barcode || '';
+        setBaseBarcodeLock(!!p.base_barcode);
         document.getElementById('new_name').value = p.name || '';
         document.getElementById('new_category').value = p.category || '';
         document.getElementById('new_size_range').value = p.size_range || '';
@@ -7974,11 +7986,15 @@
         document.getElementById('delistedMsg').style.display = 'none';
         if (!b) return;
         const current = editingProductId ? products.find(p => p.id === editingProductId) : null;
-        if (current && (current.base_barcode || '') === b) return; // unchanged: nothing to look up (and no re-render over typed rows)
+        if (current && (current.base_barcode || '') === b) { setBaseBarcodeLock(!!b); return; } // unchanged: nothing to look up (and no re-render over typed rows)
         const local = products.find(p => p.base_barcode === b && p.id !== editingProductId);
         const info = local ? { id: local.id, name: local.name, active: true } : await findBarcodeOwner(b);
         if (el.value.trim() !== b) return; // changed while we were asking
-        if (!info) { document.getElementById('foundMsg').style.display = 'none'; return; }
+        if (!info) {
+            document.getElementById('foundMsg').style.display = 'none';
+            if (current) setBaseBarcodeLock(true); // a free code on a saved style: autosave writes it, the field locks again
+            return;
+        }
         // Scan-to-find on a blank form: jump straight to that style, as before.
         if (info.active && !editingProductId && !formHasWorkBeyondBarcode()) {
             if (!products.find(p => p.id === info.id)) await loadInventory();
@@ -8020,6 +8036,33 @@
         document.getElementById('new_base_barcode').value = p ? (p.base_barcode || '') : '';
         blockedBarcode = null;
         document.getElementById('delistedMsg').style.display = 'none';
+        setBaseBarcodeLock(!!(p && p.base_barcode));
+    }
+
+    // A saved style's main code is printed on its labels and is what the garment's
+    // own tag scans as, so it is locked on an open style: a stray scan or keystroke
+    // in this field used to overwrite it and autosave (style 1323 became "14").
+    // Changing it is still allowed, through the Change button and one warning.
+    function setBaseBarcodeLock(locked) {
+        const el = document.getElementById('new_base_barcode');
+        const btn = document.getElementById('baseBarcodeChangeBtn');
+        el.readOnly = locked;
+        btn.classList.toggle('hidden', !locked || !isManagerOrAdmin());
+    }
+
+    function unlockBaseBarcode() {
+        const p = editingProductId ? products.find(x => x.id === editingProductId) : null;
+        if (!p) return;
+        const stock = p.variants.reduce((sum, v) => sum + Object.values(v.stockByLocation || {}).reduce((s, l) => s + (Number(l.quantity) || 0), 0), 0);
+        const msg = t('inv.barcode_change_confirm')
+            .replace('{code}', p.base_barcode || '')
+            .replace('{sizes}', p.variants.length)
+            .replace('{stock}', stock);
+        if (!confirm(msg)) return;
+        setBaseBarcodeLock(false);
+        const el = document.getElementById('new_base_barcode');
+        el.focus();
+        el.select();
     }
 
     async function openClashStyle(id) {
