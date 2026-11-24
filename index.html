@@ -636,6 +636,66 @@
         .shp-chip.empty { background: transparent; border: 1px dashed rgba(36,22,30,0.16); color: var(--text-secondary); }
         .shp-chip.sold { box-shadow: 0 0 0 1.5px var(--text-primary); }
         .shp-none { font-size: 0.78rem; color: var(--danger-color); font-weight: 600; }
+
+        /* Prekių Katalogas (admin): one row per style, one shared size axis.
+           Cells reuse the stock-popup chip shell, count only (column = size). */
+        .cat-head-tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .cat-head-tools .form-input { width: auto; height: 40px; padding: 0 10px; font-size: 0.86rem; background: var(--card-bg); }
+        .cat-search { position: relative; }
+        .cat-search .form-input { width: min(340px, 70vw); padding: 0 32px 0 34px; }
+        .cat-search > .fa-magnifying-glass { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-secondary); font-size: 0.85rem; pointer-events: none; }
+        .cat-search-clear { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); border: 0; background: none; color: var(--text-secondary); width: 28px; height: 28px; border-radius: 6px; cursor: pointer; }
+        .cat-search-clear:hover { background: var(--input-bg); }
+        .cat-stats { color: var(--text-secondary); font-size: 0.82rem; font-variant-numeric: tabular-nums; margin-top: 2px; }
+        .cat-stats b { color: var(--text-primary); font-weight: 600; }
+        .cat-legend { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; font-size: 0.74rem; color: var(--text-secondary); margin: -8px 0 10px; }
+        .cat-legend > span { display: inline-flex; gap: 5px; align-items: center; }
+        .cat-wrap { flex: 1; min-height: 0; overflow: auto; background: var(--card-bg); border: var(--glass-border); border-radius: 12px; }
+        .cat-table { border-collapse: separate; border-spacing: 0; width: 100%; font-variant-numeric: tabular-nums; }
+        .cat-table thead th { position: sticky; background: var(--card-bg); z-index: 3; font-weight: 600; color: var(--text-primary); text-align: center; white-space: nowrap; }
+        .cat-table tr.cat-band th { top: 0; height: 22px; font-size: 0.68rem; color: var(--text-secondary); letter-spacing: 0.04em; padding: 4px 0 0; }
+        .cat-table tr.cat-band th.cat-b { border-bottom: 1.5px solid rgba(36,22,30,0.14); }
+        .cat-table tr.cat-nums th { top: 22px; height: 32px; font-size: 0.8rem; border-bottom: 1px solid rgba(36,22,30,0.14); padding: 0 2px; }
+        .cat-table .cat-l { text-align: left; }
+        .cat-table th.cat-sort { cursor: pointer; user-select: none; }
+        .cat-table th.cat-sort i { margin-left: 4px; font-size: 0.7rem; color: var(--text-secondary); }
+        .cat-table .cat-div { border-left: 2px solid rgba(36,22,30,0.14); }
+        .cat-table .cat-s1 { position: sticky; left: 0; z-index: 2; background: inherit; }
+        .cat-table .cat-s2 { position: sticky; left: 78px; z-index: 2; background: inherit; box-shadow: 6px 0 8px -8px var(--shadow-color); }
+        .cat-table thead .cat-s1, .cat-table thead .cat-s2 { z-index: 4; background: var(--card-bg); }
+        .cat-table tbody tr { background: var(--card-bg); height: 38px; }
+        .cat-table tbody tr:nth-child(even) { background: #FCFAFB; }
+        .cat-table tbody td { border-bottom: var(--glass-border); padding: 0 3px; text-align: center; white-space: nowrap; }
+        .cat-table tbody tr.cat-on { background: #F2ECEF; }
+        .cat-table tbody tr.cat-on td.cat-s1 { box-shadow: inset 3px 0 0 var(--accent-color); }
+        .cat-table td.cat-hz { cursor: pointer; }
+        .cat-table td.cat-code { width: 78px; min-width: 78px; padding-left: 14px; font-weight: 600; font-size: 0.84rem; }
+        .cat-table td.cat-name { min-width: 210px; max-width: 320px; padding-right: 10px; }
+        .cat-nm { display: block; overflow: hidden; text-overflow: ellipsis; font-size: 0.84rem; font-weight: 500; }
+        .cat-sub { display: block; overflow: hidden; text-overflow: ellipsis; font-size: 0.7rem; color: var(--text-secondary); margin-top: 1px; }
+        .cat-table td.cat-tot { width: 58px; min-width: 58px; font-weight: 700; font-size: 0.9rem; }
+        .cat-table .cat-sz { width: 46px; min-width: 46px; max-width: 46px; }
+        .cat-table .cat-sz.cat-wide { width: auto; max-width: none; min-width: 60px; padding-right: 12px; }
+        .cat-table mark { background: #F6E2B8; color: inherit; border-radius: 2px; padding: 0 1px; }
+        .cat-c { display: inline-flex; align-items: center; justify-content: center; gap: 3px; min-width: 34px; height: 22px; padding: 0 5px; border-radius: 6px; font-size: 0.78rem; font-weight: 700; background: var(--input-bg); color: var(--text-primary); }
+        .cat-c.q2 { background: #EADFE4; }
+        .cat-c.q5 { background: var(--accent-tint); color: var(--accent-color); box-shadow: inset 0 0 0 1px rgba(107,37,69,0.18); }
+        .cat-c i { font-style: normal; font-weight: 600; font-size: 0.6rem; color: var(--text-secondary); letter-spacing: 0.02em; }
+        .cat-c.q5 i { color: var(--accent-color); opacity: 0.75; }
+        .cat-c.e { background: transparent; border: 1px dashed rgba(36,22,30,0.26); color: rgba(36,22,30,0.38); font-weight: 400; }
+        .cat-empty { padding: 48px 16px; text-align: center; color: var(--text-secondary); }
+        .cat-pv-zero { font-size: 0.76rem; color: var(--text-secondary); margin-bottom: 10px; }
+        .cat-pv-zero b { font-weight: 600; color: var(--text-primary); }
+        .cat-pv-sales { margin-top: 4px; padding-top: 8px; border-top: var(--glass-border); }
+        .cat-pv-sales-head { display: flex; justify-content: space-between; gap: 16px; font-size: 0.78rem; font-weight: 600; color: var(--text-primary); margin-bottom: 4px; }
+        .cat-pv-sales-head span { font-weight: 400; color: var(--text-secondary); }
+        .cat-pv-lines { display: grid; grid-template-columns: 44px 1fr auto auto; gap: 2px 10px; align-items: center; font-size: 0.76rem; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+        .cat-pv-lines .d, .cat-pv-lines .loc { color: var(--text-secondary); }
+        .cat-pv-lines .loc { font-size: 0.7rem; }
+        .cat-pv-lines .q { font-weight: 600; }
+        .cat-pv-lines .shp-dot { display: inline-block; vertical-align: -1px; }
+        .cat-pv-none { font-size: 0.76rem; color: var(--text-secondary); }
+        @media (pointer: coarse) { .cat-table tbody tr { height: 46px; } }
         .bulk-price-bar { display:flex; align-items:center; gap:8px; background: var(--input-bg); border-radius: 9px; padding: 8px 10px; margin-bottom: 10px; flex-wrap:wrap; }
         .bulk-price-bar label { font-size: 0.72rem; color: var(--text-secondary); }
         .bulk-price-bar input { width: 70px; background: var(--card-bg); border: 1px solid rgba(36,22,30,0.14); border-radius: 6px; padding: 5px 7px; font-size: 0.78rem; color: var(--text-primary); outline:none; }
@@ -988,6 +1048,7 @@
          so it's never clipped by a scrolling table wrapper. -->
     <div id="imgHoverPreview" class="img-hover-preview"><img id="imgHoverPreviewImg" class="hover-thumb" alt=""></div>
     <div id="stockHoverPreview" class="stock-hover-preview" role="tooltip"></div>
+    <div id="catPreview" class="stock-hover-preview" role="tooltip"></div>
 
     <!-- LOGIN SCREEN -->
     <div id="loginOverlay">
@@ -1020,6 +1081,7 @@
             <div class="nav-btn" data-view="dailysales" onclick="switchView('dailysales')" title="Daily Sales" data-i18n-title="nav.dailysales"><i class="fas fa-receipt"></i></div>
             <div class="nav-btn" id="navDashboard" data-view="dashboard" onclick="switchView('dashboard')" title="Dashboard" data-i18n-title="nav.dashboard"><i class="fas fa-chart-line"></i></div>
             <div class="nav-btn" id="navSuppliers" data-view="suppliers" onclick="switchView('suppliers')" title="Suppliers" data-i18n-title="nav.suppliers"><i class="fas fa-clipboard-list"></i></div>
+            <div class="nav-btn" id="navCatalog" data-view="catalog" onclick="switchView('catalog')" title="Product Catalogue" data-i18n-title="nav.catalog" style="display:none"><i class="fas fa-table-list"></i></div>
             <div class="nav-spacer"></div>
             <!-- Open to every role — no display:none role gate the way
                  navInventory/navDashboard/navSuppliers get above. Storage
@@ -1351,6 +1413,36 @@
             </div>
 
             <!-- SUPPLIERS VIEW (admin/manager only) -->
+            <!-- PREKIŲ KATALOGAS (admin only) — stock matrix, one row per style -->
+            <div id="view-catalog" class="view-section">
+                <div class="header-row">
+                    <div>
+                        <h1 data-i18n="cat.title">Product Catalogue</h1>
+                        <div class="cat-stats" id="catStats"></div>
+                    </div>
+                    <div class="cat-head-tools">
+                        <select class="form-input" id="catCategory" onchange="renderCatalog()" aria-label="Category"></select>
+                        <label class="cat-search">
+                            <i class="fas fa-magnifying-glass"></i>
+                            <input type="text" class="form-input kb-toggle-input" inputmode="none" id="catSearch" autocomplete="off" placeholder="Search: code, name, supplier, colour…" data-i18n-placeholder="cat.search_placeholder" oninput="onCatalogSearch()">
+                            <button type="button" class="cat-search-clear hidden" id="catSearchClear" onclick="clearCatalogSearch()" title="Clear" data-i18n-title="cat.clear"><i class="fas fa-xmark"></i></button>
+                        </label>
+                    </div>
+                </div>
+                <div class="cat-legend">
+                    <span><span class="cat-c">1</span><span class="cat-c q2">3</span><span class="cat-c q5">6</span> <span data-i18n="cat.legend_stock">stock in both shops</span></span>
+                    <span><span class="cat-c e">·</span> <span data-i18n="cat.legend_soldout">size exists, sold out</span></span>
+                    <span><span class="cat-c"><i>XL</i>2</span> <span data-i18n="cat.legend_letter">letter size in its place on the scale</span></span>
+                </div>
+                <div class="cat-wrap" id="catWrap">
+                    <table class="cat-table">
+                        <thead id="catHead"></thead>
+                        <tbody id="catBody"></tbody>
+                    </table>
+                    <div class="cat-empty hidden" id="catEmpty" data-i18n="cat.empty">Nothing found. Try a shorter word or clear the search.</div>
+                </div>
+            </div>
+
             <div id="view-suppliers" class="view-section">
                 <div class="header-row"><h1 data-i18n="sup.title">Suppliers</h1></div>
                 <div class="split-layout">
@@ -2225,6 +2317,13 @@
             'nav.pos': 'POS', 'nav.inventory': 'Inventory', 'nav.requests': 'Transfers',
             'nav.register': 'Cash Register', 'nav.dailysales': 'Daily Sales', 'nav.dashboard': 'Dashboard',
             'nav.suppliers': 'Suppliers', 'nav.logout': 'Log out',
+            'nav.catalog': 'Product Catalogue', 'cat.title': 'Product Catalogue', 'cat.search_placeholder': 'Search: code, name, supplier, colour…', 'cat.clear': 'Clear',
+            'cat.all_categories': 'All categories', 'cat.col_code': 'Code', 'cat.col_item': 'Item', 'cat.col_total': 'Total', 'cat.col_one': 'One',
+            'cat.col_other': 'Other', 'cat.styles': 'styles', 'cat.pcs_both': 'pcs in both shops', 'cat.found': 'Found', 'cat.of': 'of', 'cat.pcs': 'pcs',
+            'cat.legend_stock': 'stock in both shops', 'cat.legend_soldout': 'size exists, sold out', 'cat.legend_letter': 'letter size in its place on the scale',
+            'cat.empty': 'Nothing found. Try a shorter word or clear the search.', 'cat.none_here': 'none', 'cat.sales': 'Sales', 'cat.sales_30d': 'Sales · 30 d.:',
+            'cat.last': 'last', 'cat.today': 'today', 'cat.yesterday': 'yesterday', 'cat.days_ago_prefix': '', 'cat.days_ago_suffix': 'd. ago',
+            'cat.no_sales_90': 'Not sold in 90 days', 'cat.sold_total': 'all time', 'cat.never_sold': 'No sales yet', 'cat.sales_failed': 'Could not load sales',
             'common.save': 'Save', 'common.cancel': 'Cancel', 'common.clear': 'Clear', 'common.close': 'Close',
             'common.confirm': 'Confirm', 'common.loading': 'Loading...', 'common.none': 'None', 'common.optional': 'Optional', 'common.no_photo': 'No photo',
             'common.active': 'Active', 'common.inactive': 'Inactive', 'common.notes': 'Notes',
@@ -2619,6 +2718,13 @@
             'nav.pos': 'Kasa', 'nav.inventory': 'Prekės', 'nav.requests': 'Pervežimai',
             'nav.register': 'Kasos aparatas', 'nav.dailysales': 'Dienos pardavimai', 'nav.dashboard': 'Suvestinė',
             'nav.suppliers': 'Tiekėjai', 'nav.logout': 'Atsijungti',
+            'nav.catalog': 'Prekių katalogas', 'cat.title': 'Prekių katalogas', 'cat.search_placeholder': 'Ieškoti: kodas, pavadinimas, tiekėjas, spalva…', 'cat.clear': 'Išvalyti',
+            'cat.all_categories': 'Visos kategorijos', 'cat.col_code': 'Kodas', 'cat.col_item': 'Prekė', 'cat.col_total': 'Iš viso', 'cat.col_one': 'Vnt.',
+            'cat.col_other': 'Kita', 'cat.styles': 'modeliai', 'cat.pcs_both': 'vnt. abiejose parduotuvėse', 'cat.found': 'Rasta', 'cat.of': 'iš', 'cat.pcs': 'vnt.',
+            'cat.legend_stock': 'likutis abiejose parduotuvėse', 'cat.legend_soldout': 'dydis yra, bet išparduotas', 'cat.legend_letter': 'raidinis dydis savo vietoje skalėje',
+            'cat.empty': 'Nieko nerasta. Pabandykite trumpesnį žodį arba išvalykite paiešką.', 'cat.none_here': 'nėra', 'cat.sales': 'Pardavimai', 'cat.sales_30d': 'Pardavimai · 30 d.:',
+            'cat.last': 'paskutinis', 'cat.today': 'šiandien', 'cat.yesterday': 'vakar', 'cat.days_ago_prefix': 'prieš', 'cat.days_ago_suffix': 'd.',
+            'cat.no_sales_90': 'Per 90 d. neparduota', 'cat.sold_total': 'iš viso', 'cat.never_sold': 'Pardavimų dar nebuvo', 'cat.sales_failed': 'Nepavyko įkelti pardavimų',
             'common.save': 'Išsaugoti', 'common.cancel': 'Atšaukti', 'common.clear': 'Išvalyti', 'common.close': 'Uždaryti',
             'common.confirm': 'Patvirtinti', 'common.loading': 'Kraunama...', 'common.none': 'Nėra', 'common.optional': 'Neprivaloma', 'common.no_photo': 'Nuotraukos nėra',
             'common.active': 'Aktyvus', 'common.inactive': 'Neaktyvus', 'common.notes': 'Pastabos',
@@ -3444,6 +3550,7 @@
         document.getElementById('navDashboard').style.display = (PROFILE.role === 'admin' || PROFILE.role === 'manager') ? 'flex' : 'none';
         document.getElementById('navSuppliers').style.display = (PROFILE.role === 'admin' || PROFILE.role === 'manager') ? 'flex' : 'none';
         document.getElementById('navOverridePin').style.display = (PROFILE.role === 'admin' || PROFILE.role === 'manager') ? 'flex' : 'none';
+        document.getElementById('navCatalog').style.display = PROFILE.role === 'admin' ? 'flex' : 'none'; // admin only for now
         updateCachedLoginBanner();
         toast(t('offline.profile_reverified_toast'), 'success');
     }
@@ -3596,6 +3703,7 @@
         document.getElementById('navDashboard').style.display = (PROFILE.role === 'admin' || PROFILE.role === 'manager') ? 'flex' : 'none';
         document.getElementById('navSuppliers').style.display = (PROFILE.role === 'admin' || PROFILE.role === 'manager') ? 'flex' : 'none';
         document.getElementById('navOverridePin').style.display = (PROFILE.role === 'admin' || PROFILE.role === 'manager') ? 'flex' : 'none';
+        document.getElementById('navCatalog').style.display = PROFILE.role === 'admin' ? 'flex' : 'none'; // admin only for now
         updateCachedLoginBanner();
         initWeatherWidget(); // fire-and-forget, never blocks app boot
         deviceCheckIn();     // fire-and-forget, observe-only (see DEVICES section)
@@ -4227,6 +4335,7 @@
         renderCategoryFilterBar();
         renderProducts(applyPosFilters(products));
         if (document.getElementById('view-inventory').classList.contains('active')) renderProductsList();
+        if (catalogViewActive()) scheduleCatalogRender(0);
     }
 
     // QA-AUDIT FIX: stock shown anywhere in the POS grid/variant picker must
@@ -10995,6 +11104,7 @@
             if (productId !== null) affectedProductIds.add(productId);
         }
         if (affectedProductIds.size === 0) return;
+        if (catalogViewActive()) scheduleCatalogRender(1500);
 
         if (document.getElementById('view-pos').classList.contains('active')) {
             // Patch only the specific cards that actually changed, in
@@ -13745,6 +13855,323 @@ ${qrBlock}${field(skuT.g, qrColX, skuT.y)}${field(colourT.g, qrColX, colourT.y)}
     /* ============================================================
        VIEW SWITCHING
        ============================================================ */
+    /* ============================================================
+       PREKIŲ KATALOGAS (admin only): one row per style, one shared size
+       axis for EU numbers / letters / ONE, each cell = stock in both shops,
+       all colours summed. Stock comes from the in-memory `products` (the
+       admin catalogue load already carries every store's quantity), so it
+       costs no queries and follows realtime patches. Hovering the code, name
+       or total opens the stock popup plus recent sales, which come from
+       rpc_get_sales_by_variant (admin sees both shops), read once per visit.
+       ============================================================ */
+    const CAT_SIZE_ALIAS = { XXL: '2XL', XXXL: '3XL' };
+    // Where letter sizes sit on the numeric scale (plus-size placement,
+    // accepted with the mockup on 2026-11-25). Change here only.
+    const CAT_LETTER_AT = { XS: 40, S: 42, M: 44, L: 46, XL: 50, '2XL': 54, '3XL': 58, '4XL': 62, '5XL': 64, '6XL': 66, '7XL': 68, '8XL': 70 };
+    const CAT_COLS = ['≤38', '40', '42', '44', '46', '48', '50', '52', '54', '56', '58', '60', '62+', 'ONE', 'OTHER'];
+    const CAT_BANDS = [['', 1], ['XS', 1], ['S', 1], ['M', 1], ['L', 2], ['XL', 2], ['2XL', 2], ['3XL', 2], ['4XL+', 1], ['', 1], ['', 1]]; // [label, colspan] over CAT_COLS
+    const CAT_SALES_DAYS = 90;
+    let catSales = null;            // Map<productId, [{d, color, hex, size, qty, loc}]> newest first; null until loaded
+    let catSalesFailed = false;
+    let catSalesPromise = null;
+    let catView = [];
+    let catSortKey = 'code', catSortDir = 1;
+    let catRenderTimer = null, catSearchTimer = null, catHoverTimer = null;
+    let catOpenRow = null, catPinned = false, catXY = [0, 0], catWired = false;
+
+    const catalogViewActive = () => document.getElementById('view-catalog').classList.contains('active');
+    const catCanon = s => { const x = String(s).trim().toUpperCase(); return CAT_SIZE_ALIAS[x] || x; };
+    const catNumCol = n => n <= 38 ? '≤38' : n >= 62 ? '62+' : String(n % 2 ? n - 1 : n);
+    function catSizeCol(raw) {
+        const s = catCanon(raw);
+        if (/^\d{2}$/.test(s) && +s >= 30) return { col: catNumCol(+s), tag: (+s <= 38 || +s >= 62) ? s : '' };
+        const dbl = s.match(/^(\d{2})\/(\d{2})$/);
+        if (dbl) return { col: catNumCol(+dbl[1]), tag: s };
+        if (s in CAT_LETTER_AT) return { col: catNumCol(CAT_LETTER_AT[s]), tag: s };
+        if (s === 'ONE') return { col: 'ONE', tag: '' };
+        return { col: 'OTHER', tag: s };
+    }
+    function catSizeRank(raw) {
+        const s = catCanon(raw);
+        if (/^\d{1,2}$/.test(s)) return +s < 30 ? 500 + +s : +s;
+        const dbl = s.match(/^(\d{2})\//); if (dbl) return +dbl[1] + 0.5;
+        if (s in CAT_LETTER_AT) return CAT_LETTER_AT[s] - 0.1;
+        if (s === 'ONE') return 1000;
+        return 2000;
+    }
+    const catCmpSize = (a, b) => (catSizeRank(a) - catSizeRank(b)) || String(a).localeCompare(String(b), 'lt', { numeric: true });
+    const catFold = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    const catCategoryLabel = c => c ? c.replace(/\s+\d+$/, '').replace(/\s{2,}/g, ' ') : '—';
+    const catCodeKey = c => String(c || '').split(/[-.]/).map(x => x.padStart(6, '0')).join('-');
+    const catQty = (v, st) => Math.max(0, v.stockByLocation[st.id] ? v.stockByLocation[st.id].quantity : 0);
+
+    function catBuildRows() {
+        const supName = new Map(supplierPicker.map(s => [String(s.id), s.name]));
+        const rows = [];
+        for (const p of products) {
+            const cells = {}; let total = 0;
+            for (const v of p.variants) {
+                const { col, tag } = catSizeCol(v.size);
+                const cell = cells[col] || (cells[col] = { q: 0, tags: new Set(), labels: new Set() });
+                const q = STORES.reduce((a, st) => a + catQty(v, st), 0);
+                cell.q += q; total += q;
+                if (q > 0) { if (tag) cell.tags.add(tag); cell.labels.add(catCanon(v.size)); }
+            }
+            if (total <= 0) continue; // the catalogue lists what is on hand
+            const supplier = supName.get(String(p.supplierId)) || '';
+            const colorNames = [...new Set(p.variants.map(v => v.colorName))];
+            rows.push({ p, cells, total, supplier, cat: catCategoryLabel(p.category),
+                hay: catFold([p.base_barcode, p.name, p.category, supplier, p.size_range, p.composition, ...colorNames].join(' ')) });
+        }
+        return rows;
+    }
+
+    function catHighlight(text, terms) {
+        const s = String(text || '');
+        if (!terms.length) return escapeHtml(s);
+        const f = catFold(s);
+        if (f.length !== s.length) return escapeHtml(s); // folding changed the length — skip marks rather than misplace them
+        const marks = new Array(s.length).fill(false);
+        for (const tm of terms) { let i = f.indexOf(tm); while (i > -1) { for (let k = i; k < i + tm.length; k++) marks[k] = true; i = f.indexOf(tm, i + tm.length); } }
+        let html = '', open = false;
+        for (let i = 0; i < s.length; i++) {
+            if (marks[i] && !open) { html += '<mark>'; open = true; }
+            if (!marks[i] && open) { html += '</mark>'; open = false; }
+            html += escapeHtml(s[i]);
+        }
+        return html + (open ? '</mark>' : '');
+    }
+
+    function catCellHTML(cell, col) {
+        if (!cell) return '';
+        if (cell.q <= 0) return `<span class="cat-c e">·</span>`;
+        const cls = cell.q >= 5 ? ' q5' : cell.q >= 2 ? ' q2' : '';
+        let tag = '';
+        if (cell.tags.size) {
+            const tg = [...cell.tags].sort(catCmpSize);
+            tag = tg.length > 2 || ((col === '≤38' || col === '62+' || col === 'OTHER') && tg.length > 1) ? `${tg[0]}–${tg[tg.length - 1]}` : tg.join('·');
+        }
+        const title = [...cell.labels].sort(catCmpSize).join(', ');
+        return `<span class="cat-c${cls}" title="${escapeHtml(title)}">${tag ? `<i>${escapeHtml(tag)}</i>` : ''}${cell.q}</span>`;
+    }
+
+    function renderCatalogHead() {
+        const arrow = k => catSortKey === k ? (catSortDir > 0 ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort';
+        const colLabel = c => c === 'ONE' ? t('cat.col_one') : c === 'OTHER' ? t('cat.col_other') : c;
+        let i = 0;
+        const bands = CAT_BANDS.map(([label, span]) => { const first = i; i += span; return `<th colspan="${span}" class="${label ? 'cat-b' : ''}${first >= 13 ? ' cat-div' : ''}">${label}</th>`; }).join('');
+        document.getElementById('catHead').innerHTML =
+            `<tr class="cat-band"><th class="cat-s1"></th><th class="cat-s2"></th><th></th>${bands}</tr>
+             <tr class="cat-nums"><th class="cat-l cat-s1 cat-sort" data-sort="code" style="padding-left:14px">${t('cat.col_code')}<i class="fas ${arrow('code')}"></i></th>
+             <th class="cat-l cat-s2">${t('cat.col_item')}</th>
+             <th class="cat-sort" data-sort="total">${t('cat.col_total')}<i class="fas ${arrow('total')}"></i></th>
+             ${CAT_COLS.map((c, k) => `<th class="cat-sz${k >= 13 ? ' cat-div' : ''}${k === 14 ? ' cat-wide' : ''}">${colLabel(c)}</th>`).join('')}</tr>`;
+    }
+
+    function renderCatalog() {
+        if (!catalogViewActive()) return;
+        catClosePreview();
+        const rows = catBuildRows();
+        const terms = catFold(document.getElementById('catSearch').value).split(/\s+/).filter(Boolean);
+        const catSel = document.getElementById('catCategory');
+        const cats = [...new Set(rows.map(r => r.cat))].sort((a, b) => a.localeCompare(b, 'lt'));
+        const chosen = catSel.value;
+        catSel.innerHTML = `<option value="">${t('cat.all_categories')}</option>` + cats.map(c => `<option${c === chosen ? ' selected' : ''}>${escapeHtml(c)}</option>`).join('');
+        const cat = cats.includes(chosen) ? chosen : '';
+        catView = rows.filter(r => (!cat || r.cat === cat) && terms.every(tm => r.hay.includes(tm)));
+        catView.sort((a, b) => catSortKey === 'total'
+            ? (a.total - b.total) * catSortDir || catCodeKey(a.p.base_barcode).localeCompare(catCodeKey(b.p.base_barcode))
+            : catCodeKey(a.p.base_barcode).localeCompare(catCodeKey(b.p.base_barcode)) * catSortDir);
+        const units = catView.reduce((s, r) => s + r.total, 0), allUnits = rows.reduce((s, r) => s + r.total, 0);
+        document.getElementById('catStats').innerHTML = catView.length === rows.length
+            ? `<b>${rows.length}</b> ${t('cat.styles')} · <b>${allUnits.toLocaleString(currentLocale())}</b> ${t('cat.pcs_both')}`
+            : `${t('cat.found')} <b>${catView.length}</b> ${t('cat.of')} ${rows.length} · <b>${units.toLocaleString(currentLocale())}</b> ${t('cat.pcs')}`;
+        document.getElementById('catEmpty').classList.toggle('hidden', catView.length > 0);
+        document.getElementById('catBody').innerHTML = catView.map((r, i) => {
+            const sub = [r.cat, r.supplier].filter(x => x && x.trim()).join(' · ');
+            return `<tr data-i="${i}">
+                <td class="cat-l cat-code cat-s1 cat-hz">${catHighlight(r.p.base_barcode || '—', terms)}</td>
+                <td class="cat-l cat-name cat-s2 cat-hz"><span class="cat-nm">${catHighlight(r.p.name, terms)}</span><span class="cat-sub">${catHighlight(sub, terms)}</span></td>
+                <td class="cat-tot cat-hz">${r.total}</td>
+                ${CAT_COLS.map((c, k) => `<td class="cat-sz${k >= 13 ? ' cat-div' : ''}${k === 14 ? ' cat-wide' : ''}">${catCellHTML(r.cells[c], c)}</td>`).join('')}
+            </tr>`;
+        }).join('');
+    }
+
+    // Realtime patches / reloads re-render, but never under an open popup.
+    function scheduleCatalogRender(delay) {
+        clearTimeout(catRenderTimer);
+        catRenderTimer = setTimeout(function run() {
+            if (catOpenRow) { catRenderTimer = setTimeout(run, 1000); return; }
+            renderCatalog();
+        }, delay);
+    }
+
+    function onCatalogSearch() {
+        document.getElementById('catSearchClear').classList.toggle('hidden', !document.getElementById('catSearch').value);
+        clearTimeout(catSearchTimer);
+        catSearchTimer = setTimeout(renderCatalog, 120);
+    }
+    function clearCatalogSearch() {
+        const box = document.getElementById('catSearch');
+        box.value = '';
+        document.getElementById('catSearchClear').classList.add('hidden');
+        renderCatalog();
+    }
+
+    async function catLoadSales() {
+        const from = new Date(Date.now() - CAT_SALES_DAYS * 864e5).toISOString();
+        const PAGE = 1000, all = [];
+        for (let start = 0; ; start += PAGE) {
+            const { data, error } = await sb.rpc('rpc_get_sales_by_variant', { p_location_id: null, p_date_from: from, p_date_to: null })
+                .select('order_item_id, product_id, created_at, status, is_refunded, color_name, color_hex, size, quantity, location_id')
+                .order('order_item_id').range(start, start + PAGE - 1);
+            if (error) throw error;
+            all.push(...(data || []));
+            if ((data || []).length < PAGE) break;
+        }
+        const map = new Map();
+        for (const r of all) {
+            if (r.status !== 'COMPLETED' || r.is_refunded) continue;
+            const pid = Number(r.product_id);
+            if (!map.has(pid)) map.set(pid, []);
+            map.get(pid).push({ d: new Date(r.created_at), color: r.color_name, hex: r.color_hex, size: r.size, qty: r.quantity, loc: r.location_id });
+        }
+        for (const list of map.values()) list.sort((a, b) => b.d - a.d);
+        return map;
+    }
+
+    function openCatalogView() {
+        catWireEvents();
+        renderCatalogHead();
+        renderCatalog();
+        // Fresh sales once per visit; the popup shows "loading" until they land.
+        catSales = null; catSalesFailed = false;
+        const p = catSalesPromise = catLoadSales()
+            .then(map => { if (p === catSalesPromise) catSales = map; })
+            .catch(err => { console.warn('catalog sales', err && err.message); if (p === catSalesPromise) { catSales = new Map(); catSalesFailed = true; } })
+            .finally(() => { if (p === catSalesPromise && catOpenRow) catOpenPreview(catOpenRow); });
+    }
+
+    function catAgo(d) {
+        const days = Math.floor((new Date().setHours(0, 0, 0, 0) - new Date(d).setHours(0, 0, 0, 0)) / 864e5);
+        if (days <= 0) return t('cat.today');
+        if (days === 1) return t('cat.yesterday');
+        return `${t('cat.days_ago_prefix')} ${days} ${t('cat.days_ago_suffix')}`.trim();
+    }
+
+    function catSalesHTML(p) {
+        if (!catSales) return `<div class="cat-pv-sales"><div class="cat-pv-sales-head">${t('cat.sales')}<span>${t('common.loading')}</span></div></div>`;
+        if (catSalesFailed) return `<div class="cat-pv-sales"><div class="cat-pv-sales-head">${t('cat.sales')}</div><div class="cat-pv-none">${t('cat.sales_failed')}</div></div>`;
+        const list = catSales.get(p.id) || [];
+        if (!list.length) {
+            const ever = productSalesRank.get(p.id) || 0;
+            const txt = ever > 0 ? `${t('cat.no_sales_90')} · ${t('cat.sold_total')} ${ever} ${t('cat.pcs')}` : t('cat.never_sold');
+            return `<div class="cat-pv-sales"><div class="cat-pv-sales-head">${t('cat.sales')}</div><div class="cat-pv-none">${txt}</div></div>`;
+        }
+        const since = Date.now() - 30 * 864e5;
+        const sold30 = list.filter(s => s.d.getTime() >= since).reduce((a, s) => a + s.qty, 0);
+        const storeName = id => (STORES.find(s => s.id === id) || {}).name || '';
+        const lines = list.slice(0, 5).map(s => {
+            const dd = `${String(s.d.getMonth() + 1).padStart(2, '0')}.${String(s.d.getDate()).padStart(2, '0')}`;
+            return `<span class="d">${dd}</span><span><span class="shp-dot" style="background:${escapeHtml(s.hex || 'transparent')}"></span>${escapeHtml(s.color)} <b>${escapeHtml(s.size)}</b></span><span class="q">${s.qty} ${t('cat.pcs')}</span><span class="loc">${escapeHtml(storeName(s.loc))}</span>`;
+        }).join('');
+        return `<div class="cat-pv-sales"><div class="cat-pv-sales-head">${t('cat.sales_30d')} ${sold30} ${t('cat.pcs')}<span>${t('cat.last')} ${catAgo(list[0].d)}</span></div><div class="cat-pv-lines">${lines}</div></div>`;
+    }
+
+    function catPreviewHTML(r) {
+        const p = r.p;
+        const colors = [], byColor = new Map();
+        for (const v of p.variants) {
+            if (!byColor.has(v.colorId)) { const c = { id: v.colorId, name: v.colorName, hex: v.colorHex, image: v.colorImage, bySize: new Map() }; byColor.set(v.colorId, c); colors.push(c); }
+            byColor.get(v.colorId).bySize.set(v.size, v);
+        }
+        const sizes = [...new Set(p.variants.filter(v => STORES.some(st => catQty(v, st) > 0)).map(v => v.size))].sort(catCmpSize);
+        const stores = STORES.map(st => {
+            const total = p.variants.reduce((a, v) => a + catQty(v, st), 0);
+            if (!total) return `<div class="cat-pv-zero"><b>${escapeHtml(st.name)}</b> · ${t('cat.none_here')}</div>`;
+            const rows = colors.filter(c => [...c.bySize.values()].some(v => catQty(v, st) > 0)).map(c => {
+                const chips = sizes.map(sz => {
+                    const v = c.bySize.get(sz), n = v ? catQty(v, st) : 0;
+                    return n > 0 ? `<span class="shp-chip${n <= 2 ? ' low' : ''}">${escapeHtml(sz)} <b>${n}</b></span>` : `<span class="shp-chip empty">${escapeHtml(sz)}</span>`;
+                }).join('');
+                return `<div class="shp-row"><span class="shp-color" title="${escapeHtml(c.name)}"><span class="shp-dot" style="background:${escapeHtml(c.hex || 'transparent')}"></span><span class="shp-color-name">${escapeHtml(c.name)}</span></span><span class="shp-chips">${chips}</span></div>`;
+            }).join('');
+            return `<div class="shp-store"><div class="shp-store-head">${escapeHtml(st.name)}<span>${total} ${t('ds.hover_pcs')}</span></div>${rows}</div>`;
+        }).join('');
+        const img = p.image_url || (colors.find(c => c.image) || {}).image || '';
+        const price = p.defaultPrice != null ? p.defaultPrice : Math.max(0, ...p.variants.map(v => Number(v.price) || 0));
+        const meta = [p.base_barcode || '—', r.supplier, price ? money(price) : ''].filter(Boolean).map(escapeHtml).join(' · ');
+        return `${photoTagHTML(img, 'shp-photo', true, null, true)}<div class="shp-body"><p class="shp-name">${escapeHtml(p.name)}</p><div class="shp-code">${meta}</div>${stores}${catSalesHTML(p)}</div>`;
+    }
+
+    function catOpenPreview(tr) {
+        const r = catView[Number(tr.dataset.i)];
+        if (!r) return;
+        if (catOpenRow && catOpenRow !== tr) catOpenRow.classList.remove('cat-on');
+        tr.classList.add('cat-on');
+        catOpenRow = tr;
+        const el = document.getElementById('catPreview');
+        el.innerHTML = catPreviewHTML(r);
+        el.classList.add('open');
+        // Beside the pointer, below the row (above when it doesn't fit), clamped inside the window.
+        const box = tr.getBoundingClientRect(), w = el.offsetWidth, h = el.offsetHeight, m = 8;
+        const x = Math.max(m, Math.min(catXY[0] + 16, window.innerWidth - w - m));
+        let y = box.bottom + 6;
+        if (y + h > window.innerHeight - m) y = box.top - h - 6;
+        if (y < m) y = Math.max(m, window.innerHeight - h - m);
+        el.style.left = x + 'px';
+        el.style.top = y + 'px';
+    }
+
+    function catClosePreview() {
+        clearTimeout(catHoverTimer);
+        const el = document.getElementById('catPreview');
+        if (el) el.classList.remove('open');
+        if (catOpenRow) catOpenRow.classList.remove('cat-on');
+        catOpenRow = null; catPinned = false;
+    }
+
+    // Popup opens only over the code / name / total cells, never over the size grid.
+    function catWireEvents() {
+        if (catWired) return;
+        catWired = true;
+        const body = document.getElementById('catBody');
+        body.addEventListener('mouseover', e => {
+            if (!canHover() || catPinned) return;
+            const hz = e.target.closest('td.cat-hz');
+            clearTimeout(catHoverTimer);
+            if (!hz) { if (catOpenRow) catHoverTimer = setTimeout(catClosePreview, 120); return; }
+            const tr = hz.parentElement;
+            catXY = [e.clientX, e.clientY];
+            if (tr === catOpenRow) return;
+            catHoverTimer = setTimeout(() => catOpenPreview(tr), catOpenRow ? 60 : 150);
+        });
+        body.addEventListener('mouseleave', () => { if (!catPinned) { clearTimeout(catHoverTimer); catHoverTimer = setTimeout(catClosePreview, 120); } });
+        // Tap (tablet) or click pins it; tapping the same row again closes it.
+        body.addEventListener('click', e => {
+            const hz = e.target.closest('td.cat-hz');
+            if (!hz) return;
+            e.stopPropagation();
+            const tr = hz.parentElement;
+            catXY = [e.clientX, e.clientY];
+            if (catPinned && catOpenRow === tr) { catClosePreview(); return; }
+            catOpenPreview(tr); catPinned = true;
+        });
+        document.getElementById('catHead').addEventListener('click', e => {
+            const th = e.target.closest('[data-sort]');
+            if (!th) return;
+            const k = th.dataset.sort;
+            catSortDir = catSortKey === k ? -catSortDir : 1;
+            catSortKey = k;
+            renderCatalogHead();
+            renderCatalog();
+        });
+        document.getElementById('catWrap').addEventListener('scroll', () => { if (catOpenRow) catClosePreview(); }, { passive: true });
+        document.addEventListener('click', () => { if (catOpenRow) catClosePreview(); });
+        document.addEventListener('keydown', e => { if (e.key === 'Escape' && catOpenRow) catClosePreview(); });
+    }
+
     function switchView(view) {
         // Leaving Manage Catalog: edits on the open style save themselves first.
         if (view !== 'inventory' && document.getElementById('view-inventory').classList.contains('active')) {
@@ -13777,8 +14204,10 @@ ${qrBlock}${field(skuT.g, qrColX, skuT.y)}${field(colourT.g, qrColX, colourT.y)}
         // gap as changeViewLocation() (see its comment above). Scanning to
         // check a remote store's stock is normal even though checkout is
         // blocked there, so focus regardless of local/remote.
+        if (view !== 'catalog') catClosePreview();
         if (view === 'pos') { focusPosEntryPoint(); loadInventory(); }
         else if (view === 'storage') { openStorageTab(); }
+        else if (view === 'catalog') { openCatalogView(); }
         else if (view === 'inventory') {
             // Same "an automatic refresh must not leave a stale search term
             // pointing at a filter that no longer applies" rule as POS's
