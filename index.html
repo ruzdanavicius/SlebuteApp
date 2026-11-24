@@ -584,8 +584,8 @@
         /* Daily Sales — read-only per-location stock badges (same data/coloring as the
            Add Stock screen's .sre-stock, minus the quick-add input and adjust button:
            this table is a glance-only report, not a place to edit stock). */
-        .ds-stock-cell { display:flex; align-items:center; gap: 8px; flex-wrap: wrap; }
-        .ds-stock-badges { display:flex; align-items:center; gap: 6px; flex-wrap: wrap; }
+        .ds-stock-cell { display:flex; align-items:center; gap: 8px; flex-wrap: nowrap; }
+        .ds-stock-badges { display:flex; align-items:center; gap: 6px; flex-wrap: nowrap; }
         .ds-stock-badge { display:flex; align-items:center; gap: 5px; background: var(--input-bg); border-radius: 8px; padding: 4px 8px; }
         .ds-stock-badge .ds-stock-loc { font-size: 0.66rem; color: var(--text-secondary); }
         .ds-stock-badge .ds-stock-qty { font-weight: 700; font-size: 0.85rem; min-width: 14px; text-align:center; }
@@ -692,6 +692,11 @@
         .live-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--success-color); margin-left: 4px; animation: livePulse 1.8s infinite; }
         @keyframes livePulse { 0% { box-shadow: 0 0 0 0 rgba(71,116,89,0.45);} 70% { box-shadow: 0 0 0 6px rgba(71,116,89,0);} 100% { box-shadow: 0 0 0 0 rgba(71,116,89,0);} }
         .ds-wrap, .dash-wrap { max-width: 980px; margin: 0 auto; width: 100%; overflow-y:auto; padding-bottom:40px; }
+        /* Daily Sales uses the full width of wide till screens (capped so lines
+           stay readable), so each sale fits on one line instead of wrapping. */
+        .ds-wrap { max-width: 1480px; }
+        .ds-sold-table th, .ds-sold-table td { white-space: nowrap; }
+        .ds-sold-table td.ds-item-cell { white-space: normal; min-width: 160px; }
         .stat-box .value.sm { font-size: 1.1rem; }
         .stat-box .value-note { font-size: 0.68rem; color: var(--text-secondary); margin-top: 4px; font-weight: 400; }
         .sale-line-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
@@ -11667,7 +11672,7 @@
                 <h3>${t('ds.items_sold')} (${itemsSold})${voided ? ` <span class="muted" style="font-weight:400; font-size:0.78rem;">— ${voided} ${t('ds.voided_excluded')}</span>` : ''}</h3>
                 ${lines.length === 0 ? `<p class="muted" style="font-size:0.85rem;">${t('ds.no_items_sold')}</p>` : `
                 <div class="sale-line-table-wrap">
-                <table class="sale-line-table">
+                <table class="sale-line-table ds-sold-table">
                     <thead><tr><th>${t('ds.col_time')}</th><th>${t('ds.col_barcode')}</th><th>${t('ds.col_item')}</th><th>${t('ds.col_color')}</th><th>${t('ds.col_size')}</th><th>${t('ds.col_qty')}</th><th>${t('ds.col_price')}</th><th>${t('ds.col_discount')}</th><th>${t('ds.col_total')}</th><th>${t('ds.col_stock')}</th></tr></thead>
                     <tbody>
                         ${(() => { let prevOrder = null, basketIdx = -1; return lines.map(l => {
@@ -11687,14 +11692,14 @@
                             <tr class="${basketCls}" style="${l.status!=='COMPLETED'||l.is_refunded ? 'opacity:0.5; text-decoration:line-through;' : ''}">
                                 <td>${new Date(l.created_at).toLocaleTimeString(currentLocale(), {hour:'2-digit',minute:'2-digit'})}</td>
                                 <td class="muted${hoverCls}" ${hoverAttr}>${escapeHtml(l.base_barcode || '—')}</td>
-                                <td class="${hoverCls.trim()}" ${hoverAttr}>${escapeHtml(l.product_name)}${l.oversold_note_id ? `<i class="fas fa-triangle-exclamation ds-oos-flag" title="${escapeHtml(l.oversold_note_body || '')}" onclick="showOversoldNoteFromRow(event, ${l.order_item_id})"></i>` : ''}</td>
+                                <td class="ds-item-cell${hoverCls}" ${hoverAttr}>${escapeHtml(l.product_name)}${l.oversold_note_id ? `<i class="fas fa-triangle-exclamation ds-oos-flag" title="${escapeHtml(l.oversold_note_body || '')}" onclick="showOversoldNoteFromRow(event, ${l.order_item_id})"></i>` : ''}</td>
                                 <td>${escapeHtml(l.color_name)}</td>
                                 <td>${escapeHtml(l.size)}</td>
                                 <td>${l.quantity}</td>
                                 <td>${money(l.unit_price)}</td>
                                 <td>${lineDiscount > 0.004 ? `-${money(lineDiscount)}` : '—'}</td>
                                 <td><b>${money(displayTotal)}</b></td>
-                                <td class="ds-stock-cell">
+                                <td><div class="ds-stock-cell">
                                     ${(() => {
                                         const v = variantById.get(l.variant_id);
                                         if (!v) return `<span class="muted">—</span>`;
@@ -11708,7 +11713,7 @@
                                         }).join('')}</div>`;
                                     })()}
                                     ${v ? `<i class="fas fa-right-left ds-stock-transfer-icon" title="${t('ds.rebalance_action_title')}" onclick="openStockRebalanceModal(${l.variant_id})"></i>` : ''}
-                                </td>
+                                </div></td>
                             </tr>`;
                         }).join(''); })()}
                     </tbody>
