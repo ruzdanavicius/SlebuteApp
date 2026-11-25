@@ -2664,7 +2664,7 @@
             'scantransfer.scanned_prefix': 'Scanned', 'returns.not_match_suffix': "doesn't match any known SKU.",
             'scantransfer.headed_elsewhere_prefix': 'is headed to', 'scantransfer.receive_here_anyway': 'Receive here anyway',
             'scantransfer.request_completed_suffix': 'received.', 'scantransfer.redirected_suffix': 'redirected to this store.',
-            'receive.nothing_to_receive': 'Nothing waiting to be received here.', 'receive.all_done': 'Everything scanned in.',
+            'receive.nothing_to_receive': 'Nothing waiting to be received here.', 'receive.scan_not_arriving': 'is not on any arriving transfer — nothing was added to a sale.','receive.all_done': 'Everything scanned in.',
             'labels.printing_prefix': 'Printing', 'labels.printed_prefix': 'Printed',
             'labels.skipped_prefix': 'Skipped', 'labels.skipped_zero_suffix': '(0 copies — already labeled)',
             'scantransfer.leaving': 'leaving', 'scantransfer.arriving_at': 'arriving at',
@@ -3067,7 +3067,7 @@
             'scantransfer.scanned_prefix': 'Nuskaityta', 'returns.not_match_suffix': 'neatitinka jokio žinomo SKU.',
             'scantransfer.headed_elsewhere_prefix': 'vyksta į', 'scantransfer.receive_here_anyway': 'Vis tiek priimti čia',
             'scantransfer.request_completed_suffix': 'gauta.', 'scantransfer.redirected_suffix': 'nukreipta į šią parduotuvę.',
-            'receive.nothing_to_receive': 'Čia nėra ko priimti.', 'receive.all_done': 'Viskas nuskaityta.',
+            'receive.nothing_to_receive': 'Čia nėra ko priimti.', 'receive.scan_not_arriving': 'nėra jokiame atvykstančiame pervežime — į pardavimą nepridėta.','receive.all_done': 'Viskas nuskaityta.',
             'labels.printing_prefix': 'Spausdinama', 'labels.printed_prefix': 'Atspausdinta',
             'labels.skipped_prefix': 'Praleista', 'labels.skipped_zero_suffix': '(0 kopijų — jau su etikete)',
             'scantransfer.leaving': 'išvyksta iš', 'scantransfer.arriving_at': 'atvyksta į',
@@ -4050,6 +4050,11 @@
         // its own onkeydown/Enter, bypassing this global listener
         // entirely — see handleStorageTabScanManualEnter()).
         if (document.getElementById('view-storage')?.classList.contains('active')) { handleStorageTabScan(code); return; }
+        // Pervežimai is a receiving screen, never a till: a scan here with no
+        // scan-in window open (forgot to press "Scan in", or closed it) opens
+        // the pooled receive for the shop the item is arriving at and counts
+        // it — it must never jump to POS and put the garment in a sale.
+        if (document.getElementById('view-requests')?.classList.contains('active')) { handleRequestsViewScan(code); return; }
         if (document.getElementById('view-pos').classList.contains('active') === false) {
             switchView('pos');
         }
@@ -10423,6 +10428,23 @@
         status.innerText = `"${code}" ${t('scantransfer.not_part_suffix')}`;
         status.style.color = 'var(--danger-color)';
         return true;
+    }
+
+    // A scan on the Pervežimai screen with no scan window open (see
+    // resolveScan). Picks the arriving transfer that carries this SKU — this
+    // terminal's own shop first; an admin may also receive for another shop —
+    // opens the pooled receive for that shop and counts the scan in it.
+    function handleRequestsViewScan(code) {
+        const norm = code.toLowerCase();
+        const isAdmin = PROFILE.role === 'admin';
+        const arriving = requestsCache.filter(r =>
+            r.status === 'IN_TRANSIT' && r.request_type === 'STORE_TRANSFER' &&
+            (r.target.id === DEVICE_LOCATION_ID || isAdmin) &&
+            (r.stock_request_items || []).some(it => (it.product_variants?.sku || '').toLowerCase() === norm));
+        const pick = arriving.find(r => r.target.id === DEVICE_LOCATION_ID) || arriving[0];
+        if (!pick) { toast(`"${code}" ${t('receive.scan_not_arriving')}`, 'warn'); return; }
+        openReceiveStockModal(pick.target.id);
+        if (receiveContext) handleReceiveScan(code);
     }
 
     // Fires the moment a pooled request's own lines are all scanned --
