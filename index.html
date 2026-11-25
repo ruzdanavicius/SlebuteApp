@@ -3607,7 +3607,7 @@
         }
         const ok = await loadProfile(data.user.id);
         btn.disabled = false; btn.innerText = t('login.signin');
-        if (ok) { rememberLoginEmail(email); showApp(); } else await sb.auth.signOut();
+        if (ok) { rememberLoginEmail(email); showApp(); } else await sb.auth.signOut({ scope: 'local' });
     }
 
     // LOGIN EMAIL QUICK-PICK — emails that signed in successfully on THIS
@@ -3659,7 +3659,11 @@
     async function logout() {
         if (realtimeReconnectTimer) { clearTimeout(realtimeReconnectTimer); realtimeReconnectTimer = null; }
         if (realtimeChannel) { sb.removeChannel(realtimeChannel); realtimeChannel = null; }
-        await sb.auth.signOut();
+        // scope 'local': sign out THIS till only. The default ('global')
+        // revokes every session of the account, so one logout kicked the
+        // same login off every other till/phone ("Sesija baigėsi" there
+        // within the hour, once its token came up for refresh).
+        await sb.auth.signOut({ scope: 'local' });
         window.location.reload();
     }
 
@@ -4460,6 +4464,15 @@
 
     function applyPosFilters(items, keepOutOfStock) {
         if (items === products) items = sortBySales(items);
+        // A typed search or scan result always looks across ALL categories.
+        // A category chip left selected from earlier used to silently narrow
+        // the search too, so in-stock codes came back "nothing found" (23 Nov:
+        // every zero-result code search had a chip still set). Searching now
+        // drops the chip back to "All" so the bar matches what's shown.
+        if (items !== products && activeCategory !== null) {
+            activeCategory = null;
+            renderCategoryFilterBar();
+        }
         const sellable = filterBySale(filterByCategory(items.filter(hasSizes)));
         if (keepOutOfStock) { lastHiddenOutOfStock = 0; return sellable; }
         return filterInStockHere(sellable);
@@ -4514,6 +4527,10 @@
     }
 
     function setActiveCategoryByIndex(i) {
+        // Tapping a category while a search is showing starts browsing that
+        // category fresh (search text cleared) — otherwise applyPosFilters()
+        // would see the search and reset the chip straight back to "All".
+        if (lastSearchResults !== null) { lastSearchResults = null; barcodeInput.value = ''; }
         activeCategory = categoryFilterList[i];
         renderCategoryFilterBar();
         renderProducts(applyPosFilters(lastSearchResults !== null ? lastSearchResults : products));
