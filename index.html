@@ -2541,7 +2541,7 @@
             'req.scan_in': 'Scan In', 'req.admin_cancel': 'Admin cancel',
             'req.status_pending': 'Pending', 'req.status_accepted': 'Accepted', 'req.status_in_transit': 'In Transit',
             'req.status_completed': 'Completed', 'req.status_cancelled': 'Cancelled',
-            'ds.no_sales': 'No sales recorded this day.', 'ds.total_revenue': 'Total Revenue', 'ds.orders': 'Orders',
+            'ds.no_sales': 'No sales recorded this day.', 'ds.total_revenue': 'Total Revenue', 'ds.orders': 'Sales',
             'ds.discounts_given': 'Discounts Given', 'ds.items_sold': 'Items Sold', 'ds.voided_excluded': 'voided/refunded, excluded from totals',
             'ds.no_items_sold': 'No items sold.', 'ds.col_time': 'Time', 'ds.col_item': 'Item', 'ds.col_color': 'Color',
             'ds.col_size': 'Size', 'ds.col_qty': 'Qty', 'ds.col_price': 'Price', 'ds.col_discount': 'Discount',
@@ -2944,7 +2944,7 @@
             'req.scan_in': 'Nusk. gavimą', 'req.admin_cancel': 'Administratoriaus atšaukimas',
             'req.status_pending': 'Laukiama', 'req.status_accepted': 'Priimta', 'req.status_in_transit': 'Pakeliui',
             'req.status_completed': 'Užbaigta', 'req.status_cancelled': 'Atšaukta',
-            'ds.no_sales': 'Šią dieną pardavimų neužfiksuota.', 'ds.total_revenue': 'Bendros pajamos', 'ds.orders': 'Užsakymai',
+            'ds.no_sales': 'Šią dieną pardavimų neužfiksuota.', 'ds.total_revenue': 'Bendros pajamos', 'ds.orders': 'Pardavimai',
             'ds.discounts_given': 'Suteiktos nuolaidos', 'ds.items_sold': 'Parduota prekių', 'ds.voided_excluded': 'anuliuota/grąžinta, neįtraukta į sumas',
             'ds.no_items_sold': 'Prekių neparduota.', 'ds.col_time': 'Laikas', 'ds.col_item': 'Prekė', 'ds.col_color': 'Spalva',
             'ds.col_size': 'Dydis', 'ds.col_qty': 'Kiekis', 'ds.col_price': 'Kaina', 'ds.col_discount': 'Nuolaida',
@@ -3607,7 +3607,7 @@
         }
         const ok = await loadProfile(data.user.id);
         btn.disabled = false; btn.innerText = t('login.signin');
-        if (ok) { rememberLoginEmail(email); showApp(); } else await sb.auth.signOut();
+        if (ok) { rememberLoginEmail(email); showApp(); } else await sb.auth.signOut({ scope: 'local' });
     }
 
     // LOGIN EMAIL QUICK-PICK — emails that signed in successfully on THIS
@@ -3659,7 +3659,11 @@
     async function logout() {
         if (realtimeReconnectTimer) { clearTimeout(realtimeReconnectTimer); realtimeReconnectTimer = null; }
         if (realtimeChannel) { sb.removeChannel(realtimeChannel); realtimeChannel = null; }
-        await sb.auth.signOut();
+        // scope 'local': sign out THIS till only. The default ('global')
+        // revokes every session of the account, so one logout kicked the
+        // same login off every other till/phone ("Sesija baigėsi" there
+        // within the hour, once its token came up for refresh).
+        await sb.auth.signOut({ scope: 'local' });
         window.location.reload();
     }
 
@@ -4460,6 +4464,15 @@
 
     function applyPosFilters(items, keepOutOfStock) {
         if (items === products) items = sortBySales(items);
+        // A typed search or scan result always looks across ALL categories.
+        // A category chip left selected from earlier used to silently narrow
+        // the search too, so in-stock codes came back "nothing found" (23 Nov:
+        // every zero-result code search had a chip still set). Searching now
+        // drops the chip back to "All" so the bar matches what's shown.
+        if (items !== products && activeCategory !== null) {
+            activeCategory = null;
+            renderCategoryFilterBar();
+        }
         const sellable = filterBySale(filterByCategory(items.filter(hasSizes)));
         if (keepOutOfStock) { lastHiddenOutOfStock = 0; return sellable; }
         return filterInStockHere(sellable);
@@ -4514,6 +4527,10 @@
     }
 
     function setActiveCategoryByIndex(i) {
+        // Tapping a category while a search is showing starts browsing that
+        // category fresh (search text cleared) — otherwise applyPosFilters()
+        // would see the search and reset the chip straight back to "All".
+        if (lastSearchResults !== null) { lastSearchResults = null; barcodeInput.value = ''; }
         activeCategory = categoryFilterList[i];
         renderCategoryFilterBar();
         renderProducts(applyPosFilters(lastSearchResults !== null ? lastSearchResults : products));
