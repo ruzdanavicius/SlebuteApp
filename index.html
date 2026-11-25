@@ -4055,19 +4055,13 @@
         // the pooled receive for the shop the item is arriving at and counts
         // it — it must never jump to POS and put the garment in a sale.
         if (document.getElementById('view-requests')?.classList.contains('active')) { handleRequestsViewScan(code); return; }
-        const hit = findVariantBySku(code);
-        // A garment this shop has none of (display or storage) that IS on a
-        // transfer arriving here is a delivery being unpacked, not a sale:
-        // count it into the scan-in window instead of the "out of stock —
-        // sell anyway?" OK prompt on every single item.
-        if (hit && !isRemoteView() && availableStock(hit.variant) <= 0 && !(hit.variant.storageStock > 0)
-            && findArrivingTransferForSku(code, true)) {
-            handleRequestsViewScan(code);
-            return;
-        }
+        // POS scans are always sales. Receiving lives only in Pervežimai's
+        // scan-in window (handled above via receiveContext) — never mixed in
+        // here, so a cashier is never unsure what a scan just did.
         if (document.getElementById('view-pos').classList.contains('active') === false) {
             switchView('pos');
         }
+        const hit = findVariantBySku(code);
         // Routed through posScanOrSelectVariant, not addToCart directly:
         // if the exact scanned SKU shows 0 on display but has stock in
         // storage — most often because the garment is physically already
@@ -10451,18 +10445,14 @@
     // resolveScan). Picks the arriving transfer that carries this SKU — this
     // terminal's own shop first; an admin may also receive for another shop —
     // opens the pooled receive for that shop and counts the scan in it.
-    function findArrivingTransferForSku(code, ownShopOnly) {
-        const norm = (code || '').toLowerCase();
+    function handleRequestsViewScan(code) {
+        const norm = code.toLowerCase();
         const isAdmin = PROFILE.role === 'admin';
         const arriving = requestsCache.filter(r =>
             r.status === 'IN_TRANSIT' && r.request_type === 'STORE_TRANSFER' &&
-            (r.target.id === DEVICE_LOCATION_ID || (isAdmin && !ownShopOnly)) &&
+            (r.target.id === DEVICE_LOCATION_ID || isAdmin) &&
             (r.stock_request_items || []).some(it => (it.product_variants?.sku || '').toLowerCase() === norm));
-        return arriving.find(r => r.target.id === DEVICE_LOCATION_ID) || arriving[0] || null;
-    }
-
-    function handleRequestsViewScan(code) {
-        const pick = findArrivingTransferForSku(code, false);
+        const pick = arriving.find(r => r.target.id === DEVICE_LOCATION_ID) || arriving[0];
         if (!pick) { toast(`"${code}" ${t('receive.scan_not_arriving')}`, 'warn'); return; }
         openReceiveStockModal(pick.target.id);
         if (receiveContext) handleReceiveScan(code);
