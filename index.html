@@ -2705,6 +2705,7 @@
             'closeshift.expected': 'Expected (system)', 'closeshift.close_btn': 'Close Shift', 'ds.close_shift': 'Close Shift',
             'register.open_shift': 'Open Shift', 'register.open_shift_btn': 'Open Shift',
             'register.no_shift_open': 'No shift is open yet. Enter the starting cash float to open one.',
+            'register.expected_drawer': 'Expected in drawer',
             'register.opened': 'Opened', 'register.opening_float': 'Opening float', 'register.orders_today': 'Orders today',
             'register.cash_sales': 'Cash sales', 'register.card_sales': 'Card sales', 'register.split_sales': 'Of which split (included above)',
             'register.cash_in': 'Cash In', 'register.cash_out': 'Cash Out', 'register.close_shift': 'Close Shift',
@@ -3108,6 +3109,7 @@
             'closeshift.expected': 'Numatoma (sistemos)', 'closeshift.close_btn': 'Uždaryti pamainą', 'ds.close_shift': 'Uždaryti pamainą',
             'register.open_shift': 'Pamainos atidarymas', 'register.open_shift_btn': 'Atidaryti pamainą',
             'register.no_shift_open': 'Pamaina dar neatidaryta. Įveskite pradinę kasos sumą, kad ją atidarytumėte.',
+            'register.expected_drawer': 'Turi būti kasoje',
             'register.opened': 'Atidaryta', 'register.opening_float': 'Pradinė suma', 'register.orders_today': 'Šiandienos užsakymai',
             'register.cash_sales': 'Grynųjų pardavimai', 'register.card_sales': 'Kortelės pardavimai', 'register.split_sales': 'Iš jų mišrūs (įskaičiuota aukščiau)',
             'register.cash_in': 'Grynųjų įnešimas', 'register.cash_out': 'Grynųjų išėmimas', 'register.close_shift': 'Uždaryti pamainą',
@@ -11453,11 +11455,25 @@
         // any store. It's now wrapped in rpc_get_register_summary(), which
         // enforces "admin sees any register, everyone else only their own
         // store's" server-side. See migration: security_lockdown_anon_access.
-        const [{ data: summaryRows }, { data: movements }] = await Promise.all([
+        // rpc_preview_register_close is read-only and uses the exact formula
+        // the Close Shift count is checked against (opening float + cash
+        // sales incl. cash leg of split + cash in − cash out), so this tile
+        // always matches the "Expected (system)" figure at close.
+        const [{ data: summaryRows }, { data: movements }, { data: drawer }] = await Promise.all([
             sb.rpc('rpc_get_register_summary', { p_register_id: currentRegister.id }),
-            sb.from('cash_movements').select('*').eq('register_id', currentRegister.id).order('created_at', { ascending: false })
+            sb.from('cash_movements').select('*').eq('register_id', currentRegister.id).order('created_at', { ascending: false }),
+            sb.rpc('rpc_preview_register_close', { p_register_id: currentRegister.id })
         ]);
         const summary = (summaryRows && summaryRows[0]) || null;
+        const drawerTile = drawer ? `
+            <div class="form-card" style="border:2px solid var(--accent-color); margin-bottom:16px; display:flex; align-items:center; gap:16px;">
+                <i class="fas fa-cash-register" style="color:var(--accent-color); font-size:1.6rem; flex-shrink:0;"></i>
+                <div style="flex:1; min-width:0;">
+                    <div class="muted" style="font-size:0.85rem;">${t('register.expected_drawer')}</div>
+                    <div style="font-size:1.9rem; font-weight:700; line-height:1.2;">${money(drawer.expected_cash)}</div>
+                    <div class="muted" style="font-size:0.78rem;">${t('register.opening_float')} ${money(drawer.opening_float)} + ${t('register.cash_sales')} ${money(drawer.cash_sales)} + ${t('register.cash_in')} ${money(drawer.cash_in)} − ${t('register.cash_out')} ${money(drawer.cash_out)}</div>
+                </div>
+            </div>` : '';
 
         // Daily Sales is now correctly bucketed by each ORDER's own local
         // calendar date (migration_27), regardless of which register/shift
@@ -11481,6 +11497,7 @@
 
         wrap.innerHTML = `
             ${staleBanner}
+            ${drawerTile}
             <div class="stat-grid">
                 <div class="stat-box"><div class="label">${t('register.opened')}</div><div class="value" style="font-size:1rem;">${new Date(currentRegister.opened_at).toLocaleTimeString(currentLocale())}</div></div>
                 <div class="stat-box"><div class="label">${t('register.opening_float')}</div><div class="value">${money(currentRegister.opening_float)}</div></div>
