@@ -2537,7 +2537,7 @@
             'req.incoming': 'Incoming', 'req.in_transit': 'In-Transit', 'req.completed_today': 'Completed Today',
             'req.nothing_here': 'Nothing here.', 'req.client_pickup': 'Client Pickup', 'req.stock_transfer': 'Stock Transfer',
             'req.hold_at': 'Hold at:', 'req.client_label': 'Client:', 'req.from': 'From', 'req.to': 'To',
-            'req.ref': 'Ref:', 'req.holds_until': 'Holds until', 'req.scan_out': 'Scan Out', 'req.complete': 'Complete',
+            'req.ref': 'Ref:', 'req.holds_until': 'Holds until', 'req.scan_out': 'Scan Out', 'req.approve_incoming': 'Approve', 'req.approve_incoming_confirm': 'Approve {n} units for {shop}? No scanning now — the shop scans them in when they arrive.', 'req.approve_incoming_done': 'Approved — on the way to {shop}','req.complete': 'Complete',
             'req.scan_in': 'Scan In', 'req.admin_cancel': 'Admin cancel',
             'req.status_pending': 'Pending', 'req.status_accepted': 'Accepted', 'req.status_in_transit': 'In Transit',
             'req.status_completed': 'Completed', 'req.status_cancelled': 'Cancelled',
@@ -2664,7 +2664,7 @@
             'scantransfer.scanned_prefix': 'Scanned', 'returns.not_match_suffix': "doesn't match any known SKU.",
             'scantransfer.headed_elsewhere_prefix': 'is headed to', 'scantransfer.receive_here_anyway': 'Receive here anyway',
             'scantransfer.request_completed_suffix': 'received.', 'scantransfer.redirected_suffix': 'redirected to this store.',
-            'receive.nothing_to_receive': 'Nothing waiting to be received here.', 'receive.all_done': 'Everything scanned in.',
+            'receive.nothing_to_receive': 'Nothing waiting to be received here.', 'receive.scan_not_arriving': 'is not on any arriving transfer — nothing was added to a sale.','receive.all_done': 'Everything scanned in.',
             'labels.printing_prefix': 'Printing', 'labels.printed_prefix': 'Printed',
             'labels.skipped_prefix': 'Skipped', 'labels.skipped_zero_suffix': '(0 copies — already labeled)',
             'scantransfer.leaving': 'leaving', 'scantransfer.arriving_at': 'arriving at',
@@ -2940,7 +2940,7 @@
             'req.incoming': 'Gaunami', 'req.in_transit': 'Pakeliui', 'req.completed_today': 'Šiandien užbaigti',
             'req.nothing_here': 'Čia nieko nėra.', 'req.client_pickup': 'Kliento atsiėmimas', 'req.stock_transfer': 'Prekių perkėlimas',
             'req.hold_at': 'Laikoma:', 'req.client_label': 'Klientas:', 'req.from': 'Iš', 'req.to': 'į',
-            'req.ref': 'Nr.:', 'req.holds_until': 'Laikoma iki', 'req.scan_out': 'Nusk. išsiuntimą', 'req.complete': 'Užbaigti',
+            'req.ref': 'Nr.:', 'req.holds_until': 'Laikoma iki', 'req.scan_out': 'Nusk. išsiuntimą', 'req.approve_incoming': 'Patvirtinti', 'req.approve_incoming_confirm': 'Patvirtinti {n} vnt. į {shop}? Skenuoti dabar nereikia — parduotuvė nuskenuos priimdama.', 'req.approve_incoming_done': 'Patvirtinta — keliauja į {shop}','req.complete': 'Užbaigti',
             'req.scan_in': 'Nusk. gavimą', 'req.admin_cancel': 'Administratoriaus atšaukimas',
             'req.status_pending': 'Laukiama', 'req.status_accepted': 'Priimta', 'req.status_in_transit': 'Pakeliui',
             'req.status_completed': 'Užbaigta', 'req.status_cancelled': 'Atšaukta',
@@ -3067,7 +3067,7 @@
             'scantransfer.scanned_prefix': 'Nuskaityta', 'returns.not_match_suffix': 'neatitinka jokio žinomo SKU.',
             'scantransfer.headed_elsewhere_prefix': 'vyksta į', 'scantransfer.receive_here_anyway': 'Vis tiek priimti čia',
             'scantransfer.request_completed_suffix': 'gauta.', 'scantransfer.redirected_suffix': 'nukreipta į šią parduotuvę.',
-            'receive.nothing_to_receive': 'Čia nėra ko priimti.', 'receive.all_done': 'Viskas nuskaityta.',
+            'receive.nothing_to_receive': 'Čia nėra ko priimti.', 'receive.scan_not_arriving': 'nėra jokiame atvykstančiame pervežime — į pardavimą nepridėta.','receive.all_done': 'Viskas nuskaityta.',
             'labels.printing_prefix': 'Spausdinama', 'labels.printed_prefix': 'Atspausdinta',
             'labels.skipped_prefix': 'Praleista', 'labels.skipped_zero_suffix': '(0 kopijų — jau su etikete)',
             'scantransfer.leaving': 'išvyksta iš', 'scantransfer.arriving_at': 'atvyksta į',
@@ -4050,6 +4050,11 @@
         // its own onkeydown/Enter, bypassing this global listener
         // entirely — see handleStorageTabScanManualEnter()).
         if (document.getElementById('view-storage')?.classList.contains('active')) { handleStorageTabScan(code); return; }
+        // Pervežimai is a receiving screen, never a till: a scan here with no
+        // scan-in window open (forgot to press "Scan in", or closed it) opens
+        // the pooled receive for the shop the item is arriving at and counts
+        // it — it must never jump to POS and put the garment in a sale.
+        if (document.getElementById('view-requests')?.classList.contains('active')) { handleRequestsViewScan(code); return; }
         if (document.getElementById('view-pos').classList.contains('active') === false) {
             switchView('pos');
         }
@@ -10142,7 +10147,16 @@
         const iAmSource = r.source.id === DEVICE_LOCATION_ID || isAdmin;
         const iAmTarget = r.target.id === DEVICE_LOCATION_ID || isAdmin;
 
-        if (r.status === 'PENDING' && iAmSource) {
+        // Incoming goods (source = the virtual Atvykstančios prekės store) have
+        // nothing physical to "scan out" — the goods are only a list of what's
+        // expected. The real check is the shop's scan-in on arrival, so the
+        // admin approves in one click: PENDING/ACCEPTED -> IN_TRANSIT, no scan.
+        const isIncoming = INCOMING_STORE_ID != null && r.source.id === INCOMING_STORE_ID
+            && r.request_type === 'STORE_TRANSFER';
+        if (isIncoming && isAdmin && ['PENDING', 'ACCEPTED'].includes(r.status)) {
+            out.push(`<button class="btn btn-success btn-sm" onclick="approveIncomingTransfer(${r.id})"><i class="fas fa-check"></i> ${t('req.approve_incoming')}</button>`);
+            out.push(`<button class="btn btn-danger btn-sm" onclick="manageRequest(${r.id}, 'CANCELLED')"><i class="fas fa-trash"></i></button>`);
+        } else if (r.status === 'PENDING' && iAmSource) {
             out.push(`<button class="btn btn-success btn-sm" onclick="manageRequest(${r.id}, 'ACCEPTED')"><i class="fas fa-check"></i></button>`);
             out.push(`<button class="btn btn-danger btn-sm" onclick="manageRequest(${r.id}, 'CANCELLED')"><i class="fas fa-trash"></i></button>`);
         } else if (r.status === 'ACCEPTED' && iAmSource) {
@@ -10168,6 +10182,26 @@
         await loadRequests();
         await loadInventory();
         return true;
+    }
+
+    // One-click approve for incoming goods (see buildRequestActions). The
+    // server only allows PENDING -> ACCEPTED -> IN_TRANSIT, so this is two
+    // calls; if the second fails the transfer is left ACCEPTED and the same
+    // button is shown again, so a retry just finishes the job.
+    async function approveIncomingTransfer(id) {
+        const r = requestsCache.find(x => x.id === id);
+        if (!r) return;
+        const units = (r.stock_request_items || []).reduce((s, it) => s + (it.quantity || 0), 0);
+        if (!confirm(t('req.approve_incoming_confirm').replace('{n}', units).replace('{shop}', r.target.name))) return;
+        if (r.status === 'PENDING') {
+            const { error } = await sb.rpc('rpc_update_stock_request_status', { p_request_id: id, p_new_status: 'ACCEPTED', p_payment: null });
+            if (error) { toast(error.message, 'error'); await loadRequests(); return; }
+        }
+        const { error } = await sb.rpc('rpc_update_stock_request_status', { p_request_id: id, p_new_status: 'IN_TRANSIT', p_payment: null });
+        if (error) { toast(error.message, 'error'); await loadRequests(); return; }
+        toast(t('req.approve_incoming_done').replace('{shop}', r.target.name), 'success');
+        await loadRequests();
+        await loadInventory();
     }
 
     /* ============================================================
@@ -10206,7 +10240,9 @@
             items
         };
         document.getElementById('scanTransferConfirmBtn').classList.remove('hidden');
-        document.getElementById('scanTransferManualHint').classList.remove('hidden');
+        // Shop-to-shop scan-out is compulsory: only an admin may skip it
+        // (e.g. a dead scanner), staff must scan every unit.
+        document.getElementById('scanTransferManualHint').classList.toggle('hidden', PROFILE.role !== 'admin');
         document.getElementById('scanTransferStatus').style.color = '';
         document.getElementById('scanTransferStatus').innerText = t('scantransfer.hint');
         renderScanTransferModal();
@@ -10273,7 +10309,7 @@
     }
 
     function forceCompleteScan() {
-        if (!scanTransferContext) return;
+        if (!scanTransferContext || PROFILE.role !== 'admin') return;
         if (!confirm(t('scantransfer.force_confirm'))) return;
         scanTransferContext.items.forEach(it => it.scannedQty = it.requiredQty);
         renderScanTransferModal();
@@ -10392,6 +10428,23 @@
         status.innerText = `"${code}" ${t('scantransfer.not_part_suffix')}`;
         status.style.color = 'var(--danger-color)';
         return true;
+    }
+
+    // A scan on the Pervežimai screen with no scan window open (see
+    // resolveScan). Picks the arriving transfer that carries this SKU — this
+    // terminal's own shop first; an admin may also receive for another shop —
+    // opens the pooled receive for that shop and counts the scan in it.
+    function handleRequestsViewScan(code) {
+        const norm = code.toLowerCase();
+        const isAdmin = PROFILE.role === 'admin';
+        const arriving = requestsCache.filter(r =>
+            r.status === 'IN_TRANSIT' && r.request_type === 'STORE_TRANSFER' &&
+            (r.target.id === DEVICE_LOCATION_ID || isAdmin) &&
+            (r.stock_request_items || []).some(it => (it.product_variants?.sku || '').toLowerCase() === norm));
+        const pick = arriving.find(r => r.target.id === DEVICE_LOCATION_ID) || arriving[0];
+        if (!pick) { toast(`"${code}" ${t('receive.scan_not_arriving')}`, 'warn'); return; }
+        openReceiveStockModal(pick.target.id);
+        if (receiveContext) handleReceiveScan(code);
     }
 
     // Fires the moment a pooled request's own lines are all scanned --
