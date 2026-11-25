@@ -4055,10 +4055,19 @@
         // the pooled receive for the shop the item is arriving at and counts
         // it — it must never jump to POS and put the garment in a sale.
         if (document.getElementById('view-requests')?.classList.contains('active')) { handleRequestsViewScan(code); return; }
+        const hit = findVariantBySku(code);
+        // A garment this shop has none of (display or storage) that IS on a
+        // transfer arriving here is a delivery being unpacked, not a sale:
+        // count it into the scan-in window instead of the "out of stock —
+        // sell anyway?" OK prompt on every single item.
+        if (hit && !isRemoteView() && availableStock(hit.variant) <= 0 && !(hit.variant.storageStock > 0)
+            && findArrivingTransferForSku(code, true)) {
+            handleRequestsViewScan(code);
+            return;
+        }
         if (document.getElementById('view-pos').classList.contains('active') === false) {
             switchView('pos');
         }
-        const hit = findVariantBySku(code);
         // Routed through posScanOrSelectVariant, not addToCart directly:
         // if the exact scanned SKU shows 0 on display but has stock in
         // storage — most often because the garment is physically already
@@ -10352,10 +10361,16 @@
                     variantId: it.product_variants?.id, sku: it.product_variants?.sku || '',
                     name: it.product_variants?.product_colors?.products?.name || '',
                     size: it.product_variants?.size || '', colorName: it.product_variants?.product_colors?.color_name || '',
-                    requiredQty: it.quantity, scannedQty: 0
+                    requiredQty: it.quantity,
+                    scannedQty: Math.min(it.quantity, receiveProgress[r.id + ':' + it.product_variants?.id] || 0)
                 });
             }
         }
+        // Drop saved progress for transfers no longer arriving (completed,
+        // cancelled, or received on another device).
+        const live = new Set(requestsCache.filter(r => r.status === 'IN_TRANSIT').map(r => String(r.id)));
+        for (const k of Object.keys(receiveProgress)) if (!live.has(k.split(':')[0])) delete receiveProgress[k];
+        saveReceiveProgress();
         scanTransferContext = null;
         receiveContext = { locationId: targetLocationId, targetName: relevant[0].target.name, items };
         document.getElementById('scanTransferConfirmBtn').classList.add('hidden');
@@ -10400,6 +10415,8 @@
         const item = ctx.items.find(it => it.sku && it.sku.toLowerCase() === norm && it.scannedQty < it.requiredQty);
         if (item) {
             item.scannedQty++;
+            receiveProgress[item.requestId + ':' + item.variantId] = item.scannedQty;
+            saveReceiveProgress();
             status.innerText = `${t('scantransfer.scanned_prefix')} ${item.sku} (${item.scannedQty}/${item.requiredQty})`;
             status.style.color = 'var(--success-color)';
             renderReceiveModal();
@@ -10434,17 +10451,37 @@
     // resolveScan). Picks the arriving transfer that carries this SKU — this
     // terminal's own shop first; an admin may also receive for another shop —
     // opens the pooled receive for that shop and counts the scan in it.
-    function handleRequestsViewScan(code) {
-        const norm = code.toLowerCase();
+    function findArrivingTransferForSku(code, ownShopOnly) {
+        const norm = (code || '').toLowerCase();
         const isAdmin = PROFILE.role === 'admin';
         const arriving = requestsCache.filter(r =>
             r.status === 'IN_TRANSIT' && r.request_type === 'STORE_TRANSFER' &&
-            (r.target.id === DEVICE_LOCATION_ID || isAdmin) &&
+            (r.target.id === DEVICE_LOCATION_ID || (isAdmin && !ownShopOnly)) &&
             (r.stock_request_items || []).some(it => (it.product_variants?.sku || '').toLowerCase() === norm));
-        const pick = arriving.find(r => r.target.id === DEVICE_LOCATION_ID) || arriving[0];
+        return arriving.find(r => r.target.id === DEVICE_LOCATION_ID) || arriving[0] || null;
+    }
+
+    function handleRequestsViewScan(code) {
+        const pick = findArrivingTransferForSku(code, false);
         if (!pick) { toast(`"${code}" ${t('receive.scan_not_arriving')}`, 'warn'); return; }
         openReceiveStockModal(pick.target.id);
         if (receiveContext) handleReceiveScan(code);
+    }
+
+    // Scan-in progress survives closing the window (or a page reload): a
+    // half-unpacked box picks up where it left off instead of starting at 0.
+    // Key "<requestId>:<variantId>" -> units scanned so far. Per-device
+    // convenience only; the server is still credited only when a transfer's
+    // lines are all scanned.
+    const RECEIVE_PROGRESS_KEY = 'slebute.receiveProgress';
+    let receiveProgress = {};
+    try { receiveProgress = JSON.parse(localStorage.getItem(RECEIVE_PROGRESS_KEY) || '{}') || {}; } catch (e) { receiveProgress = {}; }
+    function saveReceiveProgress() {
+        try { localStorage.setItem(RECEIVE_PROGRESS_KEY, JSON.stringify(receiveProgress)); } catch (e) { /* private mode etc. */ }
+    }
+    function forgetReceiveProgress(requestId) {
+        for (const k of Object.keys(receiveProgress)) if (k.startsWith(requestId + ':')) delete receiveProgress[k];
+        saveReceiveProgress();
     }
 
     // Fires the moment a pooled request's own lines are all scanned --
@@ -10458,6 +10495,7 @@
 
         const { error } = await sb.rpc('rpc_update_stock_request_status', { p_request_id: requestId, p_new_status: 'COMPLETED' });
         if (error) { toast(error.message, 'error'); return; }
+        forgetReceiveProgress(requestId);
         toast(`${linesForRequest[0].requestNumber} ${t('scantransfer.request_completed_suffix')}`, 'success');
         for (const it of linesForRequest) checkReorderConflict(it.variantId, ctx.locationId, it.requiredQty);
 
