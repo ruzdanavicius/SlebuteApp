@@ -1644,6 +1644,7 @@
                             <input type="number" id="splitCardInput" placeholder="0.00" oninput="onSplitChange('card')">
                         </div>
                     </div>
+                    <div id="splitHint" class="muted" style="font-size:0.8rem; margin-top:6px; display:none;"></div>
                 </div>
             </div>
 
@@ -2386,6 +2387,7 @@
             'dev.pending': 'waiting', 'dev.rejected': 'rejected', 'dev.approve': 'Accept', 'dev.reject': 'Reject',
             'dev.approved_toast': 'Device accepted.', 'dev.rejected_toast': 'Device rejected.',
             'cart.split_cash_label': 'Cash (€)', 'cart.split_card_label': 'Card (€)',
+            'cart.split_as_cash': 'Card is €0 — this will be saved as a cash sale.', 'cart.split_as_card': 'Cash is €0 — this will be saved as a card sale.',
             'cart.total': 'Total', 'cart.change_due': 'Change due', 'cart.checkout': 'Checkout',
             'vm.stock_note': 'Stock shown is for the location you are viewing.',
             'vm.stock_at_prefix': 'Stock at', 'vm.tap_to_request': 'tap a size to add it as a transfer request',
@@ -2707,7 +2709,7 @@
             'register.no_shift_open': 'No shift is open yet. Enter the starting cash float to open one.',
             'register.expected_drawer': 'Expected in drawer',
             'register.opened': 'Opened', 'register.opening_float': 'Opening float', 'register.orders_today': 'Orders today',
-            'register.cash_sales': 'Cash sales', 'register.card_sales': 'Card sales', 'register.split_sales': 'Of which split (included above)',
+            'register.cash_sales': 'Cash sales', 'register.card_sales': 'Card sales', 'register.split_sales': 'Of which split (included above)', 'register.split_parts': 'cash {cash} + card {card}',
             'register.cash_in': 'Cash In', 'register.cash_out': 'Cash Out', 'register.close_shift': 'Close Shift',
             'register.stale_shift_title': 'This shift is still open from a previous day',
             'register.stale_shift_body': "Sales are still reported correctly by their own date, but for clean cash-up, close this till and open a fresh one for today.",
@@ -2790,6 +2792,7 @@
             'dev.pending': 'laukia', 'dev.rejected': 'atmestas', 'dev.approve': 'Priimti', 'dev.reject': 'Atmesti',
             'dev.approved_toast': 'Įrenginys priimtas.', 'dev.rejected_toast': 'Įrenginys atmestas.',
             'cart.split_cash_label': 'Grynieji (€)', 'cart.split_card_label': 'Kortelė (€)',
+            'cart.split_as_cash': 'Kortele 0 € — bus išsaugota kaip grynųjų pardavimas.', 'cart.split_as_card': 'Grynais 0 € — bus išsaugota kaip kortelės pardavimas.',
             'cart.total': 'Viso', 'cart.change_due': 'Grąža', 'cart.checkout': 'Apmokėti',
             'vm.stock_note': 'Rodomas kiekis yra peržiūrimoje parduotuvėje.',
             'vm.stock_at_prefix': 'Atsargos —', 'vm.tap_to_request': 'palieskite dydį, kad pridėtumėte kaip perkėlimo užklausą',
@@ -3111,7 +3114,7 @@
             'register.no_shift_open': 'Pamaina dar neatidaryta. Įveskite pradinę kasos sumą, kad ją atidarytumėte.',
             'register.expected_drawer': 'Turi būti kasoje',
             'register.opened': 'Atidaryta', 'register.opening_float': 'Pradinė suma', 'register.orders_today': 'Šiandienos užsakymai',
-            'register.cash_sales': 'Grynųjų pardavimai', 'register.card_sales': 'Kortelės pardavimai', 'register.split_sales': 'Iš jų mišrūs (įskaičiuota aukščiau)',
+            'register.cash_sales': 'Grynųjų pardavimai', 'register.card_sales': 'Kortelės pardavimai', 'register.split_sales': 'Iš jų mišrūs (įskaičiuota aukščiau)', 'register.split_parts': 'grynais {cash} + kortele {card}',
             'register.cash_in': 'Grynųjų įnešimas', 'register.cash_out': 'Grynųjų išėmimas', 'register.close_shift': 'Uždaryti pamainą',
             'register.stale_shift_title': 'Ši pamaina vis dar atidaryta nuo ankstesnės dienos',
             'register.stale_shift_body': 'Pardavimai vis tiek teisingai priskiriami savo dienai, bet dėl tvarkingo kasos uždarymo uždarykite šią kasą ir atidarykite naują šiandienai.',
@@ -5701,6 +5704,12 @@
             const cashV = parseFloat(document.getElementById('splitCashInput').value) || 0;
             const cardV = parseFloat(document.getElementById('splitCardInput').value) || 0;
             payBtn.disabled = Math.abs((cashV + cardV) - total) > 0.01;
+            // One part at €0 isn't a mixed sale: say what it will be saved as
+            // (checkout() converts it) instead of blocking the cashier.
+            const hint = document.getElementById('splitHint');
+            const single = payBtn.disabled ? null : (cardV < 0.005 ? 'cash' : (cashV < 0.005 ? 'card' : null));
+            hint.style.display = single ? 'block' : 'none';
+            if (single) hint.innerText = t(single === 'cash' ? 'cart.split_as_cash' : 'cart.split_as_card');
         } else {
             payBtn.disabled = false;
         }
@@ -5715,6 +5724,21 @@
     // the amount received shouldn't need to reach for the button too.
     function confirmCashTenderedEnter() {
         if (!document.getElementById('payBtn').disabled) handleMainAction();
+    }
+
+    // Stat tile for mixed ("Mišrus") sales on Register / Daily Sales / Dashboard.
+    // When the cash and card parts are known they are already counted inside
+    // the cash and card tiles, so the tile says "of which" and shows the parts
+    // instead of a lump cashiers would add on top. `alwaysIncluded`: the till's
+    // register_summary has always folded the parts in, even before the
+    // split_cash/split_card columns existed.
+    function splitBreakdownBox(total, cash, card, sm, alwaysIncluded) {
+        const hasParts = cash !== undefined && cash !== null && card !== undefined && card !== null;
+        const label = (hasParts || alwaysIncluded) ? t('register.split_sales') : t('cart.split');
+        const note = hasParts && Number(total) > 0
+            ? `<div class="value-note">${t('register.split_parts').replace('{cash}', money(cash)).replace('{card}', money(card))}</div>`
+            : '';
+        return `<div class="stat-box"><div class="label">${label}</div><div class="value${sm ? ' sm' : ''}">${money(total)}</div>${note}</div>`;
     }
 
     function onSplitChange(which) {
@@ -5737,8 +5761,11 @@
         document.getElementById('cashPaySection').classList.toggle('hidden', method !== 'CASH');
         document.getElementById('splitPaySection').classList.toggle('hidden', method !== 'SPLIT');
         if (method === 'SPLIT') {
+            // Both blank: the cashier types one part, the other fills itself in.
+            // (Pre-filling card = total let an untouched "Mišrus" save as a
+            // card-only sale labelled mixed.)
             document.getElementById('splitCashInput').value = '';
-            document.getElementById('splitCardInput').value = cartGrandTotal().toFixed(2);
+            document.getElementById('splitCardInput').value = '';
         }
         updateCartUI();
         focusPosEntryPoint();
@@ -5810,11 +5837,18 @@
             cashTendered = parseFloat(document.getElementById('splitCashInput').value) || 0;
             cardAmount = parseFloat(document.getElementById('splitCardInput').value) || 0;
         }
+        // A "mixed" sale with one part at €0 is really cash-only or card-only:
+        // save it as that, so reports and the till close never show a fake split.
+        let saveMethod = paymentMethod;
+        if (paymentMethod === 'SPLIT') {
+            if (cardAmount < 0.005) { saveMethod = 'CASH'; cardAmount = 0; }
+            else if (cashTendered < 0.005) { saveMethod = 'CARD'; cashTendered = 0; cardAmount = total; }
+        }
 
         const payload = {
             p_location_id: DEVICE_LOCATION_ID,
             p_items: items,
-            p_payment_method: paymentMethod,
+            p_payment_method: saveMethod,
             p_cash_tendered: cashTendered,
             p_card_amount: cardAmount,
             p_discount_total: discEur > 0 ? discEur : 0,
@@ -11514,7 +11548,7 @@
                 <div class="stat-box"><div class="label">${t('register.orders_today')}</div><div class="value">${summary?.order_count ?? 0}</div></div>
                 <div class="stat-box"><div class="label">${t('register.cash_sales')}</div><div class="value">${money(summary?.cash_total)}</div></div>
                 <div class="stat-box"><div class="label">${t('register.card_sales')}</div><div class="value">${money(summary?.card_total)}</div></div>
-                <div class="stat-box"><div class="label">${t('register.split_sales')}</div><div class="value">${money(summary?.split_total)}</div></div>
+                ${splitBreakdownBox(summary?.split_total, summary?.split_cash, summary?.split_card, false, true)}
             </div>
             <div style="display:flex; gap:10px; margin-bottom:20px;">
                 <button class="btn btn-success" style="flex:1;" onclick="openMovementModal('CASH_IN')"><i class="fas fa-arrow-down"></i> ${t('register.cash_in')}</button>
@@ -11964,7 +11998,7 @@
             <div class="stat-grid">
                 <div class="stat-box"><div class="label">${t('cart.cash')}</div><div class="value sm">${money(s.cash_revenue)}</div></div>
                 <div class="stat-box"><div class="label">${t('cart.card')}</div><div class="value sm">${money(s.card_revenue)}</div></div>
-                <div class="stat-box"><div class="label">${t('cart.split')}</div><div class="value sm">${money(s.split_revenue)}</div></div>
+                ${splitBreakdownBox(s.split_revenue, s.split_cash, s.split_card, true)}
             </div>
             <div class="section-card">
                 <h3>${t('ds.items_sold')} (${itemsSold})${voided ? ` <span class="muted" style="font-weight:400; font-size:0.78rem;">— ${voided} ${t('ds.voided_excluded')}</span>` : ''}</h3>
@@ -12160,6 +12194,11 @@
         const totalCash = periodRows.reduce((a,r) => a + Number(r.cash_revenue), 0);
         const totalCard = periodRows.reduce((a,r) => a + Number(r.card_revenue), 0);
         const totalSplit = periodRows.reduce((a,r) => a + Number(r.split_revenue), 0);
+        // split_cash/split_card only exist once migration 20261126175024 is live;
+        // until then cash/card exclude mixed sales and the tile stays a plain lump.
+        const hasSplitParts = periodRows.length > 0 && periodRows[0].split_cash !== undefined;
+        const totalSplitCash = hasSplitParts ? periodRows.reduce((a,r) => a + Number(r.split_cash), 0) : undefined;
+        const totalSplitCard = hasSplitParts ? periodRows.reduce((a,r) => a + Number(r.split_card), 0) : undefined;
         const totalDiscounts = periodRows.reduce((a,r) => a + Number(r.total_discounts), 0);
         const totalOrders = periodRows.reduce((a,r) => a + Number(r.order_count), 0);
 
@@ -12187,7 +12226,7 @@
             <div class="stat-grid">
                 <div class="stat-box"><div class="label">${t('cart.cash')}</div><div class="value sm">${money(totalCash)}</div></div>
                 <div class="stat-box"><div class="label">${t('cart.card')}</div><div class="value sm">${money(totalCard)}</div></div>
-                <div class="stat-box"><div class="label">${t('cart.split')}</div><div class="value sm">${money(totalSplit)}</div></div>
+                ${splitBreakdownBox(totalSplit, totalSplitCash, totalSplitCard, true)}
             </div>
 
             <div class="section-card">
