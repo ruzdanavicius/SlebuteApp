@@ -3432,6 +3432,15 @@
     }
 
     function money(n) { return `€${Number(n||0).toFixed(2)}`; }
+    // Sizes are stored in capitals with the numbered plus-size spelling
+    // ("xl" -> "XL", "XXL" -> "2XL", "XXXL" -> "3XL"), so "xl" and "XL" never
+    // end up as two sizes. Also used for the size range ("L-XXL" -> "L-2XL").
+    // SKUs are left as typed - printed labels must keep scanning.
+    function normSize(v) {
+        return String(v ?? '').trim().replace(/\s+/g, ' ').toUpperCase()
+            .replace(/\bXXXL\b/g, '3XL').replace(/\bXXL\b/g, '2XL');
+    }
+
     // Reads an amount typed by hand: "4.5" and "4,5" both mean 4.5 (the money
     // inputs are type="text", so the browser's locale never rewrites them).
     // Where both separators appear the last one is the decimal ("1.234,50").
@@ -8597,7 +8606,7 @@
         [['base_barcode', 'new_base_barcode'], ['category', 'new_category'], ['size_range', 'new_size_range'],
          ['composition', 'new_composition'], ['description', 'new_description']].forEach(([key, elId]) => {
             const el = document.getElementById(elId);
-            const v = el.value.trim() || null;
+            const v = (key === 'size_range' ? normSize(el.value) : el.value.trim()) || null;
             if (key === 'base_barcode' && v && v === blockedBarcode) return; // already refused as taken — don't resend on every blur
             if (v !== (p[key] || null) && !skip(el)) out[key] = v;
         });
@@ -8855,13 +8864,14 @@
             block.querySelectorAll('.size-row-existing').forEach(r => {
                 if (r.querySelector('.sale-badge')) return;
                 const ctx = findVariantContext(parseInt(r.dataset.variantId));
-                if (ctx) savedSizes[String(ctx.size).trim().toLowerCase()] = ctx.size;
+                if (ctx) savedSizes[normSize(ctx.size).toLowerCase()] = ctx.size;
             });
             const seenNew = {};
             let sizedRows = 0;
             block.querySelectorAll('.size-row').forEach(row => {
                 const sizeEl = row.querySelector('.size-input');
-                let size = sizeEl.value.trim();
+                let size = normSize(sizeEl.value);
+                if (size && sizeEl.value !== size) sizeEl.value = size;
                 const priceEl = row.querySelector('.price-input');
                 const price = parseMoney(priceEl.value) || 0;
                 const cost = parseMoney(row.querySelector('.cost-input').value) || 0;
@@ -8949,7 +8959,7 @@
             id: editingProductId, name,
             base_barcode: document.getElementById('new_base_barcode').value.trim() || null,
             category: document.getElementById('new_category').value.trim() || null,
-            size_range: document.getElementById('new_size_range').value.trim() || null,
+            size_range: normSize(document.getElementById('new_size_range').value) || null,
             composition: document.getElementById('new_composition').value.trim() || null,
             description: document.getElementById('new_description').value.trim() || null,
             image_url: currentPhotoUrls[0] || null,
