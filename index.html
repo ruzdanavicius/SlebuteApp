@@ -12194,7 +12194,7 @@
         const totalCash = periodRows.reduce((a,r) => a + Number(r.cash_revenue), 0);
         const totalCard = periodRows.reduce((a,r) => a + Number(r.card_revenue), 0);
         const totalSplit = periodRows.reduce((a,r) => a + Number(r.split_revenue), 0);
-        // split_cash/split_card only exist once migration 20261126190000 is live;
+        // split_cash/split_card only exist once migration 20261126175024 is live;
         // until then cash/card exclude mixed sales and the tile stays a plain lump.
         const hasSplitParts = periodRows.length > 0 && periodRows[0].split_cash !== undefined;
         const totalSplitCash = hasSplitParts ? periodRows.reduce((a,r) => a + Number(r.split_cash), 0) : undefined;
