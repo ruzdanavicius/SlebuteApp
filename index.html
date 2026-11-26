@@ -11938,6 +11938,20 @@
         loadDailySalesDay(next);
     }
 
+    /* SPEED: flipping dates used to wipe the screen to a spinner and wait for
+       the day's three queries AND a full loadInventory() (the whole catalogue,
+       paged, just to refresh the Likutis column). Now:
+       - each (store, day) result is cached; a seen day renders instantly and
+         is re-checked quietly in the background (re-rendered only if changed);
+       - the previous day is preloaded after each render, so ‹ is instant;
+       - the catalogue is awaited only if it was never loaded. This store's
+         stock is already kept live by the realtime inventory patch, so a full
+         reload runs in the background at most once a minute;
+       - a slow answer for a day the user already flipped past is dropped. */
+    const dailySalesDayCache = new Map(); // `${locId}|${date}` -> { summary, lines, returns, sig }
+    let dailySalesReqSeq = 0;
+    let dailySalesInvRefreshedAt = 0;
+
     async function loadDailySalesDay(dateStr, silent = false) {
         dailySalesCurrentDate = dateStr;
         const isToday = dateStr === todayDateStr();
@@ -11945,8 +11959,55 @@
         document.getElementById('dailySalesLiveDot').classList.toggle('hidden', !isToday);
 
         const wrap = document.getElementById('dailySalesWrap');
-        if (!silent) wrap.innerHTML = `<div class="empty-state"><i class="fas fa-spinner fa-spin"></i>${t('common.loading')}</div>`;
+        const locId = dailySalesLocationId();
+        const key = `${locId}|${dateStr}`;
+        const reqId = ++dailySalesReqSeq;
+        const cached = dailySalesDayCache.get(key);
+        if (cached) {
+            if (!silent) renderDailySalesContent(cached.summary, cached.lines, cached.returns);
+        } else if (!silent) {
+            wrap.innerHTML = `<div class="empty-state"><i class="fas fa-spinner fa-spin"></i>${t('common.loading')}</div>`;
+        }
 
+        let invP = null;
+        if (!products.length) { invP = loadInventory(); dailySalesInvRefreshedAt = Date.now(); }
+        else if (Date.now() - dailySalesInvRefreshedAt > 60000) {
+            dailySalesInvRefreshedAt = Date.now();
+            loadInventory().then(() => {
+                const c = dailySalesDayCache.get(key);
+                if (reqId === dailySalesReqSeq && c && document.getElementById('view-dailysales').classList.contains('active')) {
+                    renderDailySalesContent(c.summary, c.lines, c.returns);
+                }
+            });
+        }
+
+        const [fresh] = await Promise.all([fetchDailySalesDay(locId, dateStr), invP]);
+        if (reqId !== dailySalesReqSeq) return; // user already moved to another day/store
+        if (fresh.ok) {
+            const sig = JSON.stringify([fresh.summary, fresh.lines, fresh.returns]);
+            dailySalesDayCache.set(key, { ...fresh, sig });
+            if (dailySalesDayCache.size > 60) dailySalesDayCache.delete(dailySalesDayCache.keys().next().value);
+            // Flip to a cached day whose data didn't change: keep the screen (and any
+            // open popup). Silent callers (realtime, after a transfer) still re-render,
+            // as before, since they may come with fresh stock numbers.
+            if (cached && !silent && cached.sig === sig && !invP) return;
+        }
+        renderDailySalesContent(fresh.summary, fresh.lines, fresh.returns);
+        prefetchDailySalesDay(locId, dateStr, -1);
+    }
+
+    function prefetchDailySalesDay(locId, dateStr, delta) {
+        const d = new Date(dateStr + 'T00:00:00');
+        d.setDate(d.getDate() + delta);
+        const day = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+        const key = `${locId}|${day}`;
+        if (dailySalesDayCache.has(key)) return;
+        fetchDailySalesDay(locId, day).then(r => {
+            if (r.ok && !dailySalesDayCache.has(key)) dailySalesDayCache.set(key, { ...r, sig: JSON.stringify([r.summary, r.lines, r.returns]) });
+        });
+    }
+
+    async function fetchDailySalesDay(locId, dateStr) {
         // FIX (migration_27 + this): these must be real UTC instants, not
         // naive local-looking strings. `new Date(dateStr+'T00:00:00')` is
         // parsed in the BROWSER's local timezone (Europe/Vilnius on every
@@ -11965,8 +12026,7 @@
         // store server-side regardless of what location_id is passed.
         // v_daily_sales was already correctly RLS-scoped (security_invoker),
         // so it's untouched. See migration: security_lockdown_anon_access.
-        const locId = dailySalesLocationId();
-        const [{ data: summary }, { data: lines }, { data: returns }] = await Promise.all([
+        const [{ data: summary, error: e1 }, { data: lines, error: e2 }, { data: returns, error: e3 }] = await Promise.all([
             sb.from('v_daily_sales').select('*').eq('location_id', locId).eq('sale_date', dateStr).maybeSingle(),
             sb.rpc('rpc_get_sales_by_variant', { p_location_id: locId, p_date_from: dayStart, p_date_to: dayEnd })
                 .then(({ data, error }) => ({ data: error ? [] : (data || []).sort((a, b) => new Date(b.created_at) - new Date(a.created_at)), error })),
@@ -11974,11 +12034,10 @@
             // a return of last week's purchase shows up here today, unlike the
             // voided/refunded lines above (which stay pinned to the sale date).
             sb.rpc('rpc_get_returns_detail', { p_location_id: locId, p_date_from: dayStart, p_date_to: dayEnd })
-                .then(({ data, error }) => ({ data: error ? [] : (data || []), error })),
-            loadInventory() // keeps the stock-per-location column (below) accurate, since this view doesn't otherwise trigger a catalog refresh
+                .then(({ data, error }) => ({ data: error ? [] : (data || []), error }))
         ]);
-
-        renderDailySalesContent(summary, lines || [], returns || []);
+        // ok=false → shown as before (empty lists) but never cached, so the next visit retries.
+        return { ok: !e1 && !e2 && !e3, summary: summary || null, lines: lines || [], returns: returns || [] };
     }
 
     function returnReasonLabel(code) {
