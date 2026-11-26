@@ -11776,8 +11776,13 @@
     }
 
     function openStockPreview(anchor, productId, variantId) {
+        openHoverPopup(anchor, stockPreviewHTML(productId, variantId));
+    }
+
+    // Shared by the stock popup and the receipt popup (Suma cell) — same
+    // node, same anchoring, same close-on-click/scroll/Escape listeners.
+    function openHoverPopup(anchor, html) {
         const el = document.getElementById('stockHoverPreview');
-        const html = stockPreviewHTML(productId, variantId);
         if (!html) return;
         el.innerHTML = html;
         el.classList.add('open');
@@ -11813,6 +11818,55 @@
         if (stockPreviewAnchor === evt.currentTarget) { hideStockPreview(); return; }
         openStockPreview(evt.currentTarget, productId, variantId);
     }
+    /* DAILY SALES RECEIPT POPUP: hover (tap on tablet) over a line's Suma
+       shows that whole sale as a receipt. Built from dailySalesLinesCache —
+       every line of an order on this day is already loaded (they share one
+       created_at), so no extra query. Basket discount shown once, order-level. */
+    function receiptPreviewHTML(orderId, orderItemId) {
+        const items = dailySalesLinesCache.filter(l => l.order_id === orderId);
+        if (!items.length) return '';
+        const o = items[0];
+        const subtotal = round2(items.reduce((a, l) => a + Number(l.unit_price) * l.quantity, 0));
+        const linesTotal = items.reduce((a, l) => a + Number(l.total_price), 0);
+        const orderDisc = Number(o.order_discount_amount) || 0;
+        const grand = round2(linesTotal - orderDisc);
+        const discTotal = round2(subtotal - linesTotal); // line-level discounts; basket discount has its own row
+        const payKey = { CASH: 'cart.cash', CARD: 'cart.card', SPLIT: 'cart.split' }[o.payment_method];
+        const statusTag = o.status === 'VOIDED' ? t('orderdetail.status_voided') : (o.status === 'REFUNDED' ? t('orderdetail.status_refunded') : '');
+        const rows = items.map(l => {
+            const struck = l.status !== 'COMPLETED' || l.is_refunded ? ' text-decoration:line-through; opacity:0.6;' : '';
+            const here = l.order_item_id === orderItemId ? ' font-weight:700;' : '';
+            const lineDisc = Math.max(0, Number(l.unit_price) * l.quantity - Number(l.total_price));
+            return `<div class="receipt-line" style="${here}${struck}"><span>${l.quantity}x ${escapeHtml(l.product_name)} — ${escapeHtml(l.color_name)} / ${escapeHtml(l.size)}</span><span>${money(l.total_price)}</span></div>
+                    <div class="receipt-line" style="opacity:0.65; font-size:0.9em;${struck}"><span>${escapeHtml(l.base_barcode || l.sku || '')} · ${money(l.unit_price)}${lineDisc > 0.004 ? ` · -${money(lineDisc)}` : ''}</span><span></span></div>`;
+        }).join('');
+        return `<div class="receipt-paper">
+            <p class="center">${t('orderdetail.title_prefix')} ${escapeHtml(o.order_number || '')}</p>
+            <p class="center">${new Date(o.created_at).toLocaleString(currentLocale())}</p>
+            ${statusTag ? `<p class="center" style="font-weight:700; color:#b00;">${statusTag}</p>` : ''}
+            <hr>${rows}<hr>
+            <div class="receipt-line"><span>${t('cart.subtotal')}</span><span>${money(subtotal)}</span></div>
+            ${orderDisc > 0.004 ? `<div class="receipt-line"><span>${t('ds.order_disc_tag')}</span><span>-${money(orderDisc)}</span></div>` : ''}
+            ${discTotal > 0.004 ? `<div class="receipt-line"><span>${t('cart.discount')}</span><span>-${money(discTotal)}</span></div>` : ''}
+            <div class="receipt-line" style="font-weight:700; font-size:0.95rem;"><span>${t('receipt.total_label')}</span><span>${money(grand)}</span></div>
+            ${payKey ? `<p class="center" style="margin-top:6px;">${t(payKey)}</p>` : ''}
+        </div>`;
+    }
+
+    function showReceiptPreview(evt, orderId, orderItemId) {
+        if (!canHover()) return;
+        const anchor = evt.currentTarget;
+        clearTimeout(stockPreviewTimer);
+        stockPreviewTimer = setTimeout(() => openHoverPopup(anchor, receiptPreviewHTML(orderId, orderItemId)), 150);
+    }
+
+    function tapReceiptPreview(evt, orderId, orderItemId) {
+        if (canHover()) return;
+        evt.stopPropagation();
+        if (stockPreviewAnchor === evt.currentTarget) { hideStockPreview(); return; }
+        openHoverPopup(evt.currentTarget, receiptPreviewHTML(orderId, orderItemId));
+    }
+
     document.addEventListener('click', () => { if (stockPreviewAnchor) hideStockPreview(); });
     document.addEventListener('keydown', e => { if (e.key === 'Escape' && stockPreviewAnchor) hideStockPreview(); });
     window.addEventListener('scroll', () => { if (stockPreviewAnchor) hideStockPreview(); }, true);
@@ -12030,7 +12084,7 @@
                                 <td>${l.quantity}</td>
                                 <td>${money(l.unit_price)}</td>
                                 <td>${lineDiscount > 0.004 ? `-${money(lineDiscount)}` : '—'}</td>
-                                <td><b>${money(displayTotal)}</b></td>
+                                <td class="ds-hoverable" onmouseenter="showReceiptPreview(event, ${l.order_id}, ${l.order_item_id})" onmouseleave="hideStockPreview(100)" onclick="tapReceiptPreview(event, ${l.order_id}, ${l.order_item_id})"><b>${money(displayTotal)}</b></td>
                                 <td><div class="ds-stock-cell">
                                     ${(() => {
                                         const v = variantById.get(l.variant_id);
