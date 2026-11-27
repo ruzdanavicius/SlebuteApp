@@ -768,6 +768,22 @@
         .period-btn.active { background: var(--accent-color); color:white; }
         .period-custom { display:flex; align-items:center; gap:8px; }
         .period-custom .form-input { width: 150px; padding: 8px 10px; font-size:0.82rem; }
+        .pareto-slot { cursor: pointer; outline: none; }
+        .pareto-slot:hover .pareto-bar, .pareto-slot:focus .pareto-bar { opacity: 0.82; }
+        .pb { width: 340px; max-width: calc(100vw - 48px); font-size: 0.8rem; color: var(--text-primary); }
+        .pb-title { display: flex; justify-content: space-between; gap: 10px; font-weight: 700; font-size: 0.95rem; }
+        .pb-meta { color: var(--text-secondary); font-size: 0.74rem; margin-top: 2px; }
+        .pb-sizes { margin-top: 8px; padding: 6px 8px; background: var(--accent-tint); color: var(--accent-color); border-radius: 8px; font-size: 0.76rem; font-weight: 600; }
+        .pb-h { margin: 10px 0 4px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-secondary); }
+        .pb-row { padding: 5px 0; border-top: 1px solid var(--shadow-color); }
+        .pb-row:first-of-type { border-top: none; }
+        .pb-bc { display: flex; justify-content: space-between; gap: 8px; font-weight: 600; }
+        .pb-num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+        .pb-col { color: var(--text-secondary); font-size: 0.76rem; margin-top: 2px; display: flex; align-items: center; gap: 6px; }
+        .pb-sw { width: 10px; height: 10px; border-radius: 50%; flex: none; border: 1px solid rgba(0,0,0,0.25); display: inline-block; }
+        .pb-sw.none { border: 1px dashed var(--text-secondary); }
+        .pb-singles { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 12px; font-size: 0.74rem; }
+        .pb-singles > div { display: flex; align-items: center; gap: 5px; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .pareto-callout { background: var(--accent-tint); color: var(--accent-color); border-radius: 10px; padding: 10px 14px; font-size: 0.85rem; margin-bottom: 14px; font-weight: 600; }
         .live-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--success-color); margin-left: 4px; animation: livePulse 1.8s infinite; }
         @keyframes livePulse { 0% { box-shadow: 0 0 0 0 rgba(71,116,89,0.45);} 70% { box-shadow: 0 0 0 6px rgba(71,116,89,0);} 100% { box-shadow: 0 0 0 0 rgba(71,116,89,0);} }
@@ -2559,7 +2575,7 @@
             'dash.voided_refunded': 'voided/refunded', 'dash.store_comparison': 'Store Comparison', 'dash.summary': 'Summary',
             'dash.avg_basket': 'Avg. basket', 'dash.top5_pareto': 'Top 5 Items — Pareto', 'dash.no_sales_period': 'No sales in this period.',
             'dash.top5_prefix': 'Top 5 items =', 'dash.top5_mid': '% of total revenue this period (out of',
-            'dash.top5_suffix': 'items sold)', 'dash.trend': 'Trend', 'dash.units_sold': 'sold', 'dash.units_word': 'units',
+            'dash.top5_suffix': 'items sold)', 'dash.trend': 'Trend', 'dash.units_sold': 'sold', 'dash.units_word': 'units', 'dash.pb_barcodes': 'Barcodes', 'dash.pb_colors': 'Colours', 'dash.pb_share': 'of revenue', 'dash.pb_sizes': 'Sizes', 'dash.pb_main': 'Main barcodes (2+ sold)', 'dash.pb_singles': 'Sold 1 each',
             'dash.restock_title': 'Restock This Week', 'dash.restock_empty': "You're well stocked — nothing needs reordering right now.",
             'dash.restock_critical': 'Critical', 'dash.restock_watch': 'Watch', 'dash.restock_in_stock_prefix': 'In stock:',
             'dash.restock_threshold_prefix': 'min', 'dash.restock_days_left_suffix': 'days left at this pace',
@@ -2964,7 +2980,7 @@
             'dash.voided_refunded': 'anuliuota/grąžinta', 'dash.store_comparison': 'Parduotuvių palyginimas', 'dash.summary': 'Suvestinė',
             'dash.avg_basket': 'Vid. krepšelis', 'dash.top5_pareto': '5 geriausios prekės — Pareto', 'dash.no_sales_period': 'Šiuo laikotarpiu pardavimų nebuvo.',
             'dash.top5_prefix': '5 geriausios prekės sudaro', 'dash.top5_mid': '% viso šio laikotarpio pajamų (iš',
-            'dash.top5_suffix': 'parduotų prekių)', 'dash.trend': 'Tendencija', 'dash.units_sold': 'parduota', 'dash.units_word': 'vnt.',
+            'dash.top5_suffix': 'parduotų prekių)', 'dash.trend': 'Tendencija', 'dash.units_sold': 'parduota', 'dash.units_word': 'vnt.', 'dash.pb_barcodes': 'Barkodai', 'dash.pb_colors': 'Spalvos', 'dash.pb_share': 'pajamų', 'dash.pb_sizes': 'Dydžiai', 'dash.pb_main': 'Pagrindiniai barkodai (2+ vnt.)', 'dash.pb_singles': 'Po 1 vnt.',
             'dash.restock_title': 'Ką verta papildyti', 'dash.restock_empty': 'Atsargų pakanka — šiuo metu nieko papildyti nereikia.',
             'dash.restock_critical': 'Kritiška', 'dash.restock_watch': 'Stebėti', 'dash.restock_in_stock_prefix': 'Yra:',
             'dash.restock_threshold_prefix': 'min', 'dash.restock_days_left_suffix': 'd. liks tokiu tempu',
@@ -13127,7 +13143,8 @@
             if (l.status !== 'COMPLETED' || l.is_refunded) continue;
             const rev = Number(l.total_price);
             totalRevenueAllItems += rev;
-            if (!byProduct[l.product_name]) byProduct[l.product_name] = { name: l.product_name, units: 0, revenue: 0 };
+            if (!byProduct[l.product_name]) byProduct[l.product_name] = { name: l.product_name, units: 0, revenue: 0, lines: [] };
+            byProduct[l.product_name].lines.push(l);
             byProduct[l.product_name].units += l.quantity;
             byProduct[l.product_name].revenue += rev;
         }
@@ -13195,7 +13212,12 @@
             const y = barsBottom - h;
             const shortName = it.name.length > 16 ? it.name.slice(0,15) + '…' : it.name;
 
-            bars += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" fill="var(--accent-color)" rx="4"><title>${escapeHtml(it.name)}: ${money(it.revenue)} (${it.units} ${t('dash.units_word')})</title></rect>`;
+            // Whole column (bar + labels + gap) is one hit target — a short
+            // bar alone can be a few px tall, too small to tap on the tablet.
+            // Hover/tap opens the barcode/colour/size breakdown (paretoBreakdownHTML).
+            bars += `<g class="pareto-slot" tabindex="0" role="button" onmouseenter="showParetoBreakdown(event, ${i})" onmouseleave="hideStockPreview(100)" onclick="tapParetoBreakdown(event, ${i})" onfocus="openHoverPopup(this, paretoBreakdownHTML(${i}))" onblur="hideStockPreview()">`;
+            bars += `<rect x="${(cx - slotW/2).toFixed(1)}" y="${barsTop}" width="${slotW.toFixed(1)}" height="${H - barsTop}" fill="transparent"/>`;
+            bars += `<rect class="pareto-bar" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" fill="var(--accent-color)" rx="4"/>`;
             // Value label: inside the bar (white, near the top) when there's
             // room for it; only floats above the bar as a fallback for very
             // short bars — and even then it's still well clear of barsTop.
@@ -13205,7 +13227,7 @@
                 bars += `<text x="${cx.toFixed(1)}" y="${(y-6).toFixed(1)}" font-size="10" font-weight="700" fill="currentColor" text-anchor="middle">${money(it.revenue)}</text>`;
             }
             bars += `<text x="${cx.toFixed(1)}" y="${H-padBottom+16}" font-size="9.5" fill="currentColor" opacity="0.7" text-anchor="middle">${escapeHtml(shortName)}</text>`;
-            bars += `<text x="${cx.toFixed(1)}" y="${H-padBottom+28}" font-size="9" fill="currentColor" opacity="0.5" text-anchor="middle">${it.units} ${t('dash.units_sold')}</text>`;
+            bars += `<text x="${cx.toFixed(1)}" y="${H-padBottom+28}" font-size="9" fill="currentColor" opacity="0.5" text-anchor="middle">${it.units} ${t('dash.units_sold')}</text></g>`;
 
             const cy = cumBandBottom - (cumBandBottom - cumBandTop) * (cumPct / 100);
             points.push({ x: cx, y: cy, pct: cumPct });
@@ -13217,6 +13239,73 @@
         holder.innerHTML = `<svg class="trend-chart" viewBox="0 0 ${W} ${H}" style="color:var(--text-primary); height:230px;">
             ${bars}<path d="${linePath}" fill="none" stroke="var(--gold)" stroke-width="2"/>${dots}
         </svg>`;
+    }
+
+    /* PARETO BREAKDOWN POPUP: hover (tap on tablet) a Top-5 column to see
+       what's inside it. Bars group by product_name, which is a generic word
+       ("Megztinis" = many styles), so the popup splits it by base barcode.
+       Agreed with UX + merchandising review (2026-11-27):
+       - ranked by units (reorders are bought in units), revenue tiebreak
+       - barcodes with 2+ units get full rows (colour swatch + sizes);
+         1-unit barcodes collapse into a compact list: still all visible,
+         but read as "no winner" rather than as signal
+       - one aggregated size strip for the whole bar; no store split. */
+    function paretoBreakdownHTML(i) {
+        const c = _dashParetoCache;
+        const it = c && c.top5[i];
+        if (!it || !it.lines) return '';
+        const byBc = new Map(), sizeTot = new Map(), colorSet = new Set();
+        for (const l of it.lines) {
+            const bc = l.base_barcode || l.sku || '—';
+            let b = byBc.get(bc);
+            if (!b) { b = { bc, units: 0, revenue: 0, colors: new Map() }; byBc.set(bc, b); }
+            b.units += l.quantity; b.revenue += Number(l.total_price);
+            const cn = l.color_name || '—';
+            let col = b.colors.get(cn);
+            if (!col) { col = { name: cn, hex: l.color_hex, units: 0, sizes: new Map() }; b.colors.set(cn, col); }
+            col.units += l.quantity;
+            const sz = l.size || '—';
+            col.sizes.set(sz, (col.sizes.get(sz) || 0) + l.quantity);
+            sizeTot.set(sz, (sizeTot.get(sz) || 0) + l.quantity);
+            colorSet.add(cn);
+        }
+        const swatch = hex => /^#[0-9a-f]{3,8}$/i.test(hex || '') ? `<span class="pb-sw" style="background:${hex}"></span>` : '<span class="pb-sw none"></span>';
+        const sizeList = (m, sep) => [...m.entries()].sort((a, b) => compareSizes(a[0], b[0])).map(([s, q]) => `${escapeHtml(s)}${q > 1 ? '×' + q : ''}`).join(sep);
+        const rows = [...byBc.values()].sort((a, b) => b.units - a.units || b.revenue - a.revenue || a.bc.localeCompare(b.bc));
+        let main = rows.filter(r => r.units >= 2), singles = rows.filter(r => r.units < 2);
+        const anyRepeat = main.length > 0;
+        if (!anyRepeat) { main = singles; singles = []; } // nothing repeated — show them all as full rows
+        const share = c.totalRevenueAllItems > 0 ? (it.revenue / c.totalRevenueAllItems) * 100 : 0;
+        const mainHtml = main.map(r => `<div class="pb-row">
+                <div class="pb-bc"><span>${escapeHtml(r.bc)}</span><span class="pb-num">${r.units} ${t('dash.units_word')} · ${money(r.revenue)}</span></div>
+                ${[...r.colors.values()].sort((a, b) => b.units - a.units).map(col => `<div class="pb-col">${swatch(col.hex)}<span>${escapeHtml(col.name)}</span><span class="pb-num">${sizeList(col.sizes, ' · ')}</span></div>`).join('')}
+            </div>`).join('');
+        const singlesHtml = singles.map(r => {
+            const col = [...r.colors.values()][0];
+            const sz = [...col.sizes.keys()][0];
+            return `<div title="${escapeHtml(r.bc)} · ${escapeHtml(col.name)} · ${escapeHtml(sz)} · ${money(r.revenue)}">${swatch(col.hex)}<b>${escapeHtml(r.bc)}</b><span>${escapeHtml(sz)}</span></div>`;
+        }).join('');
+        return `<div class="pb">
+            <div class="pb-title"><span>${escapeHtml(it.name)}</span><span class="pb-num">${it.units} ${t('dash.units_word')} · ${money(it.revenue)}</span></div>
+            <div class="pb-meta">${t('dash.pb_barcodes')}: ${rows.length} · ${t('dash.pb_colors')}: ${colorSet.size} · ${share.toFixed(0)}% ${t('dash.pb_share')}</div>
+            <div class="pb-sizes">${t('dash.pb_sizes')}: ${sizeList(sizeTot, ' · ')}</div>
+            <div class="pb-h">${anyRepeat ? t('dash.pb_main') : t('dash.pb_barcodes')}</div>${mainHtml}
+            ${singles.length ? `<div class="pb-h">${t('dash.pb_singles')} (${singles.length})</div><div class="pb-singles">${singlesHtml}</div>` : ''}
+        </div>`;
+    }
+
+    function showParetoBreakdown(evt, i) {
+        if (!canHover()) return;
+        const anchor = evt.currentTarget;
+        clearTimeout(stockPreviewTimer);
+        stockPreviewTimer = setTimeout(() => openHoverPopup(anchor, paretoBreakdownHTML(i)), 150);
+    }
+
+    function tapParetoBreakdown(evt, i) {
+        if (canHover()) return;
+        evt.stopPropagation();
+        if (stockPreviewAnchor === evt.currentTarget) { hideStockPreview(); return; }
+        openHoverPopup(evt.currentTarget, paretoBreakdownHTML(i));
     }
 
     // Builds trend-chart buckets at a granularity that fits the selected
