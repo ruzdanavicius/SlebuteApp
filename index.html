@@ -939,6 +939,21 @@
         .receipt-paper hr { border: none; border-top: 1px dashed #999; margin: 8px 0; }
         .receipt-line { display:flex; justify-content:space-between; gap: 8px; }
         .receipt-qr { display:flex; justify-content:center; margin: 10px 0; }
+        /* Branded receipt (brandedReceiptHTML) — printed, Daily Sales hover, order view */
+        .receipt-paper .rc-logo { height: 56px; display: block; margin: 0 auto 4px; }
+        .receipt-paper.paper-58 .rc-logo { height: 44px; }
+        .receipt-paper .rc-brand { font-family: 'Fraunces', serif; font-size: 1.5rem; letter-spacing: -0.5px; line-height: 1.1; text-align: center; }
+        .receipt-paper .rc-tag { text-align: center; font-size: 0.68rem; letter-spacing: 0.18em; text-transform: uppercase; color: #666; margin-top: 2px; }
+        .receipt-paper .rc-muted { color: #666; }
+        .receipt-paper .rc-item { padding: 4px 0; }
+        .receipt-paper .rc-item.rc-here { background: #f3efe6; margin: 0 -8px; padding: 4px 8px; border-left: 2px solid #111; }
+        .receipt-paper .rc-item.rc-struck { text-decoration: line-through; opacity: 0.6; }
+        .receipt-paper .rc-total { display: flex; justify-content: space-between; align-items: baseline; font-size: 1.15rem; font-weight: 700; padding: 4px 0; margin: 6px 0; border-top: 1.5px solid #111; border-bottom: 1.5px solid #111; }
+        .receipt-paper .rc-stamp { display: inline-block; border: 1px solid #111; padding: 1px 6px; font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; }
+        .receipt-paper .rc-qr { margin: 8px 0 4px; }
+        .receipt-paper .rc-qr img { display: block; margin: 0 auto; }
+        .receipt-paper .rc-thanks { font-family: 'Fraunces', serif; font-size: 0.95rem; text-align: center; }
+        .stock-hover-preview .receipt-paper { padding: 16px; }
         @media print {
             @page { margin: 0; }
             body * { visibility: hidden; }
@@ -2615,6 +2630,7 @@
             'receipt.cashier': 'Cashier:', 'receipt.vat_incl': 'VAT (incl.)', 'receipt.total_label': 'TOTAL', 'receipt.change': 'Change',
             'receipt.receipt_label': 'Receipt:', 'receipt.thank_you': 'Thank you for shopping with us!',
             'receipt.final_sale_note': 'Final sale — no returns or exchanges',
+            'receipt.tagline': 'Women\'s clothing', 'receipt.copy': 'Receipt copy', 'receipt.scan_hint': 'Scan for returns or exchanges', 'receipt.net_label': 'Excl. VAT', 'receipt.items_count': 'Items', 'receipt.pcs': 'pcs', 'receipt.cash_given': 'Cash given', 'receipt.basket_disc': 'Basket discount',
             'toast.load_catalog_failed': 'Failed to load catalog:', 'toast.no_stock_item': 'No more stock available for this item.',
             'toast.added_item_prefix': 'Added', 'toast.no_stock': 'No more stock available.', 'toast.unexpected_error': 'Unexpected error:',
             'toast.client_name_required': 'Client name is required for a reservation.', 'toast.request_sent_prefix': 'Request',
@@ -3020,6 +3036,7 @@
             'receipt.cashier': 'Kasininkas:', 'receipt.vat_incl': 'PVM (įskaič.)', 'receipt.total_label': 'VISO', 'receipt.change': 'Grąža',
             'receipt.receipt_label': 'Kvitas:', 'receipt.thank_you': 'Ačiū, kad apsipirkote pas mus!',
             'receipt.final_sale_note': 'Galutinis pardavimas — negrąžinama ir nekeičiama',
+            'receipt.tagline': 'Moterų drabužiai', 'receipt.copy': 'Kvito kopija', 'receipt.scan_hint': 'Nuskenuokite grąžinant ar keičiant', 'receipt.net_label': 'Be PVM', 'receipt.items_count': 'Prekių', 'receipt.pcs': 'vnt.', 'receipt.cash_given': 'Gauta grynųjų', 'receipt.basket_disc': 'Krepšelio nuolaida',
             'toast.load_catalog_failed': 'Nepavyko įkelti katalogo:', 'toast.no_stock_item': 'Šios prekės daugiau nėra sandėlyje.',
             'toast.added_item_prefix': 'Pridėta', 'toast.no_stock': 'Daugiau nėra sandėlyje.', 'toast.unexpected_error': 'Netikėta klaida:',
             'toast.client_name_required': 'Rezervacijai būtinas kliento vardas.', 'toast.request_sent_prefix': 'Užsakymas',
@@ -3782,7 +3799,7 @@
     }
 
     async function loadStores() {
-        const { data, error } = await sb.from('stores').select('id, code, name, is_virtual').order('id');
+        const { data, error } = await sb.from('stores').select('id, code, name, is_virtual, address').order('id');
         if (!error && data) {
             STORES = data.filter(s => !s.is_virtual);
             INCOMING_STORE_ID = (data.find(s => s.is_virtual) || {}).id || null;
@@ -5875,7 +5892,8 @@
                 return;
             }
 
-            showReceipt(data, cart.slice());
+            // The RPC doesn't echo the payment back; the receipt shows what was sent.
+            showReceipt(Object.assign({ payment_method: saveMethod, cash_tendered: cashTendered }, data), cart.slice());
             cart = [];
             discountOverridePin = null;
             await loadInventory();
@@ -6014,7 +6032,9 @@
             subtotal: d.subtotal,
             tax_total: round2(d.vatEstimate),
             grand_total: d.total,
-            change_due: changeDue
+            change_due: changeDue,
+            payment_method: record.payload.p_payment_method,
+            cash_tendered: record.payload.p_cash_tendered
         };
         showReceipt(syntheticResult, record.displayItems);
 
@@ -11177,29 +11197,29 @@
         const { data, error } = await sb.rpc('rpc_lookup_order_for_refund', { p_order_number: orderNumber });
         if (error) { toast(`${t('orderdetail.not_found_prefix')} "${escapeHtml(orderNumber)}"`, 'error'); return; }
 
-        const lines = (data.items || []).map(it => {
-            const lineDiscount = Math.max(0, Number(it.unit_price) * it.quantity - Number(it.total_price));
-            return `<div class="receipt-line"><span>${it.quantity}x ${escapeHtml(it.product_name)} — ${escapeHtml(it.color_name)} / ${escapeHtml(it.size)}</span><span>${money(it.total_price)}</span></div>
-                    <div class="receipt-line" style="opacity:0.65; font-size:0.9em;"><span>${escapeHtml(it.sku)} · ${money(it.unit_price)}${lineDiscount > 0.004 ? ` · -${money(lineDiscount)}` : ''}</span><span></span></div>`;
-        }).join('');
-
-        const dateStr = new Date(data.created_at).toLocaleString(currentLocale());
         const discountTotal = Math.max(0, Number(data.subtotal) - Number(data.grand_total));
-        const statusTag = data.status === 'VOIDED' ? t('orderdetail.status_voided') : (data.status === 'REFUNDED' ? t('orderdetail.status_refunded') : '');
 
-        document.getElementById('orderDetailPaper').innerHTML = `
-            <p class="center">${t('orderdetail.title_prefix')} ${escapeHtml(data.order_number)}</p>
-            <p class="center">${dateStr}</p>
-            ${statusTag ? `<p class="center" style="font-weight:700; color:#b00;">${statusTag}</p>` : ''}
-            <hr>
-            ${lines}
-            <hr>
-            <div class="receipt-line"><span>${t('cart.subtotal')}</span><span>${money(data.subtotal)}</span></div>
-            ${discountTotal > 0.004 ? `<div class="receipt-line"><span>${t('cart.discount')}</span><span>-${money(discountTotal)}</span></div>` : ''}
-            <div class="receipt-line" style="font-weight:700; font-size:0.95rem;"><span>${t('receipt.total_label')}</span><span>${money(data.grand_total)}</span></div>
-            <hr>
-            <p class="center">${(t('cart.' + String(data.payment_method).toLowerCase()) || data.payment_method)}</p>
-        `;
+        document.getElementById('orderDetailPaper').innerHTML = brandedReceiptHTML({
+            store: STORES.find(s => s.id === data.location_id),
+            orderNumber: data.order_number,
+            createdAt: data.created_at,
+            copy: true,
+            status: data.status,
+            items: (data.items || []).map(it => ({
+                name: it.product_name, color: it.color_name, size: it.size, qty: it.quantity,
+                unit: Number(it.unit_price), total: Number(it.total_price), code: it.sku || '',
+                finalSale: !!it.is_clearance
+            })),
+            // orders.subtotal is already after line discounts (rpc_process_pos_sale),
+            // so what's left between it and the total is the basket discount.
+            subtotal: Number(data.subtotal), lineDisc: 0, orderDisc: discountTotal,
+            total: Number(data.grand_total),
+            vat: data.tax_total != null ? Number(data.tax_total) : null,
+            paymentMethod: data.payment_method,
+            cashGiven: Number(data.cash_tendered) || 0,
+            change: Number(data.change_due) || 0,
+            qrCell: 3
+        });
 
         const refundBtn = document.getElementById('orderDetailRefundBtn');
         if (data.status === 'COMPLETED') {
@@ -11831,26 +11851,95 @@
         const orderDisc = Number(o.order_discount_amount) || 0;
         const grand = round2(linesTotal - orderDisc);
         const discTotal = round2(subtotal - linesTotal); // line-level discounts; basket discount has its own row
-        const payKey = { CASH: 'cart.cash', CARD: 'cart.card', SPLIT: 'cart.split' }[o.payment_method];
-        const statusTag = o.status === 'VOIDED' ? t('orderdetail.status_voided') : (o.status === 'REFUNDED' ? t('orderdetail.status_refunded') : '');
-        const rows = items.map(l => {
-            const struck = l.status !== 'COMPLETED' || l.is_refunded ? ' text-decoration:line-through; opacity:0.6;' : '';
-            const here = l.order_item_id === orderItemId ? ' font-weight:700;' : '';
-            const lineDisc = Math.max(0, Number(l.unit_price) * l.quantity - Number(l.total_price));
-            return `<div class="receipt-line" style="${here}${struck}"><span>${l.quantity}x ${escapeHtml(l.product_name)} — ${escapeHtml(l.color_name)} / ${escapeHtml(l.size)}</span><span>${money(l.total_price)}</span></div>
-                    <div class="receipt-line" style="opacity:0.65; font-size:0.9em;${struck}"><span>${escapeHtml(l.base_barcode || l.sku || '')} · ${money(l.unit_price)}${lineDisc > 0.004 ? ` · -${money(lineDisc)}` : ''}</span><span></span></div>`;
+        // The sales view carries no tax column; every variant is 21% VAT
+        // (product_variants.vat_rate, checked 2026-11-27), VAT included in price.
+        const vat = round2(grand * 21 / 121);
+        return `<div class="receipt-paper">${brandedReceiptHTML({
+            store: STORES.find(s => s.id === o.location_id),
+            orderNumber: o.order_number || '',
+            createdAt: o.created_at,
+            copy: true,
+            status: o.status,
+            items: items.map(l => ({
+                name: l.product_name, color: l.color_name, size: l.size, qty: l.quantity,
+                unit: Number(l.unit_price), total: Number(l.total_price), code: l.base_barcode || l.sku || '',
+                struck: l.status !== 'COMPLETED' || l.is_refunded, here: l.order_item_id === orderItemId
+            })),
+            subtotal, lineDisc: discTotal, orderDisc, total: grand, vat,
+            paymentMethod: o.payment_method,
+            qrCell: 3
+        })}</div>`;
+    }
+
+    /* BRANDED RECEIPT — one layout shared by the printed receipt
+       (showReceipt), the Daily Sales hover (receiptPreviewHTML) and the order
+       view (viewOrderReceipt). Shows only what the caller actually has: no
+       cashier where the sales data has no name, no card digits (not stored).
+       The QR encodes the order number, which the Returns scan already reads.
+       Website/Facebook come from BRAND_WEBSITE / BRAND_SHOP_LINK (label config). */
+    function receiptQrImg(text, cell) {
+        try {
+            const q = window.SlebuteQrGen(0, 'M');
+            q.addData(String(text));
+            q.make();
+            return q.createImgTag(cell || 3, 0, 'QR');
+        } catch (e) { return ''; } // receipt still works without a QR
+    }
+
+    function brandedReceiptHTML(r) {
+        const store = r.store || {};
+        const when = r.createdAt ? new Date(r.createdAt) : new Date();
+        const loc = currentLocale();
+        const statusTag = r.status === 'VOIDED' ? t('orderdetail.status_voided') : (r.status === 'REFUNDED' ? t('orderdetail.status_refunded') : '');
+        const payKey = { CASH: 'cart.cash', CARD: 'cart.card', SPLIT: 'cart.split', GIFT_CARD: 'cart.gift_card' }[r.paymentMethod];
+        const count = r.items.filter(it => !it.struck).reduce((a, it) => a + it.qty, 0);
+        const rows = r.items.map(it => {
+            const cls = 'rc-item' + (it.here ? ' rc-here' : '') + (it.struck ? ' rc-struck' : '');
+            const meta = [it.color, it.size].filter(Boolean).map(escapeHtml).join(' · ');
+            const disc = round2(it.unit * it.qty - it.total);
+            return `<div class="${cls}">
+                <div class="receipt-line"><span>${escapeHtml(it.name)}${it.finalSale ? ' *' : ''}</span><span>${money(it.total)}</span></div>
+                <div class="rc-muted">${meta ? meta + ' · ' : ''}${it.qty} × ${money(it.unit)}</div>
+                ${disc > 0.004 ? `<div class="receipt-line rc-muted"><span>${t('cart.discount')}</span><span>-${money(disc)}</span></div>` : ''}
+                ${it.code ? `<div class="rc-muted">${escapeHtml(it.code)}</div>` : ''}
+            </div>`;
         }).join('');
-        return `<div class="receipt-paper">
-            <p class="center">${t('orderdetail.title_prefix')} ${escapeHtml(o.order_number || '')}</p>
-            <p class="center">${new Date(o.created_at).toLocaleString(currentLocale())}</p>
-            ${statusTag ? `<p class="center" style="font-weight:700; color:#b00;">${statusTag}</p>` : ''}
-            <hr>${rows}<hr>
-            <div class="receipt-line"><span>${t('cart.subtotal')}</span><span>${money(subtotal)}</span></div>
-            ${orderDisc > 0.004 ? `<div class="receipt-line"><span>${t('ds.order_disc_tag')}</span><span>-${money(orderDisc)}</span></div>` : ''}
-            ${discTotal > 0.004 ? `<div class="receipt-line"><span>${t('cart.discount')}</span><span>-${money(discTotal)}</span></div>` : ''}
-            <div class="receipt-line" style="font-weight:700; font-size:0.95rem;"><span>${t('receipt.total_label')}</span><span>${money(grand)}</span></div>
-            ${payKey ? `<p class="center" style="margin-top:6px;">${t(payKey)}</p>` : ''}
-        </div>`;
+        const qr = r.orderNumber ? receiptQrImg(r.orderNumber, r.qrCell) : '';
+        const fb = String(BRAND_SHOP_LINK || '').replace(/^www\./, '');
+        return `
+            <div class="center">
+                ${BRAND_LOGO_URL ? `<img class="rc-logo" src="${BRAND_LOGO_URL}" alt="Šlebutė">` : ''}
+                <div class="rc-brand">Šlebutė</div>
+                <div class="rc-tag">${t('receipt.tagline')}</div>
+                ${store.name ? `<div style="margin-top:8px;">${escapeHtml(store.name)}</div>` : ''}
+                ${store.address ? `<div class="rc-muted">${escapeHtml(store.address)}</div>` : ''}
+            </div>
+            <hr>
+            ${r.orderNumber ? `<div class="receipt-line"><span>${t('receipt.receipt_label')}</span><span>${escapeHtml(r.orderNumber)}</span></div>` : ''}
+            <div class="receipt-line rc-muted"><span>${when.toLocaleDateString(loc)}</span><span>${when.toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit' })}</span></div>
+            ${r.cashier ? `<div class="receipt-line rc-muted"><span>${t('receipt.cashier')}</span><span>${escapeHtml(r.cashier)}</span></div>` : ''}
+            ${r.copy ? `<div class="center" style="margin-top:8px;"><span class="rc-stamp">${t('receipt.copy')}</span></div>` : ''}
+            ${statusTag ? `<div class="center" style="margin-top:6px; font-weight:700; color:#b00;">${statusTag}</div>` : ''}
+            <hr>
+            ${rows}
+            <hr>
+            <div class="receipt-line"><span>${t('cart.subtotal')}</span><span>${money(r.subtotal)}</span></div>
+            ${r.lineDisc > 0.004 ? `<div class="receipt-line"><span>${t('cart.discount')}</span><span>-${money(r.lineDisc)}</span></div>` : ''}
+            ${r.orderDisc > 0.004 ? `<div class="receipt-line"><span>${t('receipt.basket_disc')}</span><span>-${money(r.orderDisc)}</span></div>` : ''}
+            <div class="rc-total"><span>${t('receipt.total_label')}</span><span>${money(r.total)}</span></div>
+            ${r.vat != null ? `<div class="receipt-line rc-muted"><span>${t('receipt.vat_incl')}</span><span>${money(r.vat)}</span></div>
+            <div class="receipt-line rc-muted"><span>${t('receipt.net_label')}</span><span>${money(round2(r.total - r.vat))}</span></div>` : ''}
+            <hr>
+            ${payKey ? `<div class="receipt-line"><span>${t(payKey)}</span><span>${money(r.total)}</span></div>` : ''}
+            ${r.cashGiven > 0.004 ? `<div class="receipt-line rc-muted"><span>${t('receipt.cash_given')}</span><span>${money(r.cashGiven)}</span></div>` : ''}
+            ${r.change > 0.004 ? `<div class="receipt-line"><span>${t('receipt.change')}</span><span>${money(r.change)}</span></div>` : ''}
+            <div class="receipt-line rc-muted"><span>${t('receipt.items_count')}</span><span>${count} ${t('receipt.pcs')}</span></div>
+            ${r.items.some(it => it.finalSale) ? `<div class="center" style="margin-top:6px; font-weight:700;">* ${t('receipt.final_sale_note')}</div>` : ''}
+            <hr>
+            ${qr ? `<div class="rc-qr">${qr}</div><div class="center rc-muted" style="font-size:0.9em;">${t('receipt.scan_hint')}</div><hr>` : ''}
+            <div class="rc-thanks">${t('receipt.thank_you')}</div>
+            ${fb ? `<div class="center rc-muted" style="margin-top:4px;">${escapeHtml(fb)}</div>` : ''}
+            <div class="center" style="font-weight:700;">${BRAND_WEBSITE}</div>`;
     }
 
     function showReceiptPreview(evt, orderId, orderItemId) {
@@ -14159,37 +14248,26 @@ ${qrBlock}${field(skuT.g, qrColX, skuT.y)}${field(colourT.g, qrColX, colourT.y)}
 
     function showReceipt(saleResult, soldItems) {
         const store = STORES.find(s => s.id === DEVICE_LOCATION_ID);
-        const now = new Date();
-        const lines = soldItems.map(i => {
-            const lineTotal = cartLineTotal(i);
-            return `<div class="receipt-line"><span>${i.qty}x ${escapeHtml(i.name)} (${i.size})${i.isClearance ? ' *' : ''}</span><span>${money(lineTotal)}</span></div>`;
-        }).join('');
-        const hasClearance = soldItems.some(i => i.isClearance);
         const paper = document.getElementById('receiptPaper');
-        paper.innerHTML = `
-            <h3>${escapeHtml(store?.name || '')}</h3>
-            <p class="center">${now.toLocaleString(currentLocale())}</p>
-            <p class="center">${t('receipt.cashier')} ${escapeHtml(PROFILE.full_name)}</p>
-            <hr>
-            ${lines}
-            ${hasClearance ? `<p class="center" style="font-weight:700;">* ${t('receipt.final_sale_note')}</p>` : ''}
-            <hr>
-            <div class="receipt-line"><span>${t('cart.subtotal')}</span><span>${money(saleResult.subtotal)}</span></div>
-            <div class="receipt-line"><span>${t('receipt.vat_incl')}</span><span>${money(saleResult.tax_total)}</span></div>
-            <div class="receipt-line" style="font-weight:700; font-size:0.95rem;"><span>${t('receipt.total_label')}</span><span>${money(saleResult.grand_total)}</span></div>
-            ${saleResult.change_due > 0 ? `<div class="receipt-line"><span>${t('receipt.change')}</span><span>${money(saleResult.change_due)}</span></div>` : ''}
-            <hr>
-            <p class="center">${t('receipt.receipt_label')} ${saleResult.order_number}</p>
-            <div class="receipt-qr" id="receiptQr"></div>
-            <p class="center">${t('receipt.thank_you')}</p>
-        `;
+        const subtotal = Number(saleResult.subtotal) || 0;
+        const total = Number(saleResult.grand_total) || 0;
+        paper.innerHTML = brandedReceiptHTML({
+            store,
+            orderNumber: saleResult.order_number,
+            cashier: PROFILE?.full_name,
+            items: soldItems.map(i => ({
+                name: i.name, color: i.colorName, size: i.size, qty: i.qty,
+                unit: Number(i.price), total: cartLineTotal(i), finalSale: !!i.isClearance
+            })),
+            subtotal, lineDisc: 0, orderDisc: round2(subtotal - total), total,
+            vat: saleResult.tax_total != null ? Number(saleResult.tax_total) : null,
+            paymentMethod: saleResult.payment_method,
+            cashGiven: Number(saleResult.cash_tendered) || 0,
+            change: Number(saleResult.change_due) || 0,
+            qrCell: 4
+        });
         document.getElementById('receiptModal').classList.add('active');
         setReceiptPaper(receiptPaperSize);
-        try {
-            const qrEl = document.getElementById('receiptQr');
-            qrEl.innerHTML = '';
-            new QRCode(qrEl, { text: saleResult.order_number, width: 100, height: 100, colorDark: '#000000', colorLight: '#ffffff' });
-        } catch(e) { /* QR lib may not have loaded yet — receipt still works without it */ }
     }
 
     /* ============================================================
