@@ -2630,7 +2630,7 @@
             'receipt.cashier': 'Cashier:', 'receipt.vat_incl': 'VAT (incl.)', 'receipt.total_label': 'TOTAL', 'receipt.change': 'Change',
             'receipt.receipt_label': 'Receipt:', 'receipt.thank_you': 'Thank you for shopping with us!',
             'receipt.final_sale_note': 'Final sale — no returns or exchanges',
-            'receipt.tagline': 'Women\'s clothing', 'receipt.copy': 'Receipt copy', 'receipt.scan_hint': 'Scan for returns or exchanges', 'receipt.net_label': 'Excl. VAT', 'receipt.items_count': 'Items', 'receipt.pcs': 'pcs', 'receipt.cash_given': 'Cash given', 'receipt.basket_disc': 'Basket discount',
+            'receipt.tagline': 'Women\'s clothing', 'receipt.copy': 'Receipt copy', 'receipt.scan_hint': 'Scan for returns or exchanges', 'receipt.net_label': 'Excl. VAT', 'receipt.items_count': 'Items', 'receipt.pcs': 'pcs', 'receipt.cash_given': 'Cash given', 'receipt.basket_disc': 'Basket discount', 'receipt.company_code': 'Co. code', 'receipt.vat_code': 'VAT',
             'toast.load_catalog_failed': 'Failed to load catalog:', 'toast.no_stock_item': 'No more stock available for this item.',
             'toast.added_item_prefix': 'Added', 'toast.no_stock': 'No more stock available.', 'toast.unexpected_error': 'Unexpected error:',
             'toast.client_name_required': 'Client name is required for a reservation.', 'toast.request_sent_prefix': 'Request',
@@ -3036,7 +3036,7 @@
             'receipt.cashier': 'Kasininkas:', 'receipt.vat_incl': 'PVM (įskaič.)', 'receipt.total_label': 'VISO', 'receipt.change': 'Grąža',
             'receipt.receipt_label': 'Kvitas:', 'receipt.thank_you': 'Ačiū, kad apsipirkote pas mus!',
             'receipt.final_sale_note': 'Galutinis pardavimas — negrąžinama ir nekeičiama',
-            'receipt.tagline': 'Moterų drabužiai', 'receipt.copy': 'Kvito kopija', 'receipt.scan_hint': 'Nuskenuokite grąžinant ar keičiant', 'receipt.net_label': 'Be PVM', 'receipt.items_count': 'Prekių', 'receipt.pcs': 'vnt.', 'receipt.cash_given': 'Gauta grynųjų', 'receipt.basket_disc': 'Krepšelio nuolaida',
+            'receipt.tagline': 'Moterų drabužiai', 'receipt.copy': 'Kvito kopija', 'receipt.scan_hint': 'Nuskenuokite grąžinant ar keičiant', 'receipt.net_label': 'Be PVM', 'receipt.items_count': 'Prekių', 'receipt.pcs': 'vnt.', 'receipt.cash_given': 'Gauta grynųjų', 'receipt.basket_disc': 'Krepšelio nuolaida', 'receipt.company_code': 'Įm. k.', 'receipt.vat_code': 'PVM k.',
             'toast.load_catalog_failed': 'Nepavyko įkelti katalogo:', 'toast.no_stock_item': 'Šios prekės daugiau nėra sandėlyje.',
             'toast.added_item_prefix': 'Pridėta', 'toast.no_stock': 'Daugiau nėra sandėlyje.', 'toast.unexpected_error': 'Netikėta klaida:',
             'toast.client_name_required': 'Rezervacijai būtinas kliento vardas.', 'toast.request_sent_prefix': 'Užsakymas',
@@ -3245,7 +3245,8 @@
     // register, set this to 0 to disable it instantly.
     const ZPL_QR_SIZE_BADGE_FRACTION = 0.30;
     const BRAND_SHOP_LINK = 'www.facebook.com/slebute';   // printed bottom-right on labels — update to your real page/site
-    const BRAND_WEBSITE = 'www.slebute.lt';               // printed bottom-centre on labels, after a small globe icon
+    const BRAND_COMPANY_CODE = '779872';     // įmonės kodas, printed on receipts (VAT no. = stores.tax_id)
+    const BRAND_WEBSITE = 'www.slebute.lt';             // printed bottom-centre on labels, after a small globe icon
     // Your logo, embedded directly so the app stays a single self-contained
     // file — no separate hosting/upload step needed. To change it later,
     // replace this data URI (or point it at a hosted image URL instead).
@@ -3799,7 +3800,7 @@
     }
 
     async function loadStores() {
-        const { data, error } = await sb.from('stores').select('id, code, name, is_virtual, address').order('id');
+        const { data, error } = await sb.from('stores').select('id, code, name, is_virtual, address, tax_id').order('id');
         if (!error && data) {
             STORES = data.filter(s => !s.is_virtual);
             INCOMING_STORE_ID = (data.find(s => s.is_virtual) || {}).id || null;
@@ -11913,6 +11914,8 @@
                 <div class="rc-tag">${t('receipt.tagline')}</div>
                 ${store.name ? `<div style="margin-top:8px;">${escapeHtml(store.name)}</div>` : ''}
                 ${store.address ? `<div class="rc-muted">${escapeHtml(store.address)}</div>` : ''}
+                ${BRAND_COMPANY_CODE ? `<div class="rc-muted">${t('receipt.company_code')} ${escapeHtml(BRAND_COMPANY_CODE)}</div>` : ''}
+                ${store.tax_id ? `<div class="rc-muted">${t('receipt.vat_code')} ${escapeHtml(store.tax_id)}</div>` : ''}
             </div>
             <hr>
             ${r.orderNumber ? `<div class="receipt-line"><span>${t('receipt.receipt_label')}</span><span>${escapeHtml(r.orderNumber)}</span></div>` : ''}
