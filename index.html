@@ -1783,6 +1783,7 @@
                     <button class="btn btn-ghost" style="flex:1;" onclick="closeScanTransferModal()" data-i18n="common.cancel">Cancel</button>
                     <button class="btn btn-primary" style="flex:1;" id="scanTransferConfirmBtn" disabled onclick="confirmScanTransfer()"><i class="fas fa-check"></i> <span data-i18n="scantransfer.confirm">Confirm</span></button>
                 </div>
+                <button class="btn btn-ghost hidden" style="width:100%; margin-top:12px; border:1px solid var(--warning-text); color:var(--warning-text);" id="receivePartialBtn" onclick="submitPartialReceive()"><i class="fas fa-box-open"></i> <span data-i18n="receive.partial_btn">Submit what was scanned (some items missing)</span></button>
                 <p class="muted" id="scanTransferManualHint" style="font-size:0.75rem; text-align:center; margin-top:12px; cursor:pointer; text-decoration:underline;" onclick="forceCompleteScan()" data-i18n="scantransfer.manual">Scanner not working? Confirm manually instead.</p>
             </div>
         </div>
@@ -2428,7 +2429,7 @@
             'reqmodal.transfer_title': 'Request Transfer', 'reqmodal.transfer_desc': 'Bring items to my current location.',
             'pickup.title': 'Complete Pickup', 'pickup.how_paid': 'How did the client pay?', 'pickup.confirm': 'Confirm & Complete',
             'scantransfer.out_title': 'Scan Out Items', 'scantransfer.in_title': 'Scan In Items',
-            'scantransfer.hint': "Scan each item's barcode to confirm.", 'scantransfer.confirm': 'Confirm',
+            'scantransfer.hint': "Scan each item's barcode to confirm.", 'receive.partial_btn': 'Submit what was scanned (some items missing)', 'receive.partial_confirm': 'Receive only the scanned items? Missing items stay on a separate open transfer (receive it when they arrive, or cancel it):', 'receive.partial_done': 'Received. Missing items moved to', 'receive.partial_none': 'Scan at least one item first.', 'scantransfer.confirm': 'Confirm',
             'scantransfer.manual': 'Scanner not working? Confirm manually instead.',
             'returns.title': 'Scan Returns', 'returns.hint_prefix': 'Scan each returned item — stock updates at',
             'returns.hint_suffix': 'once confirmed.', 'returns.scan_hint': 'Scan a receipt, type an order number, or scan an item to begin.',
@@ -2834,7 +2835,7 @@
             'reqmodal.transfer_title': 'Užsakyti perkėlimą', 'reqmodal.transfer_desc': 'Atvežti prekes į mano dabartinę vietą.',
             'pickup.title': 'Užbaigti atsiėmimą', 'pickup.how_paid': 'Kaip klientas atsiskaitė?', 'pickup.confirm': 'Patvirtinti ir užbaigti',
             'scantransfer.out_title': 'Nuskaityti išsiunčiamas prekes', 'scantransfer.in_title': 'Nuskaityti gaunamas prekes',
-            'scantransfer.hint': 'Nuskaitykite kiekvienos prekės brūkšninį kodą patvirtinimui.', 'scantransfer.confirm': 'Patvirtinti',
+            'scantransfer.hint': 'Nuskaitykite kiekvienos prekės brūkšninį kodą patvirtinimui.', 'receive.partial_btn': 'Pateikti nuskenuotas (dalies prekių nėra)', 'receive.partial_confirm': 'Priimti tik nuskenuotas prekes? Trūkstamos liks atskirame atvirame pervežime (priimkite, kai atvyks, arba atšaukite):', 'receive.partial_done': 'Priimta. Trūkstamos prekės perkeltos į', 'receive.partial_none': 'Pirmiausia nuskenuokite bent vieną prekę.', 'scantransfer.confirm': 'Patvirtinti',
             'scantransfer.manual': 'Skeneris neveikia? Patvirtinkite rankiniu būdu.',
             'returns.title': 'Nuskaityti grąžinimus', 'returns.hint_prefix': 'Nuskaitykite kiekvieną grąžinamą prekę — kiekis atnaujinamas',
             'returns.hint_suffix': 'patvirtinus.', 'returns.scan_hint': 'Nuskaitykite kvitą, įveskite užsakymo numerį arba nuskaitykite prekę, kad pradėtumėte.',
@@ -10337,6 +10338,7 @@
             scannedQty: 0
         }));
         receiveContext = null;
+        document.getElementById('receivePartialBtn').classList.add('hidden');
         scanTransferContext = {
             requestId, targetStatus: 'IN_TRANSIT',
             fromLabel: r.source.name, toLabel: r.target.name, requestNumber: r.request_number,
@@ -10479,6 +10481,10 @@
     function renderReceiveModal() {
         const ctx = receiveContext;
         if (!ctx) return;
+        // Partial submit: offered once something has been scanned but a
+        // transfer can't be finished because items are physically missing.
+        const partialBtn = document.getElementById('receivePartialBtn');
+        if (partialBtn) partialBtn.classList.toggle('hidden', !(ctx.items.some(it => it.scannedQty > 0) && ctx.items.some(it => it.scannedQty < it.requiredQty)));
         document.getElementById('scanTransferTitle').innerText = t('scantransfer.in_title');
         document.getElementById('scanTransferSubtitle').innerText = `${t('scantransfer.arriving_at')} ${ctx.targetName}`;
         if (!ctx.items.length) {
@@ -10572,6 +10578,46 @@
     function forgetReceiveProgress(requestId) {
         for (const k of Object.keys(receiveProgress)) if (k.startsWith(requestId + ':')) delete receiveProgress[k];
         saveReceiveProgress();
+    }
+
+    // Receives only the scanned units of each partly-scanned transfer
+    // (rpc_receive_transfer_partial). The server splits whatever was not
+    // scanned into a new open transfer, so missing items stay visible.
+    // Transfers with nothing scanned at all are left untouched.
+    async function submitPartialReceive() {
+        const ctx = receiveContext;
+        if (!ctx) return;
+        const byReq = new Map();
+        for (const it of ctx.items) {
+            if (!byReq.has(it.requestId)) byReq.set(it.requestId, []);
+            byReq.get(it.requestId).push(it);
+        }
+        const todo = [...byReq.entries()].filter(([, lines]) => lines.some(l => l.scannedQty > 0));
+        if (!todo.length) { toast(t('receive.partial_none'), 'warn'); return; }
+        const missing = todo.flatMap(([, lines]) => lines.filter(l => l.scannedQty < l.requiredQty)
+            .map(l => `• ${l.name} — ${l.colorName} / ${l.size}: ${l.requiredQty - l.scannedQty}`));
+        if (!confirm(t('receive.partial_confirm') + '\n\n' + missing.join('\n'))) return;
+        const btn = document.getElementById('receivePartialBtn');
+        btn.disabled = true;
+        try {
+            for (const [requestId, lines] of todo) {
+                const received = lines.filter(l => l.scannedQty > 0).map(l => ({ variant_id: l.variantId, quantity: l.scannedQty }));
+                const { data, error } = await sb.rpc('rpc_receive_transfer_partial', { p_request_id: requestId, p_received: received });
+                if (error) { toast(error.message, 'error'); continue; }
+                forgetReceiveProgress(requestId);
+                for (const l of lines) if (l.scannedQty > 0) checkReorderConflict(l.variantId, ctx.locationId, l.scannedQty);
+                toast(data && data.missing_request_number
+                    ? `${lines[0].requestNumber}: ${t('receive.partial_done')} ${data.missing_request_number}`
+                    : `${lines[0].requestNumber} ${t('scantransfer.request_completed_suffix')}`, 'success');
+            }
+        } finally { btn.disabled = false; }
+        await loadRequests();
+        await loadInventory();
+        const loc = receiveContext ? receiveContext.locationId : null;
+        closeScanTransferModal();
+        // Reopen on whatever is still arriving (incl. the split-off missing
+        // items) so the cashier sees what's left; silent if nothing is.
+        if (loc && requestsCache.some(r => r.status === 'IN_TRANSIT' && r.request_type === 'STORE_TRANSFER' && r.target.id === loc)) openReceiveStockModal(loc);
     }
 
     // Fires the moment a pooled request's own lines are all scanned --
